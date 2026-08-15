@@ -40,13 +40,18 @@ export function resolveSlots(state: SlotState, now: number): ResolvedSlots {
     return { slots: ECONOMY.PACK_SLOTS, chargeStartedAt: null, msUntilNext: 0, isFull: true }
   }
 
-  if (chargeStartedAt === null) {
-    // Not full but not charging — start the clock now. Happens on a fresh save
-    // and after a clock change moves time backwards.
+  // Not full but not charging — a fresh save. Start the clock now.
+  //
+  // A charge that starts in the future means the device clock moved backwards
+  // (timezone change, manual adjustment, a phone that lost its clock while
+  // flat). Restart the charge rather than counting from the stale timestamp,
+  // which would show a countdown longer than a full refill and grow with the
+  // size of the jump.
+  if (chargeStartedAt === null || chargeStartedAt > now) {
     chargeStartedAt = now
   }
 
-  const elapsed = Math.max(0, now - chargeStartedAt)
+  const elapsed = now - chargeStartedAt
   const completed = Math.floor(elapsed / ECONOMY.SLOT_REFILL_MS)
 
   if (completed > 0) {

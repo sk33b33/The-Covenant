@@ -124,7 +124,9 @@ export function Home() {
               block
               className="mt-3"
               disabled={slots.slots <= 0}
-              onClick={() => go({ name: 'pack-open', packId: packs[active]!.id })}
+              onClick={() =>
+                go({ name: 'pack-open', packId: packs[active]!.id, source: 'free' })
+              }
             >
               {slots.slots > 0
                 ? `Open ${packs[active]!.name}`

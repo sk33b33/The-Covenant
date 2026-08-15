@@ -16,7 +16,10 @@ export type Tab = 'home' | 'cards' | 'social' | 'battle' | 'menu'
 export type Route =
   | { name: 'enter' }
   | { name: 'tab'; tab: Tab }
-  | { name: 'pack-open'; packId: string }
+  /** `source` records how the pack is being paid for, so PackOpen charges the
+   *  right currency at the moment the wrapper is torn rather than on entry —
+   *  backing out of a sealed pack must cost nothing. */
+  | { name: 'pack-open'; packId: string; source: 'free' | 'talents' }
   | { name: 'shop' }
   | { name: 'missions' }
   | { name: 'profile' }

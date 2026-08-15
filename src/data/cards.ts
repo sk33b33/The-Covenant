@@ -1114,6 +1114,113 @@ const figures: FigureCard[] = [
     attacks: [{ name: 'The Valley', cost: ['shadow', null], damage: 50 }],
   },
 
+  /* ---------------------------------------------------------- the chase tiers */
+  /*
+   * Illustration, Sacred Art and Crown are the pull-rate ceiling. They exist as
+   * their own cards rather than alternate printings of commons, so the rarity
+   * ladder is populated at every tier — an empty tier makes a roll fall through
+   * to the one below it and quietly halves the chase rate.
+   */
+  {
+    id: 'the-garden-of-eden',
+    name: 'The Garden of Eden',
+    kind: 'figure',
+    set: 'genesis',
+    rarity: 'illustration',
+    type: 'light',
+    stage: 'basic',
+    hp: 120,
+    retreat: 3,
+    verse: 'Genesis 2:8',
+    flavor: 'And the Lord God planted a garden in Eden, in the east.',
+    attacks: [
+      {
+        name: 'Every Tree That Is Pleasant',
+        cost: ['light'],
+        damage: 20,
+        text: 'Heal 30 damage from each of your Figures.',
+        effect: 'heal-all-30',
+      },
+      { name: 'Walk in the Cool of the Day', cost: ['light', 'light', null], damage: 100 },
+    ],
+  },
+  {
+    id: 'the-ladder-to-heaven',
+    name: 'The Ladder to Heaven',
+    kind: 'figure',
+    set: 'genesis',
+    rarity: 'illustration',
+    type: 'spirit',
+    stage: 'basic',
+    hp: 110,
+    retreat: 2,
+    verse: 'Genesis 28:17',
+    flavor: 'This is none other than the house of God, and this is the gate of heaven.',
+    attacks: [
+      {
+        name: 'Set Up on the Earth',
+        cost: ['spirit'],
+        damage: 30,
+        text: 'Search your deck for any card and put it into your hand.',
+        effect: 'tutor-any',
+      },
+      { name: 'Top Reached to Heaven', cost: ['spirit', 'spirit', null], damage: 100 },
+    ],
+  },
+  {
+    id: 'the-covenant-rainbow',
+    name: 'The Covenant Rainbow',
+    kind: 'figure',
+    set: 'genesis',
+    rarity: 'illustration',
+    type: 'water',
+    stage: 'basic',
+    hp: 120,
+    retreat: 3,
+    verse: 'Genesis 9:16',
+    flavor: 'I will see it and remember the everlasting covenant.',
+    attacks: [
+      {
+        name: 'Sign in the Clouds',
+        cost: ['water'],
+        damage: 20,
+        text: 'This Figure cannot be knocked out next turn.',
+        effect: 'endure',
+      },
+      { name: 'Never Again a Flood', cost: ['water', 'water', null], damage: 100 },
+    ],
+  },
+  {
+    id: 'the-tree-of-life',
+    name: 'The Tree of Life',
+    kind: 'figure',
+    set: 'genesis',
+    rarity: 'crown',
+    anointed: true,
+    type: 'light',
+    stage: 'basic',
+    hp: 200,
+    retreat: 4,
+    verse: 'Genesis 3:22',
+    flavor: 'And take also of the tree of life, and eat, and live for ever.',
+    attacks: [
+      {
+        name: 'Leaves for the Healing',
+        cost: ['light', null],
+        damage: 40,
+        text: 'Heal all damage from one of your Benched Figures.',
+        effect: 'heal-bench-full',
+      },
+      {
+        name: 'Live For Ever',
+        cost: ['light', 'light', 'light'],
+        damage: 150,
+        text: 'Heal 50 damage from this Figure.',
+        effect: 'drain-50',
+      },
+    ],
+  },
+
   /* ------------------------------------------------------------- the chase card */
   {
     id: 'jesus-carrying-cross',

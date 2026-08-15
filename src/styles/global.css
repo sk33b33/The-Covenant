@@ -108,6 +108,37 @@
 }
 
 @layer components {
+  /*
+   * Dark full-screen surfaces — pack opening, the battle mat — that keep their
+   * own dark ground regardless of the app theme.
+   *
+   * The neumorphic shadow tokens carry an ivory highlight that assumes a light
+   * surface behind them. Over a near-black ground that highlight reads as a
+   * white halo around every button. Re-pointing the tokens for the subtree
+   * fixes it once, rather than every component needing a dark-surface variant.
+   */
+  .on-dark {
+    --surface: #241c11;
+    --surface-raised: #2e2416;
+    --bg-sunk: #14100a;
+    --ink: #efe4cf;
+    --ink-muted: #b3a488;
+    --ink-faint: #7d7059;
+    --gold-pale: #6a5334;
+    --shadow-raised:
+      5px 5px 12px rgba(0, 0, 0, 0.6),
+      -5px -5px 12px rgba(255, 226, 176, 0.05);
+    --shadow-raised-sm:
+      3px 3px 7px rgba(0, 0, 0, 0.55),
+      -3px -3px 7px rgba(255, 226, 176, 0.045);
+    --shadow-raised-lg:
+      10px 10px 24px rgba(0, 0, 0, 0.65),
+      -10px -10px 24px rgba(255, 226, 176, 0.055);
+    --shadow-pressed:
+      inset 4px 4px 9px rgba(0, 0, 0, 0.6),
+      inset -4px -4px 9px rgba(255, 226, 176, 0.045);
+  }
+
   /* The two structural surfaces every screen is built from. */
   .neu {
     background: var(--surface);

@@ -1,9 +1,11 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon, MenuIcon, ScrollIcon, ShopIcon, SocialIcon } from '@/art/icons'
+import { BattleIcon, MenuIcon, ScrollIcon, SocialIcon } from '@/art/icons'
 import { TabBar } from '@/components/TabBar'
 import { Collection } from '@/screens/Collection'
 import { Enter } from '@/screens/Enter'
+import { PackOpen } from '@/screens/PackOpen'
+import { Shop } from '@/screens/Shop'
 import { Home } from '@/screens/Home'
 import { Placeholder } from '@/screens/Placeholder'
 import { useNav, type Route } from '@/store/nav'
@@ -32,7 +34,8 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [back])
 
-  const showChrome = route.name !== 'enter' && route.name !== 'battle'
+  const showChrome =
+    route.name !== 'enter' && route.name !== 'battle' && route.name !== 'pack-open'
 
   return (
     <div className="h-full bg-bg text-ink">
@@ -107,24 +110,10 @@ function Screen({ route }: { route: Route }) {
       return null
 
     case 'pack-open':
-      return (
-        <Placeholder
-          withBack
-          icon={<ScrollIcon size={44} />}
-          title="Pack opening"
-          note="Swipe-to-tear, the five-card reveal and the rarity flare are built once the card frame exists."
-        />
-      )
+      return <PackOpen packId={route.packId} source={route.source} />
 
     case 'shop':
-      return (
-        <Placeholder
-          withBack
-          icon={<ShopIcon size={44} />}
-          title="Shop"
-          note="Spend Talents on packs here once the pack economy is wired up."
-        />
-      )
+      return <Shop />
 
     case 'missions':
       return (
