@@ -379,6 +379,18 @@
   opacity: var(--holo-opacity, 0.75);
 }
 
+/* ----------------------------------------------------------- in play */
+
+/*
+ * On the mat, remaining HP is what matters and it is drawn over the card by
+ * the board. Leaving the printed maximum underneath meant two numbers in the
+ * same corner, one partly covering the other, which read as a rendering fault.
+ * The collection still shows the printed value, where it is the useful one.
+ */
+.cov-card--in-play .cov-card__hp {
+  visibility: hidden;
+}
+
 /* ------------------------------------------------------------ compact */
 
 /* Below roughly 90 px a card cannot show its rules text legibly, so the

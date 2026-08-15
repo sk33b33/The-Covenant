@@ -32,12 +32,14 @@ interface Props {
   compact?: boolean
   /** Suppresses the sheen on chase rarities. */
   noHolo?: boolean
+  /** On the battle mat: hides the printed HP, which the board draws live. */
+  inPlay?: boolean
   className?: string
   /** Inline style hook, used by the detail view's tilt. */
   style?: React.CSSProperties
 }
 
-export function Card({ card, compact, noHolo, className, style }: Props) {
+export function Card({ card, compact, noHolo, inPlay, className, style }: Props) {
   const [artFailed, setArtFailed] = useState(false)
 
   const figure = isFigure(card) ? card : null
@@ -61,6 +63,7 @@ export function Card({ card, compact, noHolo, className, style }: Props) {
         anointed && 'cov-card--anointed',
         holo && 'cov-card--holo',
         compact && 'cov-card--compact',
+        inPlay && 'cov-card--in-play',
         className,
       )}
       style={style}

@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BattleIcon, MenuIcon, ScrollIcon, SocialIcon } from '@/art/icons'
 import { TabBar } from '@/components/TabBar'
+import { BattleHub } from '@/screens/BattleHub'
+import { BattleRoute } from '@/screens/BattleRoute'
 import { Collection } from '@/screens/Collection'
 import { Enter } from '@/screens/Enter'
 import { PackOpen } from '@/screens/PackOpen'
@@ -91,13 +93,7 @@ function Screen({ route }: { route: Route }) {
             />
           )
         case 'battle':
-          return (
-            <Placeholder
-              icon={<BattleIcon size={44} />}
-              title="Battle"
-              note="The rules engine is built and tested before any of it reaches the screen. Coin flip, Ascension and first-to-three land in milestone six."
-            />
-          )
+          return <BattleHub />
         case 'menu':
           return (
             <Placeholder
@@ -114,6 +110,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'shop':
       return <Shop />
+
+    case 'battle':
+      return <BattleRoute deckId={route.deckId} />
 
     case 'missions':
       return (
