@@ -104,6 +104,27 @@ export const ScrollIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** Trade: two cards passing in opposite directions. */
+export const TradeIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="2.8" y="4.2" width="7.6" height="10.4" rx="1.3" />
+    <rect x="13.6" y="9.4" width="7.6" height="10.4" rx="1.3" />
+    <path d="M13.2 6.6h5.2m0 0-2-2m2 2-2 2" />
+    <path d="M10.8 17.4H5.6m0 0 2 2m-2-2 2-2" />
+  </Icon>
+)
+
+/** Community: several figures around a common centre. */
+export const CommunityIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="3.1" />
+    <circle cx="12" cy="4.4" r="1.9" />
+    <circle cx="18.6" cy="16" r="1.9" />
+    <circle cx="5.4" cy="16" r="1.9" />
+    <path d="M12 6.3v2.6M14.7 13.6l2.3 1.1M9.3 13.6 7 14.7" />
+  </Icon>
+)
+
 export const SearchIcon = (p: IconProps) => (
   <Icon {...p}>
     <circle cx="10.8" cy="10.8" r="6.2" />

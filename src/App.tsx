@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon, MenuIcon, ScrollIcon, SocialIcon } from '@/art/icons'
+import { BattleIcon, MenuIcon } from '@/art/icons'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
 import { BattleRoute } from '@/screens/BattleRoute'
@@ -12,6 +12,9 @@ import { Shop } from '@/screens/Shop'
 import { StoryEncounter } from '@/screens/StoryEncounter'
 import { StoryMap } from '@/screens/StoryMap'
 import { Home } from '@/screens/Home'
+import { Missions } from '@/screens/Missions'
+import { Profile } from '@/screens/Profile'
+import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
 import { useNav, type Route } from '@/store/nav'
 import { useProfile } from '@/store/profile'
@@ -91,13 +94,7 @@ function Screen({ route }: { route: Route }) {
         case 'cards':
           return <Collection />
         case 'social':
-          return (
-            <Placeholder
-              icon={<SocialIcon size={44} />}
-              title="Social Hub"
-              note="Friends, trading and community showcases need other real players, so this ships as a visual shell later in the build."
-            />
-          )
+          return <Social />
         case 'battle':
           return <BattleHub />
         case 'menu':
@@ -124,24 +121,10 @@ function Screen({ route }: { route: Route }) {
       return <DeckBuilder deckId={route.deckId} />
 
     case 'missions':
-      return (
-        <Placeholder
-          withBack
-          icon={<ScrollIcon size={44} />}
-          title="Missions"
-          note="Daily and achievement missions that pay out Talents and Grace."
-        />
-      )
+      return <Missions />
 
     case 'profile':
-      return (
-        <Placeholder
-          withBack
-          icon={<SocialIcon size={44} />}
-          title="Profile"
-          note="Level, experience and your battle record."
-        />
-      )
+      return <Profile />
 
     case 'story-map':
       return <StoryMap />
