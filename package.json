@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "The Covenant — a biblical trading card game",
+  "description": "The Covenant \u2014 a biblical trading card game",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "art:prompts": "node --no-warnings=ExperimentalWarning --experimental-strip-types scripts/art-prompts.mjs",
+    "art:status": "node --no-warnings=ExperimentalWarning --experimental-strip-types scripts/art-prompts.mjs --status",
+    "art:import": "python3 scripts/import-card-art.py"
   },
   "dependencies": {
     "framer-motion": "^11.15.0",
