@@ -1,4 +1,7 @@
 import { motion } from 'framer-motion'
+import { STARTER_CARD_IDS } from '@/data/starter'
+import { useCollection } from '@/store/collection'
+import { useDecks } from '@/store/decks'
 import { useProfile } from '@/store/profile'
 import { useNav } from '@/store/nav'
 
@@ -11,10 +14,21 @@ import { useNav } from '@/store/nav'
  * of text and a tap target the size of the display.
  */
 export function Enter() {
+  const isNew = useProfile((s) => s.isNew)
   const markSeen = useProfile((s) => s.markSeen)
   const setTab = useNav((s) => s.setTab)
+  const addCards = useCollection((s) => s.add)
+  const ensureStarter = useDecks((s) => s.ensureStarter)
 
   const enter = () => {
+    // First entry hands over a playable deck. Landing on an empty binder, an
+    // empty deck list and an unusable Battle tab is three dead ends before the
+    // game has said anything.
+    if (isNew) {
+      addCards(STARTER_CARD_IDS)
+      ensureStarter()
+    }
+
     markSeen()
     setTab('home')
   }

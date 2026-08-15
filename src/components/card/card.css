@@ -1,0 +1,397 @@
+/*
+ * The card frame.
+ *
+ * Every dimension is expressed in `cqw` — percent of the card's own width —
+ * with the card declared as a size container. That is what lets one component
+ * serve a 64 px collection thumbnail, a 150 px card on the battle mat and a
+ * 320 px detail view with identical proportions and no size-specific rules.
+ * Using `rem` or `px` here would mean three sets of overrides and three ways to
+ * get the nameplate slightly wrong.
+ *
+ * The card is 63:88, the standard trading-card ratio, so 100cqw of width
+ * corresponds to 139.68cqw of height. Every offset below is measured against
+ * that.
+ */
+
+.cov-card {
+  container-type: inline-size;
+  position: relative;
+  aspect-ratio: 63 / 88;
+  width: 100%;
+  border-radius: 4.5cqw;
+  overflow: hidden;
+  isolation: isolate;
+  user-select: none;
+  background: #100b06;
+  box-shadow: var(--shadow-card);
+}
+
+/* ---------------------------------------------------------------- ground */
+
+.cov-card__ground {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(229, 192, 140, 0.16), transparent 55%),
+    linear-gradient(168deg, #2a2112 0%, #14100a 46%, #241b0e 100%);
+}
+
+/* Gold rules inset from the trimmed edge. */
+.cov-card__rule {
+  position: absolute;
+  inset: 1.6cqw;
+  border-radius: 3.2cqw;
+  border: 0.55cqw solid transparent;
+  background: var(--gold-leaf) border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.cov-card__rule--inner {
+  inset: 3.2cqw;
+  border-radius: 2.4cqw;
+  border-width: 0.22cqw;
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------- nameplate */
+
+.cov-card__nameplate {
+  position: absolute;
+  top: 3.6cqw;
+  left: 5cqw;
+  right: 5cqw;
+  height: 12cqw;
+  display: flex;
+  align-items: center;
+  gap: 1.6cqw;
+  padding: 0 3cqw;
+  border-radius: 2cqw;
+  /* Aged parchment, matching the supplied renders' name banner. */
+  background:
+    linear-gradient(178deg, rgba(255, 255, 255, 0.34), transparent 42%),
+    linear-gradient(160deg, #efd6a9 0%, #e0bd88 48%, #cba572 100%);
+  box-shadow:
+    inset 0 0 0 0.32cqw rgba(122, 90, 46, 0.55),
+    0 0.5cqw 1.4cqw rgba(0, 0, 0, 0.45);
+}
+
+.cov-card__stage {
+  font-family: var(--font-body);
+  font-size: 3.1cqw;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #7a5a2e;
+  white-space: nowrap;
+}
+
+.cov-card__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 6.4cqw;
+  font-weight: 700;
+  line-height: 1;
+  color: #2b2007;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Long names step down rather than truncating — a clipped name is unusable. */
+.cov-card__name--long {
+  font-size: 5.2cqw;
+}
+.cov-card__name--longer {
+  font-size: 4.3cqw;
+}
+
+.cov-card__hp {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5cqw;
+  font-family: var(--font-numeric);
+  font-weight: 700;
+  color: #7d2413;
+}
+
+.cov-card__hp-label {
+  font-size: 3.1cqw;
+  letter-spacing: 0.04em;
+}
+
+.cov-card__hp-value {
+  font-size: 7.4cqw;
+  line-height: 1;
+}
+
+/* --------------------------------------------------------------- artwork */
+
+.cov-card__art {
+  position: absolute;
+  top: 17.4cqw;
+  left: 5cqw;
+  width: 90cqw;
+  height: 62cqw;
+  overflow: hidden;
+  border-radius: 1.2cqw;
+  background: #0c0904;
+  box-shadow:
+    inset 0 0 0 0.42cqw rgba(176, 135, 81, 0.9),
+    inset 0 0 3cqw rgba(0, 0, 0, 0.6);
+}
+
+.cov-card__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* The supplied art is a 0.85 portrait shown in a 1.45 window, so the crop
+   * favours the upper body — every render places the subject's eyeline in the
+   * top third. */
+  object-position: 50% 18%;
+  display: block;
+}
+
+/* Placeholder for cards whose art has not been drawn yet. Typographic rather
+ * than a grey box, so an unfinished card still looks like a card. */
+.cov-card__placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.cov-card__placeholder-initial {
+  font-family: var(--font-display);
+  font-size: 34cqw;
+  font-weight: 700;
+  line-height: 1;
+  /* Bright enough that a card awaiting art still reads as a real, owned card.
+   * At lower opacity it was indistinguishable from an unowned silhouette. */
+  background: linear-gradient(158deg, #f4e0b8, #c49a5c 46%, #8d5f2a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0.6cqw 1.6cqw rgba(0, 0, 0, 0.55));
+}
+
+/* A faint ring behind the initial, so the window is not a plain void. */
+.cov-card__placeholder::before {
+  content: '';
+  position: absolute;
+  width: 46%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 0.5cqw solid rgba(229, 192, 140, 0.16);
+}
+
+/* -------------------------------------------------------------- type orb */
+
+.cov-card__orb {
+  position: absolute;
+  top: 70.6cqw;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 17cqw;
+  height: 17cqw;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #3a3020, #15100a 78%);
+  box-shadow:
+    0 0 0 0.55cqw rgba(176, 135, 81, 1),
+    0 0 0 0.95cqw rgba(20, 14, 8, 1),
+    0 0.8cqw 1.8cqw rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+/* ------------------------------------------------------------- text box */
+
+.cov-card__body {
+  position: absolute;
+  top: 82.5cqw;
+  left: 5cqw;
+  width: 90cqw;
+  height: 42cqw;
+  /* Top padding clears the type orb, which straddles the art/text seam as it
+   * does on the supplied renders. Without it a long first attack name runs
+   * underneath the orb. */
+  padding: 5.4cqw 3cqw 2.2cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.6cqw;
+  border-radius: 1.6cqw;
+  background:
+    linear-gradient(178deg, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(168deg, #eed6ac 0%, #ddb884 52%, #c9a06d 100%);
+  box-shadow: inset 0 0 0 0.32cqw rgba(122, 90, 46, 0.5);
+  overflow: hidden;
+}
+
+.cov-card__attack {
+  display: flex;
+  align-items: center;
+  gap: 2cqw;
+}
+
+.cov-card__attack-cost {
+  display: inline-flex;
+  gap: 0.6cqw;
+  flex-shrink: 0;
+}
+
+.cov-card__attack-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cov-card__attack-name {
+  font-family: var(--font-display);
+  font-size: 5cqw;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #2b2007;
+}
+
+.cov-card__attack-text {
+  font-family: var(--font-body);
+  font-size: 3.5cqw;
+  line-height: 1.28;
+  color: #5c421f;
+  margin-top: 0.5cqw;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cov-card__attack-damage {
+  font-family: var(--font-numeric);
+  font-size: 7cqw;
+  font-weight: 700;
+  line-height: 1;
+  color: #2b2007;
+  flex-shrink: 0;
+}
+
+/* Covenants and Relics carry prose instead of attacks. */
+.cov-card__rules {
+  font-family: var(--font-body);
+  font-size: 3.9cqw;
+  line-height: 1.32;
+  color: #3f2f14;
+}
+
+.cov-card__flavor {
+  font-family: var(--font-body);
+  font-size: 3.2cqw;
+  font-style: italic;
+  line-height: 1.24;
+  color: #6b5227;
+  border-top: 0.22cqw solid rgba(122, 90, 46, 0.35);
+  padding-top: 1.2cqw;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.cov-card__footer {
+  position: absolute;
+  top: 126.6cqw;
+  left: 5cqw;
+  width: 90cqw;
+  height: 9cqw;
+  display: flex;
+  align-items: center;
+  gap: 2.4cqw;
+  padding: 0 1cqw;
+  font-family: var(--font-body);
+  font-size: 3.2cqw;
+  font-weight: 600;
+  color: rgba(240, 220, 188, 0.72);
+}
+
+.cov-card__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8cqw;
+  white-space: nowrap;
+}
+
+.cov-card__stat-label {
+  font-size: 2.7cqw;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(240, 220, 188, 0.5);
+}
+
+.cov-card__footer-spacer {
+  flex: 1;
+}
+
+.cov-card__set {
+  font-size: 2.7cqw;
+  letter-spacing: 0.05em;
+  color: rgba(240, 220, 188, 0.5);
+}
+
+/* ------------------------------------------------------------- anointed */
+
+/* Anointed cards are worth two points, so they must be identifiable across the
+ * mat at a glance — a warm halo plus a brighter frame, not a subtle badge. */
+.cov-card--anointed .cov-card__ground {
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(255, 226, 160, 0.3), transparent 58%),
+    linear-gradient(168deg, #4a3410 0%, #1c1408 46%, #402d0e 100%);
+}
+
+.cov-card--anointed .cov-card__nameplate {
+  background:
+    linear-gradient(178deg, rgba(255, 255, 255, 0.42), transparent 42%),
+    linear-gradient(160deg, #fbeac2 0%, #eecb92 48%, #d9b077 100%);
+}
+
+/* ------------------------------------------------------------------ holo */
+
+/* Chase rarities get a moving sheen. It is a pseudo-element so it never
+ * interferes with the card's own layout or hit area. */
+.cov-card--holo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--holo-angle, 115deg),
+    transparent 34%,
+    rgba(255, 244, 214, 0.34) 46%,
+    rgba(190, 232, 255, 0.26) 52%,
+    rgba(255, 214, 236, 0.24) 58%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+  opacity: var(--holo-opacity, 0.75);
+}
+
+/* ------------------------------------------------------------ compact */
+
+/* Below roughly 90 px a card cannot show its rules text legibly, so the
+ * collection grid hides the body and footer and lets art and name carry it. */
+.cov-card--compact .cov-card__body,
+.cov-card--compact .cov-card__footer {
+  display: none;
+}
+
+.cov-card--compact .cov-card__art {
+  height: 104cqw;
+}
+
+.cov-card--compact .cov-card__orb {
+  top: 112.6cqw;
+}

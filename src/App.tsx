@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon, BinderIcon, MenuIcon, ScrollIcon, ShopIcon, SocialIcon } from '@/art/icons'
+import { BattleIcon, MenuIcon, ScrollIcon, ShopIcon, SocialIcon } from '@/art/icons'
 import { TabBar } from '@/components/TabBar'
+import { Collection } from '@/screens/Collection'
 import { Enter } from '@/screens/Enter'
 import { Home } from '@/screens/Home'
 import { Placeholder } from '@/screens/Placeholder'
@@ -77,13 +78,7 @@ function Screen({ route }: { route: Route }) {
         case 'home':
           return <Home />
         case 'cards':
-          return (
-            <Placeholder
-              icon={<BinderIcon size={44} />}
-              title="Your binder is next"
-              note="The card frame, the Genesis card pool and the collection grid arrive in the next milestone."
-            />
-          )
+          return <Collection />
         case 'social':
           return (
             <Placeholder
