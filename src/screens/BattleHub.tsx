@@ -75,11 +75,16 @@ export function BattleHub() {
             </div>
           </div>
 
-          {!validation.legal && (
+          {(validation.errors.length > 0 || validation.warnings.length > 0) && (
             <ul className="mt-3 space-y-1">
               {validation.errors.map((error) => (
                 <li key={error} className="text-xs text-[var(--negative)] leading-snug">
                   {error}
+                </li>
+              ))}
+              {validation.warnings.map((warning) => (
+                <li key={warning} className="text-xs text-[var(--warning)] leading-snug">
+                  {warning}
                 </li>
               ))}
             </ul>

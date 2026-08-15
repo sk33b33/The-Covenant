@@ -5,6 +5,7 @@ import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
 import { BattleRoute } from '@/screens/BattleRoute'
 import { Collection } from '@/screens/Collection'
+import { DeckBuilder } from '@/screens/DeckBuilder'
 import { Enter } from '@/screens/Enter'
 import { PackOpen } from '@/screens/PackOpen'
 import { Shop } from '@/screens/Shop'
@@ -113,6 +114,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'battle':
       return <BattleRoute deckId={route.deckId} />
+
+    case 'deck-builder':
+      return <DeckBuilder deckId={route.deckId} />
 
     case 'missions':
       return (

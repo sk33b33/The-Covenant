@@ -15,7 +15,14 @@ import { load, save } from './persist'
 
 export interface DeckValidation {
   legal: boolean
+  /** Breaks a rule. The deck cannot be played. */
   errors: string[]
+  /**
+   * Legal but probably a mistake. Surfaced, never enforced — building a bad
+   * deck on purpose is the player's business, and a builder that refuses
+   * anything it disagrees with is worse than one that tells you the truth.
+   */
+  warnings: string[]
   counts: { total: number; figures: number; basics: number }
 }
 
@@ -52,20 +59,29 @@ export function validateDeck(deck: Pick<Deck, 'cards' | 'energy'>): DeckValidati
     )
   }
 
-  // A Figure whose attacks need a type the Altar never supplies is a dead card;
-  // worth warning about rather than forbidding, since colourless costs exist.
+  // A Figure whose every attack needs a type the Altar never supplies can never
+  // attack. That is a trap worth naming, but it is not illegal — colourless
+  // costs exist, and a Figure can still soak damage or be retreated behind.
+  const warnings: string[] = []
   const declared = new Set<EnergyType>(deck.energy)
   const stranded = figures.filter((f) =>
     f.attacks.every((a) => a.cost.some((c) => c !== null && !declared.has(c))),
   )
   if (stranded.length) {
     const names = [...new Set(stranded.map((f) => f.name))]
-    errors.push(`No declared energy can pay for: ${names.join(', ')}.`)
+    warnings.push(`No declared energy can pay for: ${names.join(', ')}.`)
+  }
+
+  if (basics.length > 0 && basics.length < 5) {
+    warnings.push(
+      `Only ${basics.length} Basic ${basics.length === 1 ? 'Figure' : 'Figures'} — you may open with a thin board.`,
+    )
   }
 
   return {
     legal: errors.length === 0,
     errors,
+    warnings,
     counts: { total: deck.cards.length, figures: figures.length, basics: basics.length },
   }
 }
