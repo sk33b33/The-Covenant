@@ -1,49 +1,174 @@
-import { useState } from 'react'
+import { useEffect } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { BattleIcon, BinderIcon, MenuIcon, ScrollIcon, ShopIcon, SocialIcon } from '@/art/icons'
+import { TabBar } from '@/components/TabBar'
+import { Enter } from '@/screens/Enter'
+import { Home } from '@/screens/Home'
+import { Placeholder } from '@/screens/Placeholder'
+import { useNav, type Route } from '@/store/nav'
+import { useProfile } from '@/store/profile'
 
-/**
- * Scaffold smoke screen.
- *
- * Exists only to prove the toolchain end to end: design tokens resolve, the
- * self-hosted fonts load, imported card art is served, Tailwind's token bridge
- * works, and dark mode swaps cleanly. Replaced by the real app shell in M1.
- */
 export default function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const route = useNav((s) => s.route)
+  const setTab = useNav((s) => s.setTab)
+  const back = useNav((s) => s.back)
+  const isNew = useProfile((s) => s.isNew)
 
-  const toggle = () => {
-    const next = theme === 'light' ? 'dark' : 'light'
-    document.documentElement.setAttribute('data-theme', next)
-    setTheme(next)
-  }
+  // Returning players skip the splash; it is a first-run moment, not a gate.
+  useEffect(() => {
+    if (!isNew && route.name === 'enter') setTab('home')
+  }, [isNew, route.name, setTab])
+
+  // The hardware and browser back gesture pops our stack instead of leaving
+  // the app. A sentinel history entry gives us something to pop.
+  useEffect(() => {
+    history.pushState(null, '', location.href)
+    const onPop = () => {
+      back()
+      history.pushState(null, '', location.href)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [back])
+
+  const showChrome = route.name !== 'enter' && route.name !== 'battle'
 
   return (
-    <div className="min-h-full bg-bg text-ink flex flex-col items-center justify-center gap-6 p-6">
-      <h1 className="font-display text-2xl gold-leaf tracking-wide">The Covenant</h1>
-      <p className="text-ink-muted text-sm text-center max-w-app">
-        Scaffold online. Tokens, fonts, Tailwind bridge and art pipeline verified.
-      </p>
+    <div className="h-full bg-bg text-ink">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.main
+          key={routeKey(route)}
+          className="h-full"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16 }}
+        >
+          <Screen route={route} />
+        </motion.main>
+      </AnimatePresence>
 
-      <div className="flex gap-3">
-        {(['light', 'fire', 'water', 'earth', 'spirit', 'shadow'] as const).map((t) => (
-          <span
-            key={t}
-            className="w-8 h-8 rounded-pill shadow-raised-sm"
-            style={{ background: `var(--energy-${t})` }}
-            title={t}
-          />
-        ))}
-      </div>
-
-      <img
-        src="/art/cards/jacob.webp"
-        alt="Jacob"
-        width={180}
-        className="rounded-card shadow-card"
-      />
-
-      <button onClick={toggle} className="neu px-5 py-2 rounded-pill text-sm font-medium">
-        Theme: {theme}
-      </button>
+      {showChrome && <TabBar />}
     </div>
   )
+}
+
+/** Distinct key per screen so AnimatePresence swaps rather than morphs. */
+function routeKey(route: Route): string {
+  switch (route.name) {
+    case 'tab':
+      return `tab:${route.tab}`
+    case 'pack-open':
+      return `pack:${route.packId}`
+    case 'story-encounter':
+      return `enc:${route.encounterId}`
+    default:
+      return route.name
+  }
+}
+
+function Screen({ route }: { route: Route }) {
+  switch (route.name) {
+    case 'enter':
+      return <Enter />
+
+    case 'tab':
+      switch (route.tab) {
+        case 'home':
+          return <Home />
+        case 'cards':
+          return (
+            <Placeholder
+              icon={<BinderIcon size={44} />}
+              title="Your binder is next"
+              note="The card frame, the Genesis card pool and the collection grid arrive in the next milestone."
+            />
+          )
+        case 'social':
+          return (
+            <Placeholder
+              icon={<SocialIcon size={44} />}
+              title="Social Hub"
+              note="Friends, trading and community showcases need other real players, so this ships as a visual shell later in the build."
+            />
+          )
+        case 'battle':
+          return (
+            <Placeholder
+              icon={<BattleIcon size={44} />}
+              title="Battle"
+              note="The rules engine is built and tested before any of it reaches the screen. Coin flip, Ascension and first-to-three land in milestone six."
+            />
+          )
+        case 'menu':
+          return (
+            <Placeholder
+              icon={<MenuIcon size={44} />}
+              title="Menu"
+              note="Settings, profile and account options."
+            />
+          )
+      }
+      return null
+
+    case 'pack-open':
+      return (
+        <Placeholder
+          withBack
+          icon={<ScrollIcon size={44} />}
+          title="Pack opening"
+          note="Swipe-to-tear, the five-card reveal and the rarity flare are built once the card frame exists."
+        />
+      )
+
+    case 'shop':
+      return (
+        <Placeholder
+          withBack
+          icon={<ShopIcon size={44} />}
+          title="Shop"
+          note="Spend Talents on packs here once the pack economy is wired up."
+        />
+      )
+
+    case 'missions':
+      return (
+        <Placeholder
+          withBack
+          icon={<ScrollIcon size={44} />}
+          title="Missions"
+          note="Daily and achievement missions that pay out Talents and Grace."
+        />
+      )
+
+    case 'profile':
+      return (
+        <Placeholder
+          withBack
+          icon={<SocialIcon size={44} />}
+          title="Profile"
+          note="Level, experience and your battle record."
+        />
+      )
+
+    case 'story-map':
+      return (
+        <Placeholder
+          withBack
+          icon={<ScrollIcon size={44} />}
+          title="Story"
+          note="Six chapters from Genesis to Revelation. The Genesis encounters are written and playable in milestone seven."
+        />
+      )
+
+    default:
+      return (
+        <Placeholder
+          withBack
+          icon={<BattleIcon size={44} />}
+          title="Coming soon"
+          note="This screen is part of a later milestone."
+        />
+      )
+  }
 }
