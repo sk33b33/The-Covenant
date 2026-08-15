@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon, MenuIcon } from '@/art/icons'
+import { BattleIcon } from '@/art/icons'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
 import { BattleRoute } from '@/screens/BattleRoute'
@@ -12,6 +12,7 @@ import { Shop } from '@/screens/Shop'
 import { StoryEncounter } from '@/screens/StoryEncounter'
 import { StoryMap } from '@/screens/StoryMap'
 import { Home } from '@/screens/Home'
+import { Menu } from '@/screens/Menu'
 import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
@@ -98,13 +99,7 @@ function Screen({ route }: { route: Route }) {
         case 'battle':
           return <BattleHub />
         case 'menu':
-          return (
-            <Placeholder
-              icon={<MenuIcon size={44} />}
-              title="Menu"
-              note="Settings, profile and account options."
-            />
-          )
+          return <Menu />
       }
       return null
 

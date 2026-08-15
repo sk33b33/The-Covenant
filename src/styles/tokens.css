@@ -108,9 +108,9 @@
 
   /* ---- Type ------------------------------------------------------- */
   /* Cinzel for anything that should feel inscribed — card names, titles,
-   * numbers on the mat. Inter/system for UI that must stay legible small. */
+   * numbers on the mat. IBM Plex Sans for UI that must stay legible small. */
   --font-display: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+  --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
     'Helvetica Neue', Arial, sans-serif;
   --font-numeric: 'Cinzel', Georgia, serif;
 

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { asset } from '@/lib/asset'
 import { STARTER_CARD_IDS } from '@/data/starter'
 import { useCollection } from '@/store/collection'
 import { useDecks } from '@/store/decks'
@@ -41,7 +42,7 @@ export function Enter() {
     >
       {/* A very slow push-in so the screen breathes without drawing attention. */}
       <motion.img
-        src="/art/key/cover.webp"
+        src={asset("art/key/cover.webp")}
         alt="The Covenant"
         className="absolute inset-0 w-full h-full object-cover"
         style={{ objectPosition: '50% 38%' }}

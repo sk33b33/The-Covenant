@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { EnergyCost, EnergyOrb } from '@/art/EnergyOrb'
 import { RarityMark } from '@/art/RarityMark'
 import { isFigure, WEAKNESS, type Card as CardData, type FigureCard } from '@/game/types'
+import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import './card.css'
 
@@ -101,7 +102,7 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
           </div>
         ) : (
           <img
-            src={`/art/cards/${card.id}.webp`}
+            src={asset(`art/cards/${card.id}.webp`)}
             alt=""
             loading="lazy"
             decoding="async"

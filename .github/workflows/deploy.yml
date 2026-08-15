@@ -1,0 +1,61 @@
+name: Deploy
+
+# Builds and publishes the game to GitHub Pages on every push to main.
+#
+# One setting has to be turned on by hand before the first run:
+# Settings → Pages → Build and deployment → Source: "GitHub Actions".
+#
+# DEPLOY_BASE is the sub-path a project site is served from. Every asset path
+# in the app is resolved against it at runtime (see src/lib/asset.ts), so the
+# build works from a sub-path and from a domain root without changes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it; a half-published site
+# is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The rules engine and the economy are covered by tests; a red suite
+      # should never reach the published site.
+      - run: npm test
+
+      - run: npm run build
+        env:
+          DEPLOY_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

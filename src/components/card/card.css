@@ -173,9 +173,17 @@
   font-weight: 700;
   line-height: 1;
   /* Bright enough that a card awaiting art still reads as a real, owned card.
-   * At lower opacity it was indistinguishable from an unowned silhouette. */
+   * At lower opacity it was indistinguishable from an unowned silhouette.
+   *
+   * The gradient is the point rather than decoration: gold leaf is the
+   * material every supplied card render is built from — stamped filigree, a
+   * gilt nameplate, a gilded type orb — and a flat ochre letter sitting inside
+   * that frame reads as a missing asset rather than a card awaiting art. This
+   * is a card face, not a heading or a metric. */
   background: linear-gradient(158deg, #f4e0b8, #c49a5c 46%, #8d5f2a);
+  /* impeccable-disable-next-line gradient-text -- gold leaf is the card's material, per the supplied art */
   -webkit-background-clip: text;
+  /* impeccable-disable-next-line gradient-text -- gold leaf is the card's material, per the supplied art */
   background-clip: text;
   color: transparent;
   filter: drop-shadow(0 0.6cqw 1.6cqw rgba(0, 0, 0, 0.55));

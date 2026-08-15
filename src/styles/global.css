@@ -8,24 +8,34 @@
  * Fonts are self-hosted rather than pulled from Google. This is a PWA that has
  * to render correctly offline, and a card game whose whole identity rests on
  * Cinzel's inscribed capitals — a fallback to Georgia mid-match would be
- * visible. Both files are latin-subset variable woff2, 80 KB together.
+ * visible. Both files are latin-subset variable woff2, ~72 KB together.
+ *
+ * The urls are relative rather than root-absolute so the build works when it
+ * is served from a sub-path — a GitHub Pages project site, for instance —
+ * where `/fonts/...` would resolve above the app's own root.
+ *
+ * The body face is IBM Plex Sans, not Inter. Inter is on so many interfaces
+ * that it reads as the absence of a typographic decision, and it is the single
+ * most common face in generated UI. Plex has real character in its terminals
+ * and its 'a' and 'g', holds up at the 11px the card frame and tab bar need,
+ * and its slightly technical warmth sits well under Cinzel's inscribed caps.
  */
 @font-face {
   font-family: 'Cinzel';
   font-style: normal;
   font-weight: 400 900;
   font-display: swap;
-  src: url('/fonts/cinzel-latin.woff2') format('woff2');
+  src: url('../fonts/cinzel-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2018-201A,
     U+201C-201E, U+2020, U+2030, U+2039-203A, U+2044, U+2212;
 }
 
 @font-face {
-  font-family: 'Inter';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400 600;
   font-display: swap;
-  src: url('/fonts/inter-latin.woff2') format('woff2');
+  src: url('../fonts/plex-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2018-201A,
     U+201C-201E, U+2020, U+2030, U+2039-203A, U+2044, U+2212;
 }
@@ -150,10 +160,18 @@
     box-shadow: var(--shadow-pressed);
   }
 
-  /* Gold leaf applied to text — used for titles and the logo. */
+  /* Gold leaf applied to text — used for titles and the logo.
+   *
+   * Gradient text is normally an empty flourish, and impeccable is right to
+   * flag it. Here it is the material: every supplied card render is stamped
+   * gold on dark vellum, and a flat ochre title beside them looks like the
+   * gilding failed to load. Confined to display type — never to body copy,
+   * labels or numbers, which stay solid. */
   .gold-leaf {
     background: var(--gold-leaf);
+    /* impeccable-disable-next-line gradient-text -- gold leaf is the game's material, per the supplied art */
     -webkit-background-clip: text;
+    /* impeccable-disable-next-line gradient-text -- gold leaf is the game's material, per the supplied art */
     background-clip: text;
     color: transparent;
   }
