@@ -9,6 +9,8 @@ import { DeckBuilder } from '@/screens/DeckBuilder'
 import { Enter } from '@/screens/Enter'
 import { PackOpen } from '@/screens/PackOpen'
 import { Shop } from '@/screens/Shop'
+import { StoryEncounter } from '@/screens/StoryEncounter'
+import { StoryMap } from '@/screens/StoryMap'
 import { Home } from '@/screens/Home'
 import { Placeholder } from '@/screens/Placeholder'
 import { useNav, type Route } from '@/store/nav'
@@ -38,7 +40,10 @@ export default function App() {
   }, [back])
 
   const showChrome =
-    route.name !== 'enter' && route.name !== 'battle' && route.name !== 'pack-open'
+    route.name !== 'enter' &&
+    route.name !== 'battle' &&
+    route.name !== 'pack-open' &&
+    route.name !== 'story-encounter'
 
   return (
     <div className="h-full bg-bg text-ink">
@@ -139,14 +144,10 @@ function Screen({ route }: { route: Route }) {
       )
 
     case 'story-map':
-      return (
-        <Placeholder
-          withBack
-          icon={<ScrollIcon size={44} />}
-          title="Story"
-          note="Six chapters from Genesis to Revelation. The Genesis encounters are written and playable in milestone seven."
-        />
-      )
+      return <StoryMap />
+
+    case 'story-encounter':
+      return <StoryEncounter encounterId={route.encounterId} />
 
     default:
       return (
