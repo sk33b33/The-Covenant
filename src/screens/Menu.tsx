@@ -54,8 +54,8 @@ export function Menu() {
   }
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe pb-8">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         <div className="text-center pt-2 pb-4">
           <h1 className="font-display text-xl tracking-wide">Menu</h1>
         </div>

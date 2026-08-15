@@ -47,6 +47,102 @@
     #d8b57c 100%
   );
 
+  /* ---- Metals: the rarity ladder ---------------------------------- */
+  /*
+   * A card's rim is struck from the metal its rarity earns, low to high:
+   * copper, bronze, iron, silver, gold, platinum, diamond.
+   *
+   * Each is a conic gradient rather than a linear one, for two reasons. Metal
+   * reads as metal because the highlight *turns* with the corners instead of
+   * running straight across a flat face — a linear sweep looks like paint. And
+   * a conic band can be rotated by one angle, so in the card viewer the rim's
+   * highlight travels with the tilt on the same channel the holo sheen uses.
+   *
+   * Each wraps light around the bevel twice, which is what a struck edge does.
+   * The darkest stop is still unmistakably the metal rather than near-black:
+   * the card is 63:88, so a conic's short top and bottom edges each span only
+   * about 70° of the sweep, and a near-black stop landing there erases the rim
+   * along those edges entirely — a border visible only down the sides reads as
+   * a rendering fault, not as metal.
+   *
+   * Copper, bronze and gold are the three that can collapse into one warm
+   * smear at thumbnail size, so they are separated on all three axes rather
+   * than hue alone: copper is a dull pink-brown, bronze a darker olive with a
+   * muted highlight, gold the brightest and most saturated with the hardest
+   * specular. Silver and platinum are separated the same way — silver is a
+   * mid-tone with deep shadow, platinum is uniformly pale with shallow shadow,
+   * so platinum reads as lighter overall rather than merely cleaner.
+   */
+  --rim-angle: 218deg;
+
+  --metal-copper: conic-gradient(
+    from var(--rim-angle),
+    #7a4630, #b06f4c, #e8ab86, #b06f4c, #7a4630, #a86747, #dda07c, #8a5238, #7a4630
+  );
+  --metal-copper-hi: #e8ab86;
+  --metal-copper-mid: #b06f4c;
+  --metal-copper-lo: #6b3c28;
+
+  --metal-bronze: conic-gradient(
+    from var(--rim-angle),
+    #5c4f26, #8f7c3c, #cbb87a, #8f7c3c, #5c4f26, #877436, #c0ad70, #66582a, #5c4f26
+  );
+  --metal-bronze-hi: #cbb87a;
+  --metal-bronze-mid: #8f7c3c;
+  --metal-bronze-lo: #4e4320;
+
+  --metal-iron: conic-gradient(
+    from var(--rim-angle),
+    #3f464e, #6e7780, #b0bac4, #6e7780, #3f464e, #67707a, #a3adb8, #474e56, #3f464e
+  );
+  --metal-iron-hi: #b0bac4;
+  --metal-iron-mid: #6e7780;
+  --metal-iron-lo: #363c43;
+
+  --metal-silver: conic-gradient(
+    from var(--rim-angle),
+    #6b757d, #a8b4bd, #f6fafd, #a8b4bd, #6b757d, #9fabb5, #eaf1f6, #747e86, #6b757d
+  );
+  --metal-silver-hi: #f6fafd;
+  --metal-silver-mid: #a8b4bd;
+  --metal-silver-lo: #5c666e;
+
+  --metal-gold: conic-gradient(
+    from var(--rim-angle),
+    #8a6216, #d3a83e, #fff3c4, #d3a83e, #8a6216, #c89e37, #ffeab0, #966d1c, #8a6216
+  );
+  --metal-gold-hi: #fff3c4;
+  --metal-gold-mid: #d3a83e;
+  --metal-gold-lo: #7a5410;
+
+  --metal-platinum: conic-gradient(
+    from var(--rim-angle),
+    #9aa4ac, #d6dee4, #ffffff, #d6dee4, #9aa4ac, #cdd6dd, #fbfdff, #a6b0b8, #9aa4ac
+  );
+  --metal-platinum-hi: #ffffff;
+  --metal-platinum-mid: #d6dee4;
+  --metal-platinum-lo: #8b959d;
+
+  /* Not a metal, and deliberately so: the top tier stops being a better
+   * version of the tier below and becomes a different material. */
+  --metal-diamond: conic-gradient(
+    from var(--rim-angle),
+    #a9cbe8, #ffffff, #c3b2ee, #ffffff, #f4b6d5, #ffffff, #aeeae0, #ffffff, #a9cbe8
+  );
+  --metal-diamond-hi: #ffffff;
+  --metal-diamond-mid: #cfe0f0;
+  --metal-diamond-lo: #92aec6;
+
+  /* Trays and panels laid over a full-screen dark surface — the card viewer
+   * over the battle mat, where the app's own --surface would be the wrong
+   * ground entirely. */
+  --overlay-tray: rgba(16, 11, 6, 0.94);
+  --overlay-tray-edge: rgba(229, 192, 140, 0.22);
+
+  /* Halos for the two top tiers, so a chase card lifts off the binder grid. */
+  --metal-platinum-glow: 0 0 14px -2px rgba(210, 224, 236, 0.55);
+  --metal-diamond-glow: 0 0 20px -2px rgba(198, 226, 248, 0.68);
+
   /* ---- Energy types ---------------------------------------------- */
   --energy-light: #f2d675;
   --energy-fire: #d2543a;
@@ -134,6 +230,16 @@
   --d-reveal: 720ms;
 
   /* ---- Layout ----------------------------------------------------- */
+  /* The tab bar sits *over* the content rather than beside it, so screens have
+   * depth under it. That only reads as depth if you can see the tiles passing
+   * underneath, hence the transparency — and only stays legible because of the
+   * blur behind it (see .tabbar in global.css, which carries an opaque
+   * fallback for browsers without backdrop-filter).
+   *
+   * Resolved where it is used, so it picks up whichever --surface the active
+   * theme has cascaded rather than freezing the light one. */
+  --tabbar-bg: color-mix(in srgb, var(--surface) 82%, transparent);
+  --tabbar-line: color-mix(in srgb, var(--gold) 22%, transparent);
   --tabbar-h: 68px;
   --header-h: 56px;
   --app-max-w: 520px;

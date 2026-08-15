@@ -20,8 +20,8 @@ export function Placeholder({
   const back = useNav((s) => s.back)
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         {withBack && (
           <button
             onClick={back}

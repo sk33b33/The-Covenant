@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { SlotOutline } from '@/art/BattleMat'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
 import { isFigure } from '@/game/types'
 import { cx } from '@/lib/cx'
@@ -41,6 +41,13 @@ interface Props {
   targetable?: boolean
   /** Hides HP and energy for the opponent's face-down or distant pieces. */
   compactStats?: boolean
+  /**
+   * Suppresses hold-to-inspect. Set on your Active Figure while it is yours to
+   * act with: there, a single tap already lifts the card *and* brings its
+   * attacks with it, so a second gesture opening the same card without them
+   * would be strictly worse than the tap it competes with.
+   */
+  noPeek?: boolean
   className?: string
 }
 
@@ -52,6 +59,7 @@ export function BoardFigure({
   selected,
   targetable,
   compactStats,
+  noPeek,
   className,
 }: Props) {
   if (!figure) {
@@ -97,7 +105,7 @@ export function BoardFigure({
           borderRadius: '8%',
         }}
       >
-        <Card card={card} compact noHolo inPlay />
+        <PressableCard card={card} compact noHolo inPlay noPeek={noPeek} />
       </div>
 
       {/* HP bar, hugging the card's foot. */}

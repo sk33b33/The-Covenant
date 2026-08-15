@@ -18,17 +18,17 @@ const TABS: { id: Tab; label: string; Icon: typeof HomeIcon }[] = [
  * gold pill that slides between positions via a shared layout id — one moving
  * object rather than five fading ones, which is what makes it feel like a
  * physical selector.
+ *
+ * It floats over the content rather than sitting beside it (see `.tabbar` and
+ * `.pb-tabbar` in global.css), so screens keep scrolling underneath and the
+ * app has depth below the fold instead of ending in a seam.
  */
 export function TabBar() {
   const tab = useNav((s) => s.tab)
   const setTab = useNav((s) => s.setTab)
 
   return (
-    <nav
-      className="fixed inset-x-0 bottom-0 z-40 bg-[var(--surface)] pb-safe"
-      style={{ boxShadow: '0 -6px 20px -10px rgba(60,44,20,.35)' }}
-      aria-label="Main"
-    >
+    <nav className="tabbar fixed inset-x-0 bottom-0 z-40 pb-safe" aria-label="Main">
       <ul className="mx-auto max-w-app grid grid-cols-5" style={{ height: 'var(--tabbar-h)' }}>
         {TABS.map(({ id, label, Icon }) => {
           const active = tab === id
@@ -39,7 +39,11 @@ export function TabBar() {
                 className={cx(
                   'relative w-full h-full flex flex-col items-center justify-center gap-1',
                   'transition-colors duration-200',
-                  active ? 'text-[var(--gold-deep)]' : 'text-ink-faint',
+                  // `ink-faint` put these 10px labels at 3.7:1 against the bar,
+                  // under the 4.5:1 AA floor, on the app's primary navigation.
+                  // `ink-muted` clears it in both themes and the gold pill is
+                  // what marks the active tab anyway, not the label's weight.
+                  active ? 'text-[var(--gold-deep)]' : 'text-ink-muted',
                 )}
                 aria-current={active ? 'page' : undefined}
               >

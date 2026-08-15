@@ -1,5 +1,5 @@
 import { BattleIcon, ScrollIcon } from '@/art/icons'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { Button, EmptyState, Panel } from '@/components/ui'
 import { getCard } from '@/data/cards'
 import { RULES } from '@/game/config'
@@ -25,11 +25,11 @@ export function BattleHub() {
 
   if (!deck || !validation) {
     return (
-      <div className="scroll-y h-full mb-tabbar">
+      <div className="scroll-y h-full">
         <EmptyState icon={<BattleIcon size={44} />} title="No deck yet">
           Build a deck of {RULES.DECK_SIZE} cards before entering a battle.
         </EmptyState>
-        <div className="px-6">
+        <div className="px-6 pb-tabbar">
           <Button variant="gold" block onClick={() => go({ name: 'deck-builder' })}>
             Build a deck
           </Button>
@@ -41,8 +41,8 @@ export function BattleHub() {
   const cover = deck.coverCardId ? getCard(deck.coverCardId) : undefined
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe pb-6">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         <div className="text-center pt-2 pb-4">
           <h1 className="font-display text-xl tracking-wide">Battle</h1>
         </div>
@@ -52,7 +52,7 @@ export function BattleHub() {
           <div className="flex items-center gap-4">
             {cover && (
               <div className="w-[74px] shrink-0">
-                <Card card={cover} compact noHolo />
+                <PressableCard card={cover} compact noHolo standalone />
               </div>
             )}
             <div className="flex-1 min-w-0">

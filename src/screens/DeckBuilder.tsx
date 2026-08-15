@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { BackIcon, CheckIcon, CloseIcon, MinusIcon, PlusIcon, SearchIcon } from '@/art/icons'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
+import { usePeek } from '@/store/peek'
 import { Button, Panel, Progress } from '@/components/ui'
 import { CARDS, requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
@@ -30,6 +31,7 @@ import { cx } from '@/lib/cx'
  */
 export function DeckBuilder({ deckId }: { deckId?: string }) {
   const back = useNav((s) => s.back)
+  const peek = usePeek((s) => s.peek)
   const owned = useCollection((s) => s.owned)
   const decks = useDecks((s) => s.decks)
   const upsert = useDecks((s) => s.upsert)
@@ -41,7 +43,6 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   const [cards, setCards] = useState<string[]>(existing?.cards ?? [])
   const [energy, setEnergy] = useState<EnergyType[]>(existing?.energy ?? [])
   const [query, setQuery] = useState('')
-  const [preview, setPreview] = useState<CardData | null>(null)
 
   const validation = useMemo(() => validateDeck({ cards, energy }), [cards, energy])
 
@@ -112,7 +113,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   }
 
   return (
-    <div className="h-full flex flex-col mb-tabbar">
+    <div className="h-full flex flex-col">
       {/* ---------------------------------------------------------- header */}
       <div className="px-4 pt-safe shrink-0">
         <div className="flex items-center gap-2 pt-2">
@@ -208,7 +209,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
                 className="relative shrink-0 w-[52px]"
                 aria-label={`Remove ${requireCard(cardId).name}`}
               >
-                <Card card={requireCard(cardId)} compact noHolo />
+                <PressableCard card={requireCard(cardId)} compact noHolo />
                 <span
                   className="absolute -top-1 -right-1 rounded-pill w-5 h-5 grid place-items-center text-[10px] font-bold"
                   style={{ background: 'var(--gold)', color: '#241a0e' }}
@@ -246,7 +247,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
         </label>
       </div>
 
-      <div className="scroll-y flex-1 px-4 pt-3 min-h-0">
+      <div className="scroll-y flex-1 px-4 pt-3 min-h-0 pb-tabbar">
         <div className="grid grid-cols-4 gap-2 pb-4">
           {collection.map((card) => {
             const held = owned[card.id] ?? 0
@@ -258,16 +259,15 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
               <motion.button
                 key={card.id}
                 whileTap={full ? undefined : { scale: 0.94 }}
-                onClick={() => (full ? setPreview(card) : add(card.id))}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  setPreview(card)
-                }}
+                // A full tile has nothing left to add, so tapping it shows the
+                // card instead of doing nothing. Holding any tile does the
+                // same, full or not.
+                onClick={() => (full ? peek(card) : add(card.id))}
                 className="relative"
                 aria-label={`${card.name}, ${used} of ${max} in deck`}
               >
                 <div style={{ opacity: used >= max ? 0.4 : 1 }}>
-                  <Card card={card} compact noHolo />
+                  <PressableCard card={card} compact noHolo />
                 </div>
 
                 <span
@@ -308,35 +308,6 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
           {validation.legal ? 'Save deck' : `${RULES.DECK_SIZE - cards.length} more cards needed`}
         </Button>
       </div>
-
-      {preview && (
-        <PreviewSheet card={preview} onClose={() => setPreview(null)} />
-      )}
     </div>
-  )
-}
-
-/** Full card, for when a tile is tapped but cannot be added. */
-function PreviewSheet({ card, onClose }: { card: CardData; onClose: () => void }) {
-  return (
-    <motion.div
-      className="fixed inset-0 z-50 grid place-items-center px-10"
-      style={{ background: 'var(--scrim)' }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={card.name}
-    >
-      <motion.div
-        className="w-full max-w-[280px]"
-        initial={{ scale: 0.92 }}
-        animate={{ scale: 1 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Card card={card} />
-      </motion.div>
-    </motion.div>
   )
 }

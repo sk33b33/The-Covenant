@@ -5,11 +5,12 @@ import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { ScrollIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
 import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { isFigure, type EnergyType } from '@/game/types'
+import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
@@ -46,6 +47,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
   )
+  const peek = usePeek((s) => s.peek)
   // Active and Bench picks live in one object updated functionally. Held as
   // two independent pieces of state and set from a stale closure, three taps
   // inside one React batch all saw `active` as null and overwrote each other,
@@ -252,10 +254,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       ]
     })
 
-    setSheet({
-      title: card.name,
-      subtitle: `${Math.max(0, card.hp - active.damage)} of ${card.hp} HP · ${active.energy.length} energy`,
-      options: [...attackOptions, ...retreatOptions],
+    // Not a sheet. Your Active Figure is the card you look at most and the one
+    // you act with, so a single tap lifts it into the viewer with its attacks
+    // listed beneath — you read the card at a size worth reading and choose
+    // the move without a second gesture. Everything else on the mat is a
+    // hold-to-inspect, and the sheet stays for lists that are about a choice
+    // rather than about one card.
+    peek(card, {
+      actions: [...attackOptions, ...retreatOptions],
+      actionsNote: `${Math.max(0, card.hp - active.damage)} of ${card.hp} HP · ${active.energy.length} energy`,
     })
   }
 
@@ -324,6 +331,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           emptyLabel="Active"
           onClick={you.active && myTurn ? openActive : undefined}
           selected={Boolean(you.active && myTurn)}
+          noPeek={Boolean(you.active && myTurn)}
         />
         <div className="flex gap-1.5 mt-1">
           {you.bench.map((figure, i) => (
@@ -380,7 +388,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                               : undefined,
                       }}
                     >
-                      <Card card={requireCard(cardId)} compact noHolo />
+                      <PressableCard card={requireCard(cardId)} compact noHolo />
                     </div>
                     {pickedActive && (
                       <span

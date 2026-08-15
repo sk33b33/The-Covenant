@@ -77,55 +77,78 @@ export function ActionSheet({
           </div>
 
           <div className="scroll-y px-4 pb-4" style={{ maxHeight: '56vh' }}>
-            {options.length === 0 ? (
-              <p className="text-sm text-ink-muted text-center py-6 px-4">
-                Nothing can be done with this right now.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {options.map((option) => (
-                  <li key={option.id}>
-                    <button
-                      onClick={() => {
-                        if (option.disabled) return
-                        option.onSelect()
-                        onClose()
-                      }}
-                      disabled={option.disabled}
-                      className="w-full text-left rounded-lg px-4 py-3 flex items-center gap-3 transition-opacity"
-                      style={{
-                        background: 'var(--surface-raised)',
-                        opacity: option.disabled ? 0.45 : 1,
-                      }}
-                    >
-                      {option.cost && option.cost.length > 0 && (
-                        <EnergyCost cost={option.cost} size={16} className="shrink-0" />
-                      )}
-
-                      <span className="flex-1 min-w-0">
-                        <span className="block font-display text-base text-ink-strong">
-                          {option.label}
-                        </span>
-                        {(option.detail || option.reason) && (
-                          <span className="block text-xs text-ink-muted mt-0.5 leading-snug">
-                            {option.disabled ? option.reason : option.detail}
-                          </span>
-                        )}
-                      </span>
-
-                      {option.damage !== undefined && option.damage > 0 && (
-                        <span className="font-numeric font-bold text-lg text-ink-strong shrink-0">
-                          {option.damage}
-                        </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ActionList options={options} onChosen={onClose} />
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+/**
+ * The list of moves itself, without the sheet around it.
+ *
+ * Split out because the Active Figure presents the same options underneath its
+ * enlarged card rather than in a sheet. One implementation, so an attack's
+ * cost, damage and unavailable-reason are laid out the same wherever you meet
+ * it — two copies of this would drift the moment one gained a field.
+ */
+export function ActionList({
+  options,
+  onChosen,
+  emptyNote = 'Nothing can be done with this right now.',
+}: {
+  options: SheetOption[]
+  onChosen: () => void
+  emptyNote?: string
+}) {
+  if (options.length === 0) {
+    return <p className="text-sm text-ink-muted text-center py-6 px-4">{emptyNote}</p>
+  }
+
+  return (
+    <ul className="space-y-2">
+      {options.map((option) => (
+        <li key={option.id}>
+          <button
+            onClick={() => {
+              if (option.disabled) return
+              option.onSelect()
+              onChosen()
+            }}
+            disabled={option.disabled}
+            className="w-full text-left rounded-lg px-4 py-3 flex items-center gap-3 transition-opacity"
+            style={{
+              background: 'var(--surface-raised)',
+              // Dimmed enough to read as unavailable, not so far that the move
+              // becomes unreadable. At 0.45 an unavailable attack's name was
+              // illegible on the viewer's dark tray — and the whole point of
+              // showing it rather than hiding it is that you can read what you
+              // cannot yet do, and why.
+              opacity: option.disabled ? 0.62 : 1,
+            }}
+          >
+            {option.cost && option.cost.length > 0 && (
+              <EnergyCost cost={option.cost} size={16} className="shrink-0" />
+            )}
+
+            <span className="flex-1 min-w-0">
+              <span className="block font-display text-base text-ink-strong">{option.label}</span>
+              {(option.detail || option.reason) && (
+                <span className="block text-xs text-ink-muted mt-0.5 leading-snug">
+                  {option.disabled ? option.reason : option.detail}
+                </span>
+              )}
+            </span>
+
+            {option.damage !== undefined && option.damage > 0 && (
+              <span className="font-numeric font-bold text-lg text-ink-strong shrink-0">
+                {option.damage}
+              </span>
+            )}
+          </button>
+        </li>
+      ))}
+    </ul>
   )
 }

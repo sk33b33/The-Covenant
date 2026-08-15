@@ -75,6 +75,51 @@ export const RARITY_ORDER: Record<Rarity, number> = {
   crown: 6,
 }
 
+/* ------------------------------------------------------------------ metals */
+
+/**
+ * The metal a card's border is struck from.
+ *
+ * Rarity used to be legible only in the card's footer, and the footer is hidden
+ * on every compact card — which is every card on the mat, in the hand and in
+ * the binder grid. A metal rim states the same thing at any size, from across
+ * the room, without adding a badge that competes with the art.
+ *
+ * Ordered low to high, matching RARITY_ORDER one-for-one. Diamond is not a
+ * metal, which is the point: the top tier stops being a better version of the
+ * tier below it and becomes a different material.
+ */
+export const METALS = [
+  'copper',
+  'bronze',
+  'iron',
+  'silver',
+  'gold',
+  'platinum',
+  'diamond',
+] as const
+export type Metal = (typeof METALS)[number]
+
+export const RARITY_METAL: Record<Rarity, Metal> = {
+  common: 'copper',
+  uncommon: 'bronze',
+  rare: 'iron',
+  anointed: 'silver',
+  illustration: 'gold',
+  sacred: 'platinum',
+  crown: 'diamond',
+}
+
+export const METAL_LABEL: Record<Metal, string> = {
+  copper: 'Copper',
+  bronze: 'Bronze',
+  iron: 'Iron',
+  silver: 'Silver',
+  gold: 'Gold',
+  platinum: 'Platinum',
+  diamond: 'Diamond',
+}
+
 /* ------------------------------------------------------------------- cards */
 
 export type CardKind = 'figure' | 'covenant' | 'relic'

@@ -29,8 +29,8 @@ export function Shop() {
   const canRefill = !slots.isFull && economy.grace >= ECONOMY.GRACE_PER_SLOT
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe pb-8">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         <div className="flex items-center gap-3 pt-2">
           <button
             onClick={back}

@@ -194,6 +194,29 @@
   .scroll-x::-webkit-scrollbar {
     display: none;
   }
+
+  /*
+   * The tab bar sits over the content, not beside it, so screens have depth
+   * under it. Transparency is what makes that legible — you can see the tiles
+   * travelling underneath — and the blur is what keeps the labels readable
+   * over a moving card grid.
+   */
+  .tabbar {
+    background: var(--tabbar-bg);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    border-top: 1px solid var(--tabbar-line);
+    box-shadow: 0 -6px 20px -10px rgba(60, 44, 20, 0.35);
+  }
+
+  /* Without the blur, translucency stops being depth and becomes illegibility:
+   * card art shows straight through the labels. An opaque bar is the right
+   * degradation. */
+  @supports not (backdrop-filter: blur(1px)) {
+    .tabbar {
+      background: var(--surface);
+    }
+  }
 }
 
 @layer utilities {
@@ -204,7 +227,25 @@
   .pb-safe {
     padding-bottom: max(var(--s-3), env(safe-area-inset-bottom));
   }
-  .mb-tabbar {
-    margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  /*
+   * Clearance for the tab bar, applied to a scroller's *content* rather than
+   * as a margin on the scroller itself.
+   *
+   * The difference is the whole point. A margin shortens the viewport, so
+   * content stops dead above the bar and the screen ends in a hard seam with
+   * dead space under it. Padding leaves the scroller full-height: tiles travel
+   * under the bar as you scroll, and at the end of the scroll the last one
+   * still clears it. The extra --s-4 is what makes "clears it" mean visibly
+   * clear rather than exactly flush against the bar's edge.
+   *
+   * The inset term has to match `.pb-safe`'s exactly, floor included. The bar
+   * pads itself with `max(--s-3, safe-area)`, so on a phone with no inset it
+   * still stands 80px tall, not 68 — using the raw `env()` here left three
+   * pixels of clearance and the last tile looked like it was touching the bar.
+   */
+  .pb-tabbar {
+    padding-bottom: calc(
+      var(--tabbar-h) + max(var(--s-3), env(safe-area-inset-bottom)) + var(--s-5)
+    );
   }
 }

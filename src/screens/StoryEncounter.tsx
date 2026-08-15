@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { GraceIcon, TalentIcon } from '@/art/icons'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { Button } from '@/components/ui'
 import { requireCard } from '@/data/cards'
 import { getEncounter } from '@/data/story/genesis'
@@ -252,7 +252,7 @@ function Dialogue({
             transition={{ delay: 0.25, type: 'spring', stiffness: 240, damping: 22 }}
           >
             <div className="w-[132px]">
-              <Card card={requireCard(reward.cardId)} compact />
+              <PressableCard card={requireCard(reward.cardId)} compact standalone />
             </div>
             <div className="flex items-center gap-4 text-sm" style={{ color: 'var(--gold-bright)' }}>
               <span className="flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { CommunityIcon, LockIcon, SocialIcon, TradeIcon } from '@/art/icons'
 import { TreeGlyph } from '@/art/tree'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { Panel } from '@/components/ui'
 import { CARDS } from '@/data/cards'
 import { RARITY_ORDER } from '@/game/types'
@@ -27,7 +27,7 @@ export function Social() {
     .slice(0, 3)
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
+    <div className="scroll-y h-full">
       {/* Banner, echoing the reference's angled hero. */}
       <div className="relative overflow-hidden" style={{ height: 190 }}>
         <div
@@ -75,7 +75,7 @@ export function Social() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-app px-4 pb-8 -mt-2">
+      <div className="mx-auto max-w-app px-4 pb-tabbar -mt-2">
         {/* ------------------------------------------------------- showcase */}
         <Panel className="p-4">
           <div className="flex items-baseline justify-between mb-3">
@@ -96,7 +96,7 @@ export function Social() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.07 }}
                 >
-                  <Card card={card} compact />
+                  <PressableCard card={card} compact standalone />
                 </motion.div>
               ))}
             </div>

@@ -47,8 +47,8 @@ export function Home() {
   const [active, setActive] = useState(1)
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe pb-6">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         <Header />
 
         {/* ---------------------------------------------------- hero panel */}
@@ -163,7 +163,12 @@ export function Home() {
       <button
         onClick={() => go({ name: 'missions' })}
         className="fixed right-4 z-30 neu rounded-pill w-16 h-16 grid place-items-center"
-        style={{ bottom: 'calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px)' }}
+        // Matches .pb-safe's floor, not the raw inset: the bar pads itself with
+        // max(--s-3, safe-area), so on a phone reporting no inset this button
+        // would otherwise sit 12px into the bar.
+        style={{
+          bottom: 'calc(var(--tabbar-h) + max(var(--s-3), env(safe-area-inset-bottom)) + 16px)',
+        }}
         aria-label="Missions"
       >
         <ScrollIcon size={24} className="text-[var(--gold-deep)]" />

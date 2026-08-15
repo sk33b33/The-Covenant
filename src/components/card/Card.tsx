@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { EnergyCost, EnergyOrb } from '@/art/EnergyOrb'
 import { RarityMark } from '@/art/RarityMark'
-import { isFigure, WEAKNESS, type Card as CardData, type FigureCard } from '@/game/types'
+import {
+  isFigure,
+  RARITY_METAL,
+  WEAKNESS,
+  type Card as CardData,
+  type FigureCard,
+} from '@/game/types'
 import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import './card.css'
@@ -68,9 +74,14 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
         className,
       )}
       style={style}
+      // The rim's metal is chosen in CSS off this attribute rather than
+      // threaded through as an inline style, so the palette stays in one place
+      // and a card costs no extra style object per render.
+      data-metal={RARITY_METAL[card.rarity]}
       aria-label={`${card.name}, ${figure ? `${figure.hp} HP` : card.kind}`}
     >
       <div className="cov-card__ground" />
+      <div className="cov-card__rim" />
 
       {/* ------------------------------------------------------ nameplate */}
       <header className="cov-card__nameplate">

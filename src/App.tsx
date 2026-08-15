@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BattleIcon } from '@/art/icons'
+import { CardViewer } from '@/components/card/CardViewer'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
 import { BattleRoute } from '@/screens/BattleRoute'
@@ -65,6 +66,10 @@ export default function App() {
       </AnimatePresence>
 
       {showChrome && <TabBar />}
+
+      {/* Mounted once, over everything. Any card in the app opens here on a
+          hold, so it has to outlive the screen that was showing the card. */}
+      <CardViewer />
     </div>
   )
 }

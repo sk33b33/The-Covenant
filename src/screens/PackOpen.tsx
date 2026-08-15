@@ -4,7 +4,7 @@ import { CardBack } from '@/art/CardBack'
 import { PackWrapper } from '@/art/PackWrapper'
 import { RarityMark } from '@/art/RarityMark'
 import { TalentIcon } from '@/art/icons'
-import { Card } from '@/components/card/Card'
+import { PressableCard } from '@/components/card/PressableCard'
 import { Button } from '@/components/ui'
 import { getPack, getSet } from '@/data/sets'
 import { duplicateValue, isGodPack, openPack } from '@/game/packs'
@@ -335,9 +335,11 @@ function FlipCard({ card, revealed }: { card: CardData; revealed: boolean }) {
         transition={{ duration: 0.62, ease: [0.22, 1, 0.36, 1] }}
         style={{ transformStyle: 'preserve-3d', position: 'relative' }}
       >
-        {/* Face */}
+        {/* Face. Inert until it is turned over: the face stays in the DOM
+            behind the back, so without this a hold — or a Tab from the
+            keyboard — would open the card and spoil its own reveal. */}
         <div style={{ backfaceVisibility: 'hidden' }}>
-          <Card card={card} />
+          <PressableCard card={card} standalone={revealed} noPeek={!revealed} />
         </div>
 
         {/* Back, pre-rotated so it faces the viewer while the card is unflipped */}
@@ -412,7 +414,7 @@ function Summary({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06, duration: 0.32 }}
             >
-              <Card card={card} compact />
+              <PressableCard card={card} compact standalone />
 
               {/* Both markers sit along the foot. Anchoring "NEW" to the top
                   left covered the card's own name, which is the one thing the

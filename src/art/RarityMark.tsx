@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { RARITY_LABEL, RARITY_MARK, type Rarity } from '@/game/types'
+import { METAL_LABEL, RARITY_LABEL, RARITY_MARK, RARITY_METAL, type Rarity } from '@/game/types'
 
 /**
  * The rarity mark shown in a card's footer and on collection tiles.
@@ -7,6 +7,10 @@ import { RARITY_LABEL, RARITY_MARK, type Rarity } from '@/game/types'
  * Diamonds count up through the ordinary tiers, stars mark the chase tiers, and
  * a crown sits alone at the top — the same escalation the reference game uses,
  * because counting pips is faster to read at a glance than decoding a colour.
+ *
+ * The pips are struck in the same metal as the card's rim, so the two say one
+ * thing in one language. Stating rarity twice in two unrelated palettes would
+ * make a Sacred card look like it carried two different grades.
  */
 
 const DIAMOND = 'M6 0.6 11.4 6 6 11.4 0.6 6Z'
@@ -23,9 +27,9 @@ interface Props {
 export function RarityMark({ rarity, size = 11, className }: Props) {
   const uid = useId().replace(/:/g, '')
   const { shape, count } = RARITY_MARK[rarity]
+  const metal = RARITY_METAL[rarity]
 
   const d = shape === 'diamond' ? DIAMOND : shape === 'star' ? STAR : CROWN
-  const isChase = shape !== 'diamond'
   const w = shape === 'crown' ? 11 : 12
 
   return (
@@ -35,13 +39,13 @@ export function RarityMark({ rarity, size = 11, className }: Props) {
       viewBox={`0 0 ${count * w + 1.6 * (count - 1)} 12`}
       className={className}
       role="img"
-      aria-label={RARITY_LABEL[rarity]}
+      aria-label={`${RARITY_LABEL[rarity]}, ${METAL_LABEL[metal]}`}
     >
       <defs>
         <linearGradient id={`rar-${uid}`} x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0%" stopColor={isChase ? '#fff4d0' : '#f0dcbc'} />
-          <stop offset="45%" stopColor={isChase ? '#f2c85a' : '#c8a06a'} />
-          <stop offset="100%" stopColor={isChase ? '#a87a1e' : '#7a5a2e'} />
+          <stop offset="0%" stopColor={`var(--metal-${metal}-hi)`} />
+          <stop offset="45%" stopColor={`var(--metal-${metal}-mid)`} />
+          <stop offset="100%" stopColor={`var(--metal-${metal}-lo)`} />
         </linearGradient>
       </defs>
 
@@ -51,7 +55,7 @@ export function RarityMark({ rarity, size = 11, className }: Props) {
           d={d}
           transform={`translate(${i * (w + 1.6)} 0)`}
           fill={`url(#rar-${uid})`}
-          stroke="#5c421f"
+          stroke={`var(--metal-${metal}-lo)`}
           strokeWidth="0.5"
           strokeLinejoin="round"
         />

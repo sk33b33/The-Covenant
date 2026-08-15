@@ -36,26 +36,115 @@
     linear-gradient(168deg, #2a2112 0%, #14100a 46%, #241b0e 100%);
 }
 
-/* Gold rules inset from the trimmed edge. */
-.cov-card__rule {
+/* ------------------------------------------------------------------- rim */
+
+/*
+ * The metal rim. A card's rarity is struck into its edge — copper at the
+ * bottom through diamond at the top (see METALS in game/types.ts).
+ *
+ * This is the only place rarity is legible on a compact card: the footer that
+ * carries the rarity pips is hidden below ~90px, which is every card on the
+ * mat, in the hand and in the binder grid. The rim states the same thing at
+ * any size without adding a badge that competes with the art.
+ *
+ * Both rings are `cqw`, like every other dimension here, so the proportion
+ * holds identically at a 64px thumbnail and a 320px detail view.
+ */
+.cov-card__rim {
   position: absolute;
-  inset: 1.6cqw;
-  border-radius: 3.2cqw;
-  border: 0.55cqw solid transparent;
-  background: var(--gold-leaf) border-box;
+  inset: 0;
+  border-radius: 4.5cqw;
+  border: 2.6cqw solid transparent;
+  background: var(--metal-rim, var(--metal-copper)) border-box;
+  /* Paints the border box and knocks out the padding box, leaving a ring. */
   -webkit-mask:
     linear-gradient(#000 0 0) padding-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
+  z-index: 4;
 }
 
-.cov-card__rule--inner {
-  inset: 3.2cqw;
-  border-radius: 2.4cqw;
-  border-width: 0.22cqw;
-  opacity: 0.6;
+/* A dark hairline seating the metal against the card. Without it the pale
+ * metals — silver, platinum, diamond — bleed into the ground and the edge
+ * stops looking like an edge. Inside the rim rather than under it, because the
+ * card clips its own overflow. */
+.cov-card__rim::before {
+  content: '';
+  position: absolute;
+  inset: 2.6cqw;
+  border-radius: 2.8cqw;
+  border: 0.4cqw solid rgba(0, 0, 0, 0.62);
+}
+
+/* An inner hairline of the same metal, inset from the rim. Two edges a short
+ * gap apart is what makes a border look struck rather than drawn. */
+.cov-card__rim::after {
+  content: '';
+  position: absolute;
+  inset: 3.4cqw;
+  border-radius: 2.2cqw;
+  border: 0.3cqw solid transparent;
+  background: var(--metal-rim, var(--metal-copper)) border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.72;
+}
+
+.cov-card[data-metal='copper'] {
+  --metal-rim: var(--metal-copper);
+}
+.cov-card[data-metal='bronze'] {
+  --metal-rim: var(--metal-bronze);
+}
+.cov-card[data-metal='iron'] {
+  --metal-rim: var(--metal-iron);
+}
+.cov-card[data-metal='silver'] {
+  --metal-rim: var(--metal-silver);
+}
+.cov-card[data-metal='gold'] {
+  --metal-rim: var(--metal-gold);
+}
+.cov-card[data-metal='platinum'] {
+  --metal-rim: var(--metal-platinum);
+  box-shadow: var(--shadow-card), var(--metal-platinum-glow);
+}
+.cov-card[data-metal='diamond'] {
+  --metal-rim: var(--metal-diamond);
+  box-shadow: var(--shadow-card), var(--metal-diamond-glow);
+}
+
+/* Diamond alone turns, slowly. A prismatic edge that never moves reads as a
+ * pale grey rim; the drift is what makes it refract.
+ *
+ * Never on a compact card. Animating the angle repaints the whole conic
+ * gradient every frame, and the binder can hold a dozen Crown thumbnails at
+ * once — a dozen continuous repaints, for a drift too small to see at 64px.
+ * The cards you actually look at are the ones that turn. */
+@media (prefers-reduced-motion: no-preference) {
+  .cov-card[data-metal='diamond']:not(.cov-card--compact) .cov-card__rim,
+  .cov-card[data-metal='diamond']:not(.cov-card--compact) .cov-card__rim::after {
+    animation: cov-rim-turn 9s linear infinite;
+  }
+}
+
+@keyframes cov-rim-turn {
+  to {
+    --rim-angle: 578deg;
+  }
+}
+
+/* The angle has to be registered for the keyframe above to interpolate it —
+ * an unregistered custom property jumps from start to end instead. */
+@property --rim-angle {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 218deg;
 }
 
 /* ------------------------------------------------------------- nameplate */
@@ -414,4 +503,18 @@
 
 .cov-card--compact .cov-card__orb {
   top: 112.6cqw;
+}
+
+/* The rim is the one thing that gets proportionally *heavier* when small. At a
+ * 64px grid thumbnail 1.5cqw is under a pixel, and the metal — which is the
+ * only rarity cue a compact card has — disappears into the edge. The two inner
+ * hairlines go the other way: below a pixel they alias into noise, so they are
+ * dropped rather than rendered badly. */
+.cov-card--compact .cov-card__rim {
+  border-width: 3.4cqw;
+}
+
+.cov-card--compact .cov-card__rim::before,
+.cov-card--compact .cov-card__rim::after {
+  display: none;
 }

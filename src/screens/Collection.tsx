@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { BinderIcon, CloseIcon, SearchIcon } from '@/art/icons'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { Card } from '@/components/card/Card'
-import { CardDetail } from '@/components/card/CardDetail'
+import { PressableCard } from '@/components/card/PressableCard'
+import { usePeek } from '@/store/peek'
 import { EmptyState, Progress } from '@/components/ui'
 import { CARDS } from '@/data/cards'
 import { GENESIS } from '@/data/sets'
@@ -27,12 +27,12 @@ import { cx } from '@/lib/cx'
 export function Collection() {
   const owned = useCollection((s) => s.owned)
   const markSeen = useCollection((s) => s.markSeen)
+  const peek = usePeek((s) => s.peek)
   const unseen = useCollection((s) => s.unseen)
 
   const [query, setQuery] = useState('')
   const [types, setTypes] = useState<EnergyType[]>([])
   const [ownedOnly, setOwnedOnly] = useState(false)
-  const [detail, setDetail] = useState<CardData | null>(null)
 
   const ownedCount = Object.keys(owned).filter((id) => owned[id]! > 0).length
   const totalHeld = Object.values(owned).reduce((a, b) => a + b, 0)
@@ -61,8 +61,8 @@ export function Collection() {
     setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
 
   return (
-    <div className="scroll-y h-full mb-tabbar">
-      <div className="mx-auto max-w-app px-4 pt-safe pb-6">
+    <div className="scroll-y h-full">
+      <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
         <div className="text-center pt-2 pb-3">
           <h1 className="font-display text-xl tracking-wide">My Cards</h1>
         </div>
@@ -149,9 +149,8 @@ export function Collection() {
                   count={count}
                   isNew={unseen.includes(card.id)}
                   onOpen={() => {
-                    if (!count) return
-                    setDetail(card)
-                    markSeen([card.id])
+                    peek(card, { count })
+                    if (count) markSeen([card.id])
                   }}
                 />
               )
@@ -159,8 +158,6 @@ export function Collection() {
           </div>
         )}
       </div>
-
-      {detail && <CardDetail card={detail} count={owned[detail.id] ?? 0} onClose={() => setDetail(null)} />}
     </div>
   )
 }
@@ -179,12 +176,14 @@ function CollectionTile({
   const locked = count === 0
 
   return (
+    // Unowned cards open too. Wanting to read a card you have not pulled yet is
+    // the reason to keep them in the binder at all; refusing the tap made the
+    // gap look like a bug rather than a goal.
     <motion.button
-      whileTap={locked ? undefined : { scale: 0.95 }}
+      whileTap={{ scale: 0.95 }}
       onClick={onOpen}
       className="relative block w-full text-left"
       aria-label={locked ? `${card.name}, not collected` : `${card.name}, ${count} owned`}
-      disabled={locked}
     >
       {/* Unowned cards stay visible as desaturated silhouettes — the gap is the
           point of a collection screen. The card art is already dark, so this
@@ -197,7 +196,7 @@ function CollectionTile({
             : undefined
         }
       >
-        <Card card={card} compact noHolo={locked} />
+        <PressableCard card={card} compact noHolo={locked} count={count} />
       </div>
 
       {count > 1 && (
