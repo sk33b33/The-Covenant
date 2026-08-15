@@ -66,14 +66,26 @@ const LIGHT = {
 /**
  * Production constraints.
  *
- * The last two matter and are easy to forget: the game lays a nameplate across
- * the top edge and a type orb over the bottom centre, so anything important
- * placed there is covered in the finished card.
+ * Measured against the real frame in card.css rather than assumed, which
+ * corrected two of them:
+ *
+ * The nameplate does NOT sit over the artwork. It spans 3.6–15.6cqw and the
+ * art window starts at 17.4cqw, so the top of the image is fully visible —
+ * and `object-position: 50% 18%` deliberately favours it. Asking for the top
+ * eighth to be kept clear was throwing away the best part of the frame.
+ *
+ * The type orb does overlap, covering the bottom 8% of the window on a
+ * compact card and 14% on a full one, about a fifth of the width, centred.
+ *
+ * The window itself changes shape with the card's size: 0.87 (near the whole
+ * portrait) in the binder, on the mat and in hand; 1.45 — a wide band across
+ * the top — at full size. So the lower third of a render is seen small and
+ * not at all large, which is the one thing worth stating outright.
  */
 const CONSTRAINTS = [
   'Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels.',
   'Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo.',
-  'Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card.',
+  'Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown.',
   'Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.',
 ].join(' ')
 

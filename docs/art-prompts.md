@@ -34,7 +34,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Jacob's Blessing
@@ -52,7 +52,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: warm interior lamplight, deep amber, the world reduced to one room.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Sarah
@@ -70,7 +70,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Sabbath
@@ -88,7 +88,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: late golden afternoon going soft, long shadows, everything at rest.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Abram
@@ -106,7 +106,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Altar Fire
@@ -124,7 +124,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Esau
@@ -142,7 +142,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Japheth
@@ -160,7 +160,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Lot
@@ -178,7 +178,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Outer Darkness
@@ -196,7 +196,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Shem
@@ -214,7 +214,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Still Small Voice
@@ -232,7 +232,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Tent of Meeting
@@ -250,7 +250,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: blue evening outside, warm light leaking from the doorway.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Terah
@@ -268,7 +268,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Censer
@@ -286,7 +286,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: dark ground, smoke lit from within by the coals.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Raven
@@ -304,7 +304,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Scattering
@@ -322,7 +322,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: flat overcast, colourless, no sun anywhere — a day that has lost its centre.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Staff
@@ -340,7 +340,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: low warm side light picking out grain and wear.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Well of Beersheba
@@ -358,7 +358,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: cool early light, blue shadow in the well mouth, gold on the rim stones.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ## Story rewards — the card handed over on a first clear
@@ -378,7 +378,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Babel
@@ -396,7 +396,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Noah
@@ -414,7 +414,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Tempter
@@ -432,7 +432,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ## Chase rarities — Anointed and above
@@ -452,7 +452,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Covenant Rainbow
@@ -470,7 +470,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Garden of Eden
@@ -488,7 +488,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Ladder to Heaven
@@ -506,7 +506,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Archangel Michael
@@ -524,7 +524,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Israel
@@ -542,7 +542,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Deluge
@@ -560,7 +560,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Serpent
@@ -578,7 +578,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ## The rest of the set
@@ -598,7 +598,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Angel of the Lord
@@ -616,7 +616,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Consuming Fire
@@ -634,7 +634,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Enoch
@@ -652,7 +652,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Eve
@@ -670,7 +670,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Warm god-rays breaking through high cloud, with gold rim-light on the subject.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Flaming Sword
@@ -688,7 +688,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Joseph
@@ -706,7 +706,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Let There Be Light
@@ -724,7 +724,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: the first light there ever was, tearing across a lightless deep; no sun in frame, the light is its own source.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Leviathan
@@ -742,7 +742,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Nimrod
@@ -760,7 +760,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Sodom and Gomorrah
@@ -778,7 +778,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Ark
@@ -796,7 +796,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: raking side light on wet timber, deep shadow in the joins.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Binding
@@ -814,7 +814,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: high hard mountain sun, almost no shadow, nowhere to hide.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Cherubim
@@ -832,7 +832,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Nephilim
@@ -850,7 +850,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Three Visitors
@@ -868,7 +868,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Ascending Host
@@ -886,7 +886,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Breath of Life
@@ -904,7 +904,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 A cool luminous glow with no visible source, pale gold and ivory.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Cain
@@ -922,7 +922,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Coat of Many Colours
@@ -940,7 +940,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: clean even light, colours allowed to speak for themselves.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Mark of Cain
@@ -958,7 +958,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Pillar of Fire
@@ -976,7 +976,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Ram in the Thicket
@@ -994,7 +994,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Birthright
@@ -1012,7 +1012,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: dim interior light, one shaft across the objects, dust in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Burning Bush
@@ -1030,7 +1030,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Call of Abram
@@ -1048,7 +1048,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: hard dawn light from ahead, throwing the figure and camels into near-silhouette.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Curse
@@ -1066,7 +1066,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Dove
@@ -1084,7 +1084,7 @@ Compose close on the creature so it fills the middle of the frame, alert and awa
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Firmament
@@ -1102,7 +1102,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Rainbow
@@ -1120,7 +1120,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: clearing storm light, low sun behind the viewer, wet air holding colour.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Signet Ring
@@ -1138,7 +1138,7 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: jewel lighting, hard specular highlights on gold, deep black ground.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Ham
@@ -1156,7 +1156,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Rain-heavy blue-grey light, wet stone and spray, everything soaked through.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Laban
@@ -1174,7 +1174,7 @@ Compose as a portrait: the subject from mid-chest up, turned three-quarters, eye
 
 Low dusty sunlight, ochre and umber, dry stone with grit hanging in the air.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Pharaoh's Dream
@@ -1192,7 +1192,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: strange dream-light, two incompatible light sources, everything slightly too vivid.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Serpent's Curse
@@ -1210,7 +1210,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Firelight and drifting embers, a hot amber key light against deep shadow.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### Shadow of Death
@@ -1228,7 +1228,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Near-eclipse: deep indigo shadow with one narrow shaft of light.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Famine
@@ -1246,7 +1246,7 @@ Compose as a wide scene with no single face carrying it. The event itself is the
 
 Lighting: white bleached noon, no cloud, heat haze flattening the distance.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
 
 ### The Stone Pillow
@@ -1264,5 +1264,5 @@ Compose as a still life: one object, centred, lit like a museum piece against a 
 
 Lighting: grey pre-dawn, one warm edge of sunrise on the upper stone.
 
-Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Keep the top eighth of the image free of anything essential — a nameplate sits there in the finished card. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
+Portrait orientation, slightly taller than wide — roughly 6:7, about 896 by 1056 pixels. Fill the entire canvas with the illustration. No card frame, no border, no nameplate, no text, no lettering, no watermark, no signature, no logo. Compose so the whole subject sits within the upper two-thirds of the image: at large sizes the card crops to a wide band across the top, and the lowest third is not shown. Keep the bottom centre free of anything essential — a circular emblem sits there in the finished card.
 ```
