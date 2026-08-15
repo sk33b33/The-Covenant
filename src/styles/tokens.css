@@ -1,0 +1,223 @@
+/*
+ * The Covenant — design tokens
+ *
+ * The layout grammar is borrowed from Pokémon TCG Pocket: soft neumorphic
+ * panels, pill buttons, generous radii, a floating bottom tab bar. The palette
+ * is not. PTCGP's shell is a cool blue-white (#edf2f8); our cards are dark,
+ * warm and baroque, and they look like a foreign object dropped onto that.
+ * So the shell is rotated warm — parchment and ivory, gold instead of blue —
+ * and the cards become the brightest, most saturated things on screen.
+ *
+ * Every colour in the app comes from here. Nothing hardcodes a hex.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- Shell ------------------------------------------------------ */
+  --bg: #f6f1e6;
+  --bg-sunk: #ece5d6;
+  --surface: #fbf7ef;
+  --surface-raised: #fffdf8;
+  --surface-overlay: #fffdf8;
+  --scrim: rgba(30, 24, 14, 0.58);
+
+  /* ---- Ink -------------------------------------------------------- */
+  --ink: #2b2318;
+  --ink-strong: #17120a;
+  --ink-muted: #6b5d47;
+  --ink-faint: #9c8d75;
+  --ink-inverse: #fdfaf3;
+
+  /* ---- Gold: the brand ------------------------------------------- */
+  --gold: #b08751;
+  --gold-bright: #e5c08c;
+  --gold-pale: #f0dcbc;
+  --gold-deep: #7a5a2e;
+  --gold-ink: #5c421f;
+
+  /* Filigree gradient used on frames, orbs and the logo. */
+  --gold-leaf: linear-gradient(
+    155deg,
+    #f4e0b8 0%,
+    #d9b478 18%,
+    #a8763c 42%,
+    #e8cf9e 58%,
+    #8d5f2a 78%,
+    #d8b57c 100%
+  );
+
+  /* ---- Energy types ---------------------------------------------- */
+  --energy-light: #f2d675;
+  --energy-fire: #d2543a;
+  --energy-water: #3d7fa6;
+  --energy-earth: #7a6a44;
+  --energy-spirit: #8e6fb0;
+  --energy-shadow: #3a3242;
+
+  --energy-light-deep: #a8860f;
+  --energy-fire-deep: #8e2f1c;
+  --energy-water-deep: #1f4d69;
+  --energy-earth-deep: #4a3f24;
+  --energy-spirit-deep: #573a76;
+  --energy-shadow-deep: #1d1826;
+
+  /* ---- Semantic --------------------------------------------------- */
+  --positive: #4b7f4e;
+  --negative: #a8402f;
+  --warning: #c08a2e;
+  --info: #3d6f8e;
+
+  /* ---- Neumorphic depth ------------------------------------------- */
+  /* Warm shadow + ivory highlight. The PTCGP look, tuned to parchment. */
+  --shadow-raised:
+    6px 6px 14px rgba(122, 90, 46, 0.16),
+    -6px -6px 14px rgba(255, 253, 248, 0.9);
+  --shadow-raised-sm:
+    3px 3px 7px rgba(122, 90, 46, 0.14),
+    -3px -3px 7px rgba(255, 253, 248, 0.85);
+  --shadow-raised-lg:
+    10px 10px 26px rgba(122, 90, 46, 0.18),
+    -10px -10px 26px rgba(255, 253, 248, 0.95);
+  --shadow-pressed:
+    inset 4px 4px 9px rgba(122, 90, 46, 0.2),
+    inset -4px -4px 9px rgba(255, 253, 248, 0.85);
+  --shadow-card: 0 10px 26px -8px rgba(40, 28, 10, 0.45);
+  --shadow-card-lifted: 0 22px 48px -12px rgba(40, 28, 10, 0.55);
+
+  /* ---- Radii ------------------------------------------------------ */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 30px;
+  --r-card: 18px;
+  --r-pill: 999px;
+
+  /* ---- Spacing (4px scale) ---------------------------------------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+  --s-16: 64px;
+
+  /* ---- Type ------------------------------------------------------- */
+  /* Cinzel for anything that should feel inscribed — card names, titles,
+   * numbers on the mat. Inter/system for UI that must stay legible small. */
+  --font-display: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-numeric: 'Cinzel', Georgia, serif;
+
+  --t-xs: 11px;
+  --t-sm: 13px;
+  --t-base: 15px;
+  --t-md: 17px;
+  --t-lg: 21px;
+  --t-xl: 27px;
+  --t-2xl: 34px;
+  --t-3xl: 44px;
+
+  /* ---- Motion ----------------------------------------------------- */
+  /* One easing vocabulary. Cards settle, they don't bounce arbitrarily. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-settle: cubic-bezier(0.16, 1.02, 0.3, 1);
+  --d-fast: 140ms;
+  --d-base: 240ms;
+  --d-slow: 420ms;
+  --d-reveal: 720ms;
+
+  /* ---- Layout ----------------------------------------------------- */
+  --tabbar-h: 68px;
+  --header-h: 56px;
+  --app-max-w: 520px;
+}
+
+/*
+ * Dark mode. The card art is already dark and warm, so dark mode is where this
+ * game actually wants to live — the shell recedes to a deep vellum brown and
+ * the gold reads like candlelight.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --bg: #17130d;
+    --bg-sunk: #0f0c07;
+    --surface: #1f1a12;
+    --surface-raised: #272016;
+    --surface-overlay: #2b2318;
+    --scrim: rgba(0, 0, 0, 0.7);
+
+    --ink: #efe4cf;
+    --ink-strong: #fdf6e7;
+    --ink-muted: #b3a488;
+    --ink-faint: #7d7059;
+    --ink-inverse: #17130d;
+
+    --gold: #c79c62;
+    --gold-bright: #f0d09a;
+    --gold-pale: #6a5334;
+    --gold-deep: #9c7742;
+    --gold-ink: #f0d09a;
+
+    --shadow-raised:
+      6px 6px 14px rgba(0, 0, 0, 0.5),
+      -6px -6px 14px rgba(255, 226, 176, 0.045);
+    --shadow-raised-sm:
+      3px 3px 7px rgba(0, 0, 0, 0.45),
+      -3px -3px 7px rgba(255, 226, 176, 0.04);
+    --shadow-raised-lg:
+      10px 10px 26px rgba(0, 0, 0, 0.55),
+      -10px -10px 26px rgba(255, 226, 176, 0.05);
+    --shadow-pressed:
+      inset 4px 4px 9px rgba(0, 0, 0, 0.55),
+      inset -4px -4px 9px rgba(255, 226, 176, 0.045);
+    --shadow-card: 0 10px 26px -8px rgba(0, 0, 0, 0.7);
+    --shadow-card-lifted: 0 22px 48px -12px rgba(0, 0, 0, 0.8);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #17130d;
+  --bg-sunk: #0f0c07;
+  --surface: #1f1a12;
+  --surface-raised: #272016;
+  --surface-overlay: #2b2318;
+  --scrim: rgba(0, 0, 0, 0.7);
+
+  --ink: #efe4cf;
+  --ink-strong: #fdf6e7;
+  --ink-muted: #b3a488;
+  --ink-faint: #7d7059;
+  --ink-inverse: #17130d;
+
+  --gold: #c79c62;
+  --gold-bright: #f0d09a;
+  --gold-pale: #6a5334;
+  --gold-deep: #9c7742;
+  --gold-ink: #f0d09a;
+
+  --shadow-raised:
+    6px 6px 14px rgba(0, 0, 0, 0.5),
+    -6px -6px 14px rgba(255, 226, 176, 0.045);
+  --shadow-raised-sm:
+    3px 3px 7px rgba(0, 0, 0, 0.45),
+    -3px -3px 7px rgba(255, 226, 176, 0.04);
+  --shadow-raised-lg:
+    10px 10px 26px rgba(0, 0, 0, 0.55),
+    -10px -10px 26px rgba(255, 226, 176, 0.05);
+  --shadow-pressed:
+    inset 4px 4px 9px rgba(0, 0, 0, 0.55),
+    inset -4px -4px 9px rgba(255, 226, 176, 0.045);
+  --shadow-card: 0 10px 26px -8px rgba(0, 0, 0, 0.7);
+  --shadow-card-lifted: 0 22px 48px -12px rgba(0, 0, 0, 0.8);
+}

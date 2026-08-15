@@ -1,0 +1,161 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Fonts are self-hosted rather than pulled from Google. This is a PWA that has
+ * to render correctly offline, and a card game whose whole identity rests on
+ * Cinzel's inscribed capitals — a fallback to Georgia mid-match would be
+ * visible. Both files are latin-subset variable woff2, 80 KB together.
+ */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/cinzel-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2018-201A,
+    U+201C-201E, U+2020, U+2030, U+2039-203A, U+2044, U+2212;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2018-201A,
+    U+201C-201E, U+2020, U+2030, U+2039-203A, U+2044, U+2212;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: var(--t-base);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+
+    /* This is a game, not a document: no rubber-banding, no text selection,
+     * no long-press callout, no double-tap zoom fighting the card taps. */
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Inputs are the one place selection must still work. */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+    border-radius: var(--r-xs);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* The two structural surfaces every screen is built from. */
+  .neu {
+    background: var(--surface);
+    box-shadow: var(--shadow-raised);
+  }
+
+  .neu-sunk {
+    background: var(--bg-sunk);
+    box-shadow: var(--shadow-pressed);
+  }
+
+  /* Gold leaf applied to text — used for titles and the logo. */
+  .gold-leaf {
+    background: var(--gold-leaf);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Scrollers inside the app never show a bar; the content bleeds instead. */
+  .scroll-y {
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-y::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scroll-x {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  /* Safe-area helpers for notched phones in standalone PWA mode. */
+  .pt-safe {
+    padding-top: max(var(--s-3), env(safe-area-inset-top));
+  }
+  .pb-safe {
+    padding-bottom: max(var(--s-3), env(safe-area-inset-bottom));
+  }
+  .mb-tabbar {
+    margin-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  }
+}

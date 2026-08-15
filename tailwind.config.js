@@ -1,0 +1,77 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    // Tailwind reads the CSS custom properties in src/styles/tokens.css so
+    // there is exactly one place a colour or radius is ever defined.
+    extend: {
+      colors: {
+        bg: 'var(--bg)',
+        'bg-sunk': 'var(--bg-sunk)',
+        surface: 'var(--surface)',
+        'surface-raised': 'var(--surface-raised)',
+        'surface-overlay': 'var(--surface-overlay)',
+        ink: 'var(--ink)',
+        'ink-strong': 'var(--ink-strong)',
+        'ink-muted': 'var(--ink-muted)',
+        'ink-faint': 'var(--ink-faint)',
+        'ink-inverse': 'var(--ink-inverse)',
+        gold: 'var(--gold)',
+        'gold-bright': 'var(--gold-bright)',
+        'gold-pale': 'var(--gold-pale)',
+        'gold-deep': 'var(--gold-deep)',
+        'gold-ink': 'var(--gold-ink)',
+        positive: 'var(--positive)',
+        negative: 'var(--negative)',
+        warning: 'var(--warning)',
+        info: 'var(--info)',
+        light: 'var(--energy-light)',
+        fire: 'var(--energy-fire)',
+        water: 'var(--energy-water)',
+        earth: 'var(--energy-earth)',
+        spirit: 'var(--energy-spirit)',
+        shadow: 'var(--energy-shadow)',
+      },
+      fontFamily: {
+        display: 'var(--font-display)',
+        body: 'var(--font-body)',
+        numeric: 'var(--font-numeric)',
+      },
+      fontSize: {
+        xs: 'var(--t-xs)',
+        sm: 'var(--t-sm)',
+        base: 'var(--t-base)',
+        md: 'var(--t-md)',
+        lg: 'var(--t-lg)',
+        xl: 'var(--t-xl)',
+        '2xl': 'var(--t-2xl)',
+        '3xl': 'var(--t-3xl)',
+      },
+      borderRadius: {
+        xs: 'var(--r-xs)',
+        sm: 'var(--r-sm)',
+        md: 'var(--r-md)',
+        lg: 'var(--r-lg)',
+        xl: 'var(--r-xl)',
+        card: 'var(--r-card)',
+        pill: 'var(--r-pill)',
+      },
+      boxShadow: {
+        raised: 'var(--shadow-raised)',
+        'raised-sm': 'var(--shadow-raised-sm)',
+        'raised-lg': 'var(--shadow-raised-lg)',
+        pressed: 'var(--shadow-pressed)',
+        card: 'var(--shadow-card)',
+        'card-lifted': 'var(--shadow-card-lifted)',
+      },
+      transitionTimingFunction: {
+        out: 'var(--ease-out)',
+        settle: 'var(--ease-settle)',
+      },
+      maxWidth: {
+        app: 'var(--app-max-w)',
+      },
+    },
+  },
+  plugins: [],
+}
