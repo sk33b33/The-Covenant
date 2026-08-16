@@ -139,25 +139,34 @@
    * highlight moves with the card rather than sitting on it. Its strength
    * rides --rim-glint, which the viewer raises with the tilt.
    *
-   * Narrow and hard-edged: a 6° ramp into a 3° core. A soft wide band reads as
-   * sheen, which was the right shape against a surface that scattered light
-   * and the wrong one against a polished rim — polished metal throws a tight,
-   * bright line, and the tightness is what makes it read as a reflection
-   * rather than a glow. The opposite band is dimmer, as a second bounce is.
+   * A hard core inside a soft shoulder, which is the shape that reads as
+   * *bright* rather than merely as a stripe. The 3° white core keeps the
+   * tightness that makes it a reflection instead of a glow; the wide falloff
+   * either side of it is the bloom a polished surface throws around its
+   * specular, and it is what does most of the work of looking lit.
+   *
+   * The opposite band is lifted well clear of nothing, so more of the rim's
+   * circumference is lit at once and the ring never goes dark behind the
+   * travelling highlight. It stays dimmer than the core, as a second bounce is.
    */
   --metal-glint: conic-gradient(
     from calc(var(--rim-base) + var(--rim-drift) + 90deg),
     transparent 0deg,
-    transparent 36deg,
-    rgba(255, 255, 255, 0.55) 42deg,
+    rgba(255, 255, 255, 0.1) 18deg,
+    rgba(255, 255, 255, 0.34) 34deg,
+    rgba(255, 255, 255, 0.72) 42deg,
     rgba(255, 255, 255, 1) 45deg,
-    rgba(255, 255, 255, 0.55) 48deg,
-    transparent 54deg,
-    transparent 214deg,
-    rgba(255, 255, 255, 0.34) 220deg,
-    rgba(255, 255, 255, 0.68) 224deg,
-    rgba(255, 255, 255, 0.34) 228deg,
-    transparent 234deg,
+    rgba(255, 255, 255, 0.72) 48deg,
+    rgba(255, 255, 255, 0.34) 56deg,
+    rgba(255, 255, 255, 0.1) 72deg,
+    transparent 96deg,
+    transparent 190deg,
+    rgba(255, 255, 255, 0.12) 206deg,
+    rgba(255, 255, 255, 0.44) 218deg,
+    rgba(255, 255, 255, 0.78) 224deg,
+    rgba(255, 255, 255, 0.44) 230deg,
+    rgba(255, 255, 255, 0.12) 242deg,
+    transparent 262deg,
     transparent 360deg
   );
 

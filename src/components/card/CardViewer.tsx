@@ -27,10 +27,11 @@ import { usePeek } from '@/store/peek'
  * your Active Figure mid-match, which also carries its attacks underneath, so
  * one tap still both inspects and acts.
  *
- * The card leans toward your thumb, and both the holo sheen and the metal rim
- * track that lean: the pairing is what makes a rare card feel like a physical
- * foil rather than a picture of one. Release and it springs back level. Motion
- * is dropped entirely under `prefers-reduced-motion`.
+ * The card presses away from your thumb, as though pushed flat against a
+ * table, and both the holo sheen and the metal rim track that lean: the
+ * pairing is what makes a rare card feel like a physical foil rather than a
+ * picture of one. Release and it springs back level. Motion is dropped
+ * entirely under `prefers-reduced-motion`.
  *
  * Touch is the only input. The gyroscope drove this too once, which meant a
  * card turned on its own while you were reading it.
@@ -114,17 +115,15 @@ function Viewer({
   const sy = useSpring(py, TILT_SPRING)
 
   /*
-   * The card leans toward the finger: touch the right edge and that edge comes
-   * up to meet you, touch the top and the top tips forward.
+   * The card presses away from the finger: touch the right edge and that edge
+   * goes down, as though you were pushing a card flat against a table.
    *
-   * That is the opposite of the "press it flat" convention, and it is worth
-   * naming because the signs look wrong at a glance. A positive rotateY sends
-   * the *right* edge away from the viewer, so following the finger on that
-   * side means negating it; a positive rotateX sends the *top* edge away, so
-   * following the finger there means not negating it.
+   * A positive rotateY already sends the right edge away from the viewer and a
+   * positive rotateX already sends the top edge away, so this convention is
+   * the one that needs no negation on either axis.
    */
-  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
+  const rotateY = useTransform(sx, (v) => v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
 
   /*
    * The light is derived from the rotation, not from the pointer.
@@ -144,7 +143,10 @@ function Viewer({
     Math.min(1, Math.hypot(x, y)),
   )
   const holoOpacity = useTransform(lit, (v) => 0.5 + v * 0.45)
-  const glint = useTransform(lit, (v) => 0.15 + v * 0.85)
+  // A high resting floor on purpose. At 0.15 a card sitting still carried
+  // almost no highlight and read closer to matte than to metal — polished metal
+  // is bright before you move it, and only *changes* when you do.
+  const glint = useTransform(lit, (v) => 0.38 + v * 0.62)
 
   useEffect(() => {
     reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches

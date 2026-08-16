@@ -1,17 +1,13 @@
 import { useEffect, useState } from 'react'
 import { CheckIcon, ScrollIcon, SocialIcon, TreeMark } from '@/art/icons'
 import { Button, Panel } from '@/components/ui'
-import { isMuted, setMuted } from '@/lib/sound'
 import { CARDS } from '@/data/cards'
 import { ECONOMY, RULES } from '@/game/config'
 import { clearAll } from '@/store/persist'
 import { useNav } from '@/store/nav'
 import { useProfile } from '@/store/profile'
+import { applyTheme, resolveTheme, type Theme } from '@/lib/theme'
 import { cx } from '@/lib/cx'
-
-type Theme = 'system' | 'light' | 'dark'
-
-const THEME_KEY = 'covenant:theme'
 
 /**
  * Settings and the rules reference.
@@ -25,28 +21,10 @@ export function Menu() {
   const go = useNav((s) => s.go)
   const profile = useProfile()
 
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      return (localStorage.getItem(THEME_KEY) as Theme) ?? 'system'
-    } catch {
-      return 'system'
-    }
-  })
-  const [sound, setSound] = useState(() => !isMuted())
+  const [theme, setTheme] = useState<Theme>(resolveTheme)
   const [confirmReset, setConfirmReset] = useState(false)
 
-  useEffect(() => {
-    // 'system' removes the attribute entirely so the media query decides;
-    // an explicit choice stamps the root and wins in both directions.
-    if (theme === 'system') document.documentElement.removeAttribute('data-theme')
-    else document.documentElement.setAttribute('data-theme', theme)
-
-    try {
-      localStorage.setItem(THEME_KEY, theme)
-    } catch {
-      /* storage denied; the choice still applies for this session */
-    }
-  }, [theme])
+  useEffect(() => applyTheme(theme), [theme])
 
   const reset = () => {
     clearAll()
@@ -89,14 +67,14 @@ export function Menu() {
         {/* ----------------------------------------------------------- theme */}
         <h2 className="font-display text-md mt-6 mb-2 px-1">Appearance</h2>
         <Panel className="p-3">
-          <div className="grid grid-cols-3 gap-2">
-            {(['system', 'light', 'dark'] as Theme[]).map((option) => (
+          <div className="grid grid-cols-2 gap-2">
+            {(['dark', 'light'] as Theme[]).map((option) => (
               <button
                 key={option}
                 onClick={() => setTheme(option)}
                 aria-pressed={theme === option}
                 className={cx(
-                  'rounded-md py-2.5 text-sm capitalize transition-all',
+                  'rounded-md py-3 text-sm capitalize transition-all',
                   theme === option ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
                 )}
                 style={{ background: theme === option ? 'var(--bg-sunk)' : 'var(--surface)' }}
@@ -107,37 +85,9 @@ export function Menu() {
             ))}
           </div>
           <p className="text-xs text-ink-muted mt-2.5 leading-snug">
-            The card art is dark and warm, so dark mode is where this game wants
-            to live. System follows your phone.
-          </p>
-        </Panel>
-
-        {/* ----------------------------------------------------------- sound */}
-        <h2 className="font-display text-md mt-6 mb-2 px-1">Sound</h2>
-        <Panel className="p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {([true, false] as const).map((on) => (
-              <button
-                key={String(on)}
-                onClick={() => {
-                  setMuted(!on)
-                  setSound(on)
-                }}
-                aria-pressed={sound === on}
-                className={cx(
-                  'rounded-md py-2.5 text-sm transition-all',
-                  sound === on ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
-                )}
-                style={{ background: sound === on ? 'var(--bg-sunk)' : 'var(--surface)' }}
-              >
-                {sound === on && <CheckIcon size={13} className="inline mr-1 -mt-0.5" />}
-                {on ? 'On' : 'Off'}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-ink-muted mt-2.5 leading-snug">
-            A chord as you enter, and a soft tick when you press something.
-            Nothing is downloaded for either — both are generated on the device.
+            The card art is dark and warm, so dark is where this game wants to
+            live. Your phone's setting picks the first time; after that this
+            does.
           </p>
         </Panel>
 
@@ -232,16 +182,4 @@ function Rule({ title, body }: { title: string; body: string }) {
       <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">{body}</p>
     </div>
   )
-}
-
-/** Applies the saved theme before first paint, so there is no flash. */
-export function applySavedTheme(): void {
-  try {
-    const saved = localStorage.getItem(THEME_KEY)
-    if (saved === 'light' || saved === 'dark') {
-      document.documentElement.setAttribute('data-theme', saved)
-    }
-  } catch {
-    /* storage denied; fall through to the system preference */
-  }
 }

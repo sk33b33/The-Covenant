@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { asset } from './lib/asset'
-import { applySavedTheme } from './screens/Menu'
+import { applySavedTheme } from './lib/theme'
 import './styles/global.css'
 
 // Before the first paint, so an explicit theme choice never flashes the

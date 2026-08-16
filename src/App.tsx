@@ -18,8 +18,6 @@ import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
-import { playTap } from '@/lib/sound'
-import { wantsTapSound, type TapNode } from '@/lib/tapTarget'
 import { useNav, type Route } from '@/store/nav'
 import { useProfile } from '@/store/profile'
 
@@ -45,19 +43,6 @@ export default function App() {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [back])
-
-  // One delegated listener for every control in the app. Editing Button,
-  // PressableCard, TabBar and the several dozen bare <button>s across the
-  // screens would work today and drift the moment a screen is added; a single
-  // listener cannot. `pointerdown`, not `click`, so the tick lands on the press.
-  useEffect(() => {
-    const onPress = (e: PointerEvent) => {
-      const path = e.composedPath().filter(isElement).map(describe)
-      if (wantsTapSound(path)) playTap()
-    }
-    document.addEventListener('pointerdown', onPress, true)
-    return () => document.removeEventListener('pointerdown', onPress, true)
-  }, [])
 
   // The splash is an overlay, so the interface beneath it is already painted —
   // chrome included. That is what the art dissolves *to*.
@@ -97,21 +82,6 @@ export default function App() {
       <CardViewer />
     </div>
   )
-}
-
-/** Reduces a DOM node to what the tap rule needs, so the rule stays DOM-free. */
-function isElement(target: EventTarget): target is Element {
-  return target instanceof Element
-}
-
-function describe(el: Element): TapNode {
-  return {
-    tag: el.tagName.toLowerCase(),
-    role: el.getAttribute('role') ?? undefined,
-    disabled: el instanceof HTMLButtonElement ? el.disabled : undefined,
-    muted: el.hasAttribute('data-mute-tap'),
-    card: el.classList.contains('cov-card'),
-  }
 }
 
 /** Distinct key per screen so AnimatePresence swaps rather than morphs. */
