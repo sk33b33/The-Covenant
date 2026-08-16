@@ -19,18 +19,10 @@ import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
 import { useNav, type Route } from '@/store/nav'
-import { useProfile } from '@/store/profile'
 
 export default function App() {
   const route = useNav((s) => s.route)
-  const setTab = useNav((s) => s.setTab)
   const back = useNav((s) => s.back)
-  const isNew = useProfile((s) => s.isNew)
-
-  // Returning players skip the splash; it is a first-run moment, not a gate.
-  useEffect(() => {
-    if (!isNew && route.name === 'enter') setTab('home')
-  }, [isNew, route.name, setTab])
 
   // The hardware and browser back gesture pops our stack instead of leaving
   // the app. A sentinel history entry gives us something to pop.

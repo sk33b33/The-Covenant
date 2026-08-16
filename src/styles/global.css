@@ -252,58 +252,91 @@
 
 @layer components {
   /*
-   * The pack carousel.
+   * The pack carousel, as a turning ring.
    *
-   * `--pack-w` is declared once and used twice: for the item's width and for
-   * the track's inline padding. Held apart as two literals they drift, and the
-   * moment they disagree the end packs stop being able to centre — which is
-   * exactly the bug this replaced.
+   * The stage holds the perspective and takes the drag; the ring inside it is
+   * the only thing that rotates. Each pack is parked at its own angle and
+   * pushed out along z, so a single rotation on the parent moves all of them —
+   * three packs turning for the cost of one transform.
    */
-  .cov-packs {
-    /*
-     * Viewport units, not a percentage, and that is the whole fix.
-     *
-     * A percentage width on a flex child resolves against the flex container's
-     * *content* box — which this very padding shrinks. So the padding was sized
-     * for a 183px item while the item came out 86px, and every end pack sat
-     * 49px short of the centre. The two numbers have to resolve against bases
-     * that do not depend on each other.
-     */
-    --pack-w: min(47vw, 190px);
-    padding-inline: calc(50% - var(--pack-w) / 2);
-    perspective: 900px;
+  .cov-ring-stage {
+    --pack-w: min(46vw, 176px);
+    /* Three packs 120 degrees apart would only just clear each other at
+     * w/2 / tan(60deg) — about 0.29w — which stacks the two behind almost on
+     * top of the front one. A radius slightly over the pack's own width
+     * separates them and puts the back pair convincingly behind. */
+    --ring-r: calc(var(--pack-w) * 1.05);
+    height: calc(var(--pack-w) * 1.42);
+    /* Since every pack faces the camera, perspective no longer skews any face —
+     * all it does is set how hard depth bites. At 1000px the flanks came back
+     * nearly as large as the front pack and spilled past the panel; at 560 they
+     * read as clearly further away and sit inside it. */
+    perspective: 560px;
+    touch-action: pan-y;
+    position: relative;
   }
 
-  /*
-   * Two properties, both written by the scroll handler each frame: `--pack-t`
-   * is the pack's signed distance from the centre in pack-widths, `--pack-d`
-   * the same already made absolute and clamped.
-   *
-   * The magnitude comes from JS rather than from `abs()` here because CSS
-   * `abs()` only landed in Chrome 133, and this has to work on the phones
-   * people actually have. One extra line in a handler that was already
-   * iterating the children buys a floor of support several years lower.
-   */
-  .cov-pack {
-    width: var(--pack-w);
-    transform: rotateY(calc(var(--pack-t, 0) * -22deg))
-      scale(calc(1 - var(--pack-d, 0) * 0.16));
-    opacity: calc(1 - var(--pack-d, 0) * 0.45);
-    filter: drop-shadow(0 12px 22px rgba(40, 28, 10, 0.45));
+  .cov-ring {
+    position: absolute;
+    inset: 0;
     transform-style: preserve-3d;
+    transform: translateZ(calc(var(--ring-r) * -1)) rotateY(var(--ring-rot, 0deg));
   }
 
-  /* Registered so they can be read inside calc() in a transform; unregistered,
-   * a custom property is a string and the transform is simply invalid. */
-  @property --pack-t {
-    syntax: '<number>';
-    inherits: false;
-    initial-value: 0;
+  .cov-ring-pack {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: var(--pack-w);
+    margin-left: calc(var(--pack-w) / -2);
+    /* Parked on the cylinder, then turned back to face the camera.
+     *
+     * Without that last rotation this is a true cylinder, and a true cylinder
+     * with three packs is unreadable at rest: the flanks sit at 120 and 240
+     * degrees, both past side-on, so both show their backs and their titles
+     * come out mirrored. Counter-rotating by the pack's own total angle — the
+     * ring's rotation included, which is why --pack-face is written per frame
+     * rather than derived here — keeps every pack legible while it still
+     * orbits, recedes and comes back round. */
+    transform: rotateY(calc(var(--pack-i) * var(--ring-step, 120deg)))
+      translateZ(var(--ring-r)) rotateY(calc(var(--pack-face, 0deg) * -1));
+    /* --pack-d is 0 facing the viewer and 1 side-on, written each frame by the
+     * ring's subscription. The packs behind recede rather than disappearing,
+     * so the ring reads as a carousel and not as a stack of cards. */
+    opacity: calc(1 - var(--pack-d, 0) * 0.55);
+    filter: drop-shadow(0 12px 22px rgba(40, 28, 10, 0.45));
   }
 
+  /* Registered so `calc(var(--pack-i) * var(--ring-step))` resolves as a real
+   * angle. An unregistered custom property substitutes as a raw token, which
+   * happens to work in Chrome and is not something to rely on. */
   @property --pack-d {
     syntax: '<number>';
     inherits: false;
     initial-value: 0;
+  }
+
+  @property --pack-face {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  @property --pack-i {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0;
+  }
+
+  @property --ring-step {
+    syntax: '<angle>';
+    inherits: true;
+    initial-value: 120deg;
+  }
+
+  @property --ring-rot {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
 import { PackWrapper } from '@/art/PackWrapper'
 import {
   BinderIcon,
@@ -265,10 +265,15 @@ function IconButton({
 
 /* -------------------------------------------------------- pack carousel */
 
-/** Matches the `gap-3` on the track; the falloff normalises against it. */
-const PACK_GAP = 12
-
-
+/**
+ * The packs on a turning ring.
+ *
+ * Each pack is parked at its own angle on a cylinder and only the ring itself
+ * rotates, so three packs move because their parent turned rather than because
+ * three transforms were recalculated. Drag it far enough and it keeps going —
+ * past the back and round to the front again, which a flat scroller with two
+ * ends could never do.
+ */
 function PackCarousel({
   packs,
   active,
@@ -278,102 +283,144 @@ function PackCarousel({
   active: number
   onActive: (i: number) => void
 }) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const frame = useRef(0)
+  const ringRef = useRef<HTMLDivElement>(null)
+  const step = 360 / packs.length
+
+  // The ring's angle in degrees, unbounded in both directions: it is allowed to
+  // wind past 360 and keep counting, which is what lets a long drag spin
+  // through several full turns instead of stopping at an end.
+  const angle = useMotionValue(0)
+  // Stiff and just under critically damped. A softer spring reads as lag while
+  // the finger is down — the ring trailing behind the drag by a tenth of a
+  // second — which is the exact complaint the card tilt was rebuilt to fix.
+  // This settles in about 60ms with a hair of overshoot on release.
+  const spring = useSpring(angle, { stiffness: 420, damping: 30, mass: 0.9 })
+  // A spring is animated in JavaScript, so the stylesheet's reduced-motion rule
+  // cannot reach it. Reading the raw value instead makes every spin land
+  // instantly rather than travelling.
+  const reduce = useReducedMotion()
+  const spun = reduce ? angle : spring
+
+  const drag = useRef<{ x: number; from: number; moved: boolean } | null>(null)
+  // A drag that ends over a pack still fires that pack's click. Without this
+  // the ring would snap where you released it and then immediately spin
+  // somewhere else, which reads as the carousel fighting you.
+  const dragged = useRef(false)
+
+  // Kept in a ref so the frame subscription below can compare against it
+  // without being torn down and rebuilt every time the centred pack changes.
+  const activeRef = useRef(active)
+  activeRef.current = active
 
   /**
-   * Writes each pack's signed distance from the centre onto the element, and
-   * lets CSS turn that into scale, opacity and a little rotation.
+   * Writes the ring's angle and each pack's facing onto the elements directly.
    *
-   * Not React state. This runs on every scroll frame, and a setState per frame
-   * would re-render the whole hub — the same trap the card tilt was rewritten
-   * to escape. The one thing React does need is which pack is *centred*, and
-   * that changes a few times per swipe rather than sixty times a second.
+   * Not React state — this runs on every frame of a drag, and a setState per
+   * frame would re-render the whole hub. The same discipline the card tilt is
+   * built on. React is told only which pack is *front*, which changes a few
+   * times per spin rather than sixty times a second.
    */
-  const measure = () => {
-    const track = trackRef.current
-    if (!track) return
-    const centre = track.scrollLeft + track.clientWidth / 2
-
-    let closest = 0
-    let best = Infinity
-
-    Array.from(track.children).forEach((el, i) => {
-      const child = el as HTMLElement
-      const offset = child.offsetLeft + child.clientWidth / 2 - centre
-      // Normalised by the pack's own width, so one whole step from the centre
-      // is exactly 1 whatever the viewport does to the item size.
-      const t = offset / (child.clientWidth + PACK_GAP)
-      child.style.setProperty('--pack-t', String(t))
-      child.style.setProperty('--pack-d', String(Math.min(Math.abs(t), 1)))
-
-      const d = Math.abs(offset)
-      if (d < best) {
-        best = d
-        closest = i
-      }
-    })
-
-    if (closest !== active) onActive(closest)
-  }
-
-  const onScroll = () => {
-    cancelAnimationFrame(frame.current)
-    frame.current = requestAnimationFrame(measure)
-  }
-
-  // Centre the initially-active pack without animating on first paint, and lay
-  // the falloff in before the first frame so nothing pops.
   useEffect(() => {
-    const track = trackRef.current
-    const child = track?.children[active] as HTMLElement | undefined
-    if (!track || !child) return
-    track.scrollLeft = child.offsetLeft - (track.clientWidth - child.clientWidth) / 2
-    measure()
+    const paint = (deg: number) => {
+      const ring = ringRef.current
+      if (!ring) return
+      ring.style.setProperty('--ring-rot', `${deg}deg`)
 
-    const onResize = () => measure()
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      cancelAnimationFrame(frame.current)
+      let front = 0
+      let best = Infinity
+
+      Array.from(ring.children).forEach((el, i) => {
+        // How far this pack is from facing the viewer, folded into -180..180 so
+        // the pack that has just gone round the back reads as near, not as 359
+        // degrees away.
+        const raw = (((i * step + deg) % 360) + 540) % 360 - 180
+        const facing = Math.min(Math.abs(raw) / 90, 1)
+        const node = el as HTMLElement
+        node.style.setProperty('--pack-d', String(facing))
+        // The counter-rotation that keeps this pack facing the camera. It has
+        // to be the total angle, ring included, so it can only be written here.
+        node.style.setProperty('--pack-face', `${raw}deg`)
+
+        if (Math.abs(raw) < best) {
+          best = Math.abs(raw)
+          front = i
+        }
+      })
+
+      if (front !== activeRef.current) {
+        activeRef.current = front
+        onActive(front)
+      }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const scrollTo = (i: number) => {
-    const track = trackRef.current
-    const child = track?.children[i] as HTMLElement | undefined
-    if (!track || !child) return
-    track.scrollTo({
-      left: child.offsetLeft - (track.clientWidth - child.clientWidth) / 2,
-      behavior: 'smooth',
-    })
+    paint(spun.get())
+    return spun.on('change', paint)
+  }, [spun, step, onActive])
+
+  const spinTo = (i: number) => {
+    // Take the short way round rather than unwinding through the others.
+    const current = angle.get()
+    const target = -i * step
+    angle.set(current + (((target - current + 540) % 360) - 180))
   }
 
   return (
     <div>
-      {/*
-        The inline padding is what lets the first and last packs reach the
-        middle at all. With only the old px-4, centring pack one would have
-        needed a negative scrollLeft, so the ends could never occupy a snap
-        point and snap-mandatory dragged them back off-centre — which is why it
-        never felt like it locked. Half the leftover width on each side gives
-        every pack somewhere to land.
-      */}
       <div
-        ref={trackRef}
-        onScroll={onScroll}
-        className="cov-packs scroll-x flex gap-3 snap-x snap-mandatory"
+        className="cov-ring-stage"
+        // Derived from the pack count rather than hardcoded at 120, so a fourth
+        // pack lands on the ring correctly without touching the stylesheet.
+        style={{ '--ring-step': `${step}deg` } as React.CSSProperties}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          dragged.current = false
+          drag.current = { x: e.clientX, from: angle.get(), moved: false }
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current
+          if (!d) return
+          const dx = e.clientX - d.x
+          // Below the threshold this is still a tap on a pack, not a spin.
+          if (Math.abs(dx) > 8) d.moved = true
+          // A drag across the stage's full width turns the ring most of a
+          // half-turn, which makes reaching the pack behind you one gesture.
+          const width = e.currentTarget.clientWidth || 1
+          angle.set(d.from + (dx / width) * 150)
+        }}
+        onPointerUp={(e) => {
+          e.currentTarget.releasePointerCapture(e.pointerId)
+          dragged.current = drag.current?.moved ?? false
+          drag.current = null
+          // Settle on whichever pack ended up nearest the front, keeping the
+          // accumulated winding so a spin never jumps back to where it began.
+          angle.set(Math.round(angle.get() / step) * step)
+        }}
+        onPointerCancel={() => {
+          dragged.current = drag.current?.moved ?? false
+          drag.current = null
+          angle.set(Math.round(angle.get() / step) * step)
+        }}
       >
-        {packs.map((pack, i) => (
-          <button
-            key={pack.id}
-            onClick={() => scrollTo(i)}
-            className="cov-pack snap-center shrink-0 rounded-md"
-            aria-label={`${pack.name} pack`}
-          >
-            <PackWrapper pack={pack} setCode={GENESIS.code} />
-          </button>
-        ))}
+        <div ref={ringRef} className="cov-ring">
+          {packs.map((pack, i) => (
+            <button
+              key={pack.id}
+              onClick={(e) => {
+                // `detail` is 0 when a button is activated from the keyboard,
+                // which no drag can have preceded — so the guard applies to
+                // real pointer clicks only.
+                if (dragged.current && e.detail > 0) return
+                if (i !== active) spinTo(i)
+              }}
+              className="cov-ring-pack"
+              style={{ '--pack-i': i } as React.CSSProperties}
+              aria-label={`${pack.name} pack`}
+              aria-current={i === active ? 'true' : undefined}
+            >
+              <PackWrapper pack={pack} setCode={GENESIS.code} />
+            </button>
+          ))}
+        </div>
       </div>
 
       <p className="text-center text-xs text-ink-muted mt-2.5 px-2 min-h-[2.4em]">
@@ -384,7 +431,7 @@ function PackCarousel({
         {packs.map((p, i) => (
           <button
             key={p.id}
-            onClick={() => scrollTo(i)}
+            onClick={() => spinTo(i)}
             aria-label={`Show ${p.name}`}
             className={cx(
               'h-1.5 rounded-pill transition-all duration-300',

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { asset } from '@/lib/asset'
 import { STARTER_CARD_IDS } from '@/data/starter'
@@ -14,6 +15,11 @@ import { useNav } from '@/store/nav'
  * reads as a mistake. The art is the entire screen; the interface is one line
  * of text and a tap target the size of the display.
  *
+ * The tap is the only way in — there is no path that skips this screen — and it
+ * carries the entry sound. The sound is fired and forgotten: `play()` rejects
+ * on a blocked or failed load, and an entry that depended on it would leave a
+ * player staring at a splash that will not open.
+ *
  * Rendered as an overlay by App rather than as a routed screen, so its exit
  * plays over the top of the interface: the painting dissolves to reveal a game
  * that was already there, instead of cutting to it. The exit is slow — a
@@ -21,7 +27,52 @@ import { useNav } from '@/store/nav'
  * meant to be watched.
 
  */
+/** Trimmed to six seconds by scripts/trim-audio.py; the fade is below. */
+const FADE_MS = 900
+
 export function Enter() {
+  const audio = useRef<HTMLAudioElement | null>(null)
+
+  // Built on mount so the file is fetched and decoded before the tap, rather
+  // than starting a download at the moment the sound is meant to play.
+  useEffect(() => {
+    const el = new Audio(asset('audio/enter.mp3'))
+    el.preload = 'auto'
+    audio.current = el
+    return () => {
+      el.pause()
+      audio.current = null
+    }
+  }, [])
+
+  /*
+   * The clip is cut on a frame boundary, which is the only way to shorten an
+   * MP3 without an encoder — so it ends wherever the waveform happened to be.
+   * Ramping the volume down over the last moments is what turns that cut into
+   * an ending.
+   */
+  const playChime = () => {
+    const el = audio.current
+    if (!el) return
+
+    el.currentTime = 0
+    el.volume = 1
+    void el.play().catch(() => {
+      /* autoplay refused or the file never arrived; entry does not depend on it */
+    })
+
+    const fadeAt = Math.max(0, (el.duration || 6) * 1000 - FADE_MS)
+    window.setTimeout(() => {
+      const step = window.setInterval(() => {
+        el.volume = Math.max(0, el.volume - 0.06)
+        if (el.volume <= 0.01) {
+          window.clearInterval(step)
+          el.pause()
+        }
+      }, FADE_MS / 16)
+    }, fadeAt)
+  }
+
   const isNew = useProfile((s) => s.isNew)
   const markSeen = useProfile((s) => s.markSeen)
   const setTab = useNav((s) => s.setTab)
@@ -29,6 +80,8 @@ export function Enter() {
   const ensureStarter = useDecks((s) => s.ensureStarter)
 
   const enter = () => {
+    playChime()
+
     // First entry hands over a playable deck. Landing on an empty binder, an
     // empty deck list and an unusable Battle tab is three dead ends before the
     // game has said anything.
