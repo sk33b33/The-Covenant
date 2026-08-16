@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckIcon, ScrollIcon, SocialIcon, TreeMark } from '@/art/icons'
 import { Button, Panel } from '@/components/ui'
+import { isMuted, setMuted } from '@/lib/sound'
 import { CARDS } from '@/data/cards'
 import { ECONOMY, RULES } from '@/game/config'
 import { clearAll } from '@/store/persist'
@@ -31,6 +32,7 @@ export function Menu() {
       return 'system'
     }
   })
+  const [sound, setSound] = useState(() => !isMuted())
   const [confirmReset, setConfirmReset] = useState(false)
 
   useEffect(() => {
@@ -107,6 +109,35 @@ export function Menu() {
           <p className="text-xs text-ink-muted mt-2.5 leading-snug">
             The card art is dark and warm, so dark mode is where this game wants
             to live. System follows your phone.
+          </p>
+        </Panel>
+
+        {/* ----------------------------------------------------------- sound */}
+        <h2 className="font-display text-md mt-6 mb-2 px-1">Sound</h2>
+        <Panel className="p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {([true, false] as const).map((on) => (
+              <button
+                key={String(on)}
+                onClick={() => {
+                  setMuted(!on)
+                  setSound(on)
+                }}
+                aria-pressed={sound === on}
+                className={cx(
+                  'rounded-md py-2.5 text-sm transition-all',
+                  sound === on ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
+                )}
+                style={{ background: sound === on ? 'var(--bg-sunk)' : 'var(--surface)' }}
+              >
+                {sound === on && <CheckIcon size={13} className="inline mr-1 -mt-0.5" />}
+                {on ? 'On' : 'Off'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ink-muted mt-2.5 leading-snug">
+            A chord as you enter, and a soft tick when you press something.
+            Nothing is downloaded for either — both are generated on the device.
           </p>
         </Panel>
 

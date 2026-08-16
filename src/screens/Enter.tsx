@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { asset } from '@/lib/asset'
+import { playEnter } from '@/lib/sound'
 import { STARTER_CARD_IDS } from '@/data/starter'
 import { useCollection } from '@/store/collection'
 import { useDecks } from '@/store/decks'
@@ -13,6 +14,15 @@ import { useNav } from '@/store/nav'
  * lettering of its own beyond the prompt — a second title over a painted one
  * reads as a mistake. The art is the entire screen; the interface is one line
  * of text and a tap target the size of the display.
+ *
+ * Rendered as an overlay by App rather than as a routed screen, so its exit
+ * plays over the top of the interface: the painting dissolves to reveal a game
+ * that was already there, instead of cutting to it. The exit is slow — a
+ * second and a bit — because this is the one transition in the app that is
+ * meant to be watched.
+ *
+ * The tap carries the choral swell, and the screen opts out of the app-wide
+ * press tick so the two do not fire together.
  */
 export function Enter() {
   const isNew = useProfile((s) => s.isNew)
@@ -22,6 +32,10 @@ export function Enter() {
   const ensureStarter = useDecks((s) => s.ensureStarter)
 
   const enter = () => {
+    // The first gesture of the session, which is what lets the audio context
+    // start at all — browsers refuse to begin playback outside one.
+    playEnter()
+
     // First entry hands over a playable deck. Landing on an empty binder, an
     // empty deck list and an unusable Battle tab is three dead ends before the
     // game has said anything.
@@ -35,10 +49,17 @@ export function Enter() {
   }
 
   return (
-    <button
+    <motion.button
       onClick={enter}
-      className="fixed inset-0 w-full h-full overflow-hidden bg-[#0d0a06] cursor-pointer"
+      data-mute-tap
+      className="fixed inset-0 z-40 w-full h-full overflow-hidden bg-[#0d0a06] cursor-pointer"
       aria-label="Tap to enter The Covenant"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+      // Keeps drifting inward as it goes, so the art recedes into the screen
+      // rather than simply switching off.
+      exit={{ opacity: 0, scale: 1.06 }}
+      transition={{ duration: 1.15, ease: [0.4, 0, 0.2, 1] }}
     >
       {/* A very slow push-in so the screen breathes without drawing attention. */}
       <motion.img
@@ -88,6 +109,6 @@ export function Enter() {
           </motion.span>
         </motion.div>
       </div>
-    </button>
+    </motion.button>
   )
 }
