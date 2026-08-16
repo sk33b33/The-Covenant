@@ -265,6 +265,10 @@ function IconButton({
 
 /* -------------------------------------------------------- pack carousel */
 
+/** Matches the `gap-3` on the track; the falloff normalises against it. */
+const PACK_GAP = 12
+
+
 function PackCarousel({
   packs,
   active,
@@ -275,33 +279,65 @@ function PackCarousel({
   onActive: (i: number) => void
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
+  const frame = useRef(0)
 
-  // Centre the initially-active pack without animating on first paint.
-  useEffect(() => {
-    const track = trackRef.current
-    const child = track?.children[active] as HTMLElement | undefined
-    if (!track || !child) return
-    track.scrollLeft = child.offsetLeft - (track.clientWidth - child.clientWidth) / 2
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Track which pack is centred as the player swipes.
-  const onScroll = () => {
+  /**
+   * Writes each pack's signed distance from the centre onto the element, and
+   * lets CSS turn that into scale, opacity and a little rotation.
+   *
+   * Not React state. This runs on every scroll frame, and a setState per frame
+   * would re-render the whole hub — the same trap the card tilt was rewritten
+   * to escape. The one thing React does need is which pack is *centred*, and
+   * that changes a few times per swipe rather than sixty times a second.
+   */
+  const measure = () => {
     const track = trackRef.current
     if (!track) return
     const centre = track.scrollLeft + track.clientWidth / 2
 
     let closest = 0
     let best = Infinity
+
     Array.from(track.children).forEach((el, i) => {
       const child = el as HTMLElement
-      const d = Math.abs(child.offsetLeft + child.clientWidth / 2 - centre)
+      const offset = child.offsetLeft + child.clientWidth / 2 - centre
+      // Normalised by the pack's own width, so one whole step from the centre
+      // is exactly 1 whatever the viewport does to the item size.
+      const t = offset / (child.clientWidth + PACK_GAP)
+      child.style.setProperty('--pack-t', String(t))
+      child.style.setProperty('--pack-d', String(Math.min(Math.abs(t), 1)))
+
+      const d = Math.abs(offset)
       if (d < best) {
         best = d
         closest = i
       }
     })
+
     if (closest !== active) onActive(closest)
   }
+
+  const onScroll = () => {
+    cancelAnimationFrame(frame.current)
+    frame.current = requestAnimationFrame(measure)
+  }
+
+  // Centre the initially-active pack without animating on first paint, and lay
+  // the falloff in before the first frame so nothing pops.
+  useEffect(() => {
+    const track = trackRef.current
+    const child = track?.children[active] as HTMLElement | undefined
+    if (!track || !child) return
+    track.scrollLeft = child.offsetLeft - (track.clientWidth - child.clientWidth) / 2
+    measure()
+
+    const onResize = () => measure()
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      cancelAnimationFrame(frame.current)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollTo = (i: number) => {
     const track = trackRef.current
@@ -315,26 +351,28 @@ function PackCarousel({
 
   return (
     <div>
+      {/*
+        The inline padding is what lets the first and last packs reach the
+        middle at all. With only the old px-4, centring pack one would have
+        needed a negative scrollLeft, so the ends could never occupy a snap
+        point and snap-mandatory dragged them back off-centre — which is why it
+        never felt like it locked. Half the leftover width on each side gives
+        every pack somewhere to land.
+      */}
       <div
         ref={trackRef}
         onScroll={onScroll}
-        className="scroll-x flex gap-3 -mx-4 px-4 snap-x snap-mandatory"
+        className="cov-packs scroll-x flex gap-3 snap-x snap-mandatory"
       >
         {packs.map((pack, i) => (
-          <motion.button
+          <button
             key={pack.id}
             onClick={() => scrollTo(i)}
-            className="snap-center shrink-0 w-[47%] max-w-[190px] rounded-md"
-            animate={{
-              scale: i === active ? 1 : 0.88,
-              opacity: i === active ? 1 : 0.62,
-            }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            style={{ filter: 'drop-shadow(0 12px 22px rgba(40,28,10,.45))' }}
+            className="cov-pack snap-center shrink-0 rounded-md"
             aria-label={`${pack.name} pack`}
           >
             <PackWrapper pack={pack} setCode={GENESIS.code} />
-          </motion.button>
+          </button>
         ))}
       </div>
 

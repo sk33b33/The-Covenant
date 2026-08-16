@@ -249,3 +249,61 @@
     );
   }
 }
+
+@layer components {
+  /*
+   * The pack carousel.
+   *
+   * `--pack-w` is declared once and used twice: for the item's width and for
+   * the track's inline padding. Held apart as two literals they drift, and the
+   * moment they disagree the end packs stop being able to centre — which is
+   * exactly the bug this replaced.
+   */
+  .cov-packs {
+    /*
+     * Viewport units, not a percentage, and that is the whole fix.
+     *
+     * A percentage width on a flex child resolves against the flex container's
+     * *content* box — which this very padding shrinks. So the padding was sized
+     * for a 183px item while the item came out 86px, and every end pack sat
+     * 49px short of the centre. The two numbers have to resolve against bases
+     * that do not depend on each other.
+     */
+    --pack-w: min(47vw, 190px);
+    padding-inline: calc(50% - var(--pack-w) / 2);
+    perspective: 900px;
+  }
+
+  /*
+   * Two properties, both written by the scroll handler each frame: `--pack-t`
+   * is the pack's signed distance from the centre in pack-widths, `--pack-d`
+   * the same already made absolute and clamped.
+   *
+   * The magnitude comes from JS rather than from `abs()` here because CSS
+   * `abs()` only landed in Chrome 133, and this has to work on the phones
+   * people actually have. One extra line in a handler that was already
+   * iterating the children buys a floor of support several years lower.
+   */
+  .cov-pack {
+    width: var(--pack-w);
+    transform: rotateY(calc(var(--pack-t, 0) * -22deg))
+      scale(calc(1 - var(--pack-d, 0) * 0.16));
+    opacity: calc(1 - var(--pack-d, 0) * 0.45);
+    filter: drop-shadow(0 12px 22px rgba(40, 28, 10, 0.45));
+    transform-style: preserve-3d;
+  }
+
+  /* Registered so they can be read inside calc() in a transform; unregistered,
+   * a custom property is a string and the transform is simply invalid. */
+  @property --pack-t {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0;
+  }
+
+  @property --pack-d {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0;
+  }
+}

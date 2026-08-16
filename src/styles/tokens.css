@@ -170,6 +170,29 @@
     transparent 360deg
   );
 
+  /*
+   * The cosmos starburst, worn by the top two rarities.
+   *
+   * Four radial fields at four cell sizes, none a multiple of another, so the
+   * tiling never lines up into a visible lattice. Pure light with no colour of
+   * its own — screen-blended over whatever ground it lands on, so it works the
+   * same on a dark card and a parchment text box.
+   *
+   * The cells are small on purpose. Masked out of the artwork, the field only
+   * survives in the margin around it, and at the first sizes I tried a single
+   * cell was wider than that margin — so a binder thumbnail showed a row of
+   * chunky blocks along its foot rather than a starfield. Several cells have
+   * to fit across the thinnest strip they land in.
+   */
+  --foil-cosmos:
+    radial-gradient(circle at 24% 32%, rgba(255, 255, 255, 0.8) 0%, transparent 40%) 0 0 / 7px 7px,
+    radial-gradient(circle at 70% 66%, rgba(198, 226, 248, 0.55) 0%, transparent 34%) 2px 4px /
+      9px 9px,
+    radial-gradient(circle at 46% 14%, rgba(255, 244, 214, 0.46) 0%, transparent 30%) 5px 1px /
+      13px 13px,
+    radial-gradient(circle at 84% 86%, rgba(226, 198, 248, 0.4) 0%, transparent 32%) 1px 6px /
+      5px 5px;
+
   /* Trays and panels laid over a full-screen dark surface — the card viewer
    * over the battle mat, where the app's own --surface would be the wrong
    * ground entirely. */
@@ -278,6 +301,21 @@
   --tabbar-bg: color-mix(in srgb, var(--surface) 82%, transparent);
   --tabbar-line: color-mix(in srgb, var(--gold) 22%, transparent);
   --tabbar-h: 68px;
+
+  /* The lamp behind the active tab's icon.
+   *
+   * It needs a value per theme rather than one gold for both. Against
+   * parchment a pale gold simply disappears, so the light theme runs deeper
+   * and more saturated; against the near-black dark bar the same colour blooms
+   * far harder than a small nav indicator should, so dark runs dimmer with a
+   * tighter falloff. */
+  --tab-glow: radial-gradient(
+    circle,
+    var(--gold) 0%,
+    rgba(176, 135, 81, 0.42) 40%,
+    transparent 70%
+  );
+  --tab-glow-opacity: 0.9;
   --header-h: 56px;
   --app-max-w: 520px;
 }
@@ -324,6 +362,14 @@
       inset -4px -4px 9px rgba(255, 226, 176, 0.045);
     --shadow-card: 0 10px 26px -8px rgba(0, 0, 0, 0.7);
     --shadow-card-lifted: 0 22px 48px -12px rgba(0, 0, 0, 0.8);
+
+    --tab-glow: radial-gradient(
+      circle,
+      rgba(229, 192, 140, 0.55) 0%,
+      rgba(229, 192, 140, 0.18) 38%,
+      transparent 66%
+    );
+    --tab-glow-opacity: 0.62;
   }
 }
 
@@ -363,4 +409,12 @@
     inset -4px -4px 9px rgba(255, 226, 176, 0.045);
   --shadow-card: 0 10px 26px -8px rgba(0, 0, 0, 0.7);
   --shadow-card-lifted: 0 22px 48px -12px rgba(0, 0, 0, 0.8);
+
+  --tab-glow: radial-gradient(
+    circle,
+    rgba(229, 192, 140, 0.55) 0%,
+    rgba(229, 192, 140, 0.18) 38%,
+    transparent 66%
+  );
+  --tab-glow-opacity: 0.62;
 }

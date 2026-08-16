@@ -3,6 +3,7 @@ import { EnergyCost, EnergyOrb } from '@/art/EnergyOrb'
 import { RarityMark } from '@/art/RarityMark'
 import {
   isFigure,
+  RARITY_FOIL,
   RARITY_METAL,
   WEAKNESS,
   type Card as CardData,
@@ -31,13 +32,11 @@ const STAGE_LABEL: Record<FigureCard['stage'], string> = {
   'ascended-2': 'Ascended II',
 }
 
-const HOLO_RARITIES = new Set(['anointed', 'illustration', 'sacred', 'crown'])
-
 interface Props {
   card: CardData
   /** Hides rules text and footer; for thumbnails below ~90px. */
   compact?: boolean
-  /** Suppresses the sheen on chase rarities. */
+  /** Suppresses the foil. Used on thumbnails and on the battle mat. */
   noHolo?: boolean
   /** On the battle mat: hides the printed HP, which the board draws live. */
   inPlay?: boolean
@@ -51,7 +50,7 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
 
   const figure = isFigure(card) ? card : null
   const anointed = figure?.anointed ?? false
-  const holo = !noHolo && HOLO_RARITIES.has(card.rarity)
+  const foil = noHolo ? 'none' : RARITY_FOIL[card.rarity]
 
   // Non-figures have no energy type of their own; they take the frame's gold.
   const type = figure?.type ?? 'light'
@@ -68,7 +67,6 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
       className={cx(
         'cov-card',
         anointed && 'cov-card--anointed',
-        holo && 'cov-card--holo',
         compact && 'cov-card--compact',
         inPlay && 'cov-card--in-play',
         className,
@@ -78,6 +76,10 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
       // threaded through as an inline style, so the palette stays in one place
       // and a card costs no extra style object per render.
       data-metal={RARITY_METAL[card.rarity]}
+      // The finish its rarity earns: standard holo on the art, reverse holo on
+      // everything but, or a cosmos starburst. Selected in CSS off this
+      // attribute, exactly as the rim's metal is.
+      data-foil={foil}
       aria-label={`${card.name}, ${figure ? `${figure.hp} HP` : card.kind}`}
     >
       <div className="cov-card__ground" />

@@ -110,6 +110,34 @@ export const RARITY_METAL: Record<Rarity, Metal> = {
   crown: 'diamond',
 }
 
+/* ------------------------------------------------------------------- foil */
+
+/**
+ * The shine a rarity earns, borrowed from how real sets distinguish finishes.
+ *
+ * - `standard` — the sheen sits on the artwork alone, as a Holo does.
+ * - `reverse` — the inverse: frame, nameplate and text box shine while the
+ *   artwork stays matte.
+ * - `cosmos` — a starburst field across the border and background, the
+ *   specialty treatment reserved for the top of the ladder.
+ *
+ * One finish per rarity rather than a separate pull-able variant, which keeps
+ * packs, the collection and the save format exactly as they are. It rides the
+ * same rarity ladder the metal rims do, so the two read as one system.
+ */
+export const FOILS = ['none', 'standard', 'reverse', 'cosmos'] as const
+export type Foil = (typeof FOILS)[number]
+
+export const RARITY_FOIL: Record<Rarity, Foil> = {
+  common: 'none',
+  uncommon: 'none',
+  rare: 'standard',
+  anointed: 'standard',
+  illustration: 'reverse',
+  sacred: 'cosmos',
+  crown: 'cosmos',
+}
+
 export const METAL_LABEL: Record<Metal, string> = {
   copper: 'Copper',
   bronze: 'Bronze',

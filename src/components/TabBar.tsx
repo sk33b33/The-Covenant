@@ -63,10 +63,9 @@ export function TabBar() {
                     className="absolute w-11 h-11 rounded-pill -z-10"
                     style={{
                       top: 8,
-                      background:
-                        'radial-gradient(circle, var(--gold-bright) 0%, rgba(229,192,140,.35) 42%, transparent 70%)',
+                      background: 'var(--tab-glow)',
                       filter: 'blur(3px)',
-                      opacity: 0.85,
+                      opacity: 'var(--tab-glow-opacity)',
                     }}
                     transition={{ type: 'spring', stiffness: 460, damping: 38 }}
                   />

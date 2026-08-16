@@ -517,19 +517,19 @@
     linear-gradient(160deg, #fbeac2 0%, #eecb92 48%, #d9b077 100%);
 }
 
-/* ------------------------------------------------------------------ holo */
+/* ------------------------------------------------------------------ foil */
 
-/* Chase rarities get a moving sheen. It is a pseudo-element so it never
- * interferes with the card's own layout or hit area. */
-.cov-card--holo::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  /* Its own radius, since the card no longer clips — see .cov-card. */
-  border-radius: 4.5cqw;
-  z-index: 3;
-  pointer-events: none;
-  background: linear-gradient(
+/*
+ * Three finishes, chosen by [data-foil] off the rarity ladder — the same
+ * mechanism the rim's metal uses. All of them ride --holo-angle and
+ * --holo-opacity, which the card viewer already writes from the tilt, so the
+ * light travels across every finish with no wiring of its own.
+ *
+ * The sweep itself is shared. Only *where* it is allowed to land changes.
+ */
+
+.cov-card {
+  --foil-sweep: linear-gradient(
     var(--holo-angle, 115deg),
     transparent 34%,
     rgba(255, 244, 214, 0.34) 46%,
@@ -537,8 +537,95 @@
     rgba(255, 214, 236, 0.24) 58%,
     transparent 70%
   );
+}
+
+/* --- standard: the artwork alone ----------------------------------------- */
+
+/*
+ * On the art element itself, which already clips its own overflow — so this
+ * needs no mask, and it inherits the compact card's taller window for free.
+ */
+.cov-card[data-foil='standard'] .cov-card__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--foil-sweep);
   mix-blend-mode: screen;
   opacity: var(--holo-opacity, 0.75);
+}
+
+/* --- reverse: everything but the artwork --------------------------------- */
+
+/*
+ * The inverse of standard, so the mask has to punch the art window out of a
+ * full-card overlay. Two mask layers composited with `exclude`, the same
+ * technique the rim uses to make a ring: one covers the card, the other covers
+ * the art rect, and what survives is the difference.
+ *
+ * The rect is written in the same cqw values as .cov-card__art, and the
+ * compact override below changes only the height — exactly as the art's own
+ * rule does — so the hole cannot drift away from the window it is cut for.
+ */
+.cov-card[data-foil='reverse']::after,
+.cov-card[data-foil='cosmos']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4.5cqw;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--foil-sweep);
+  mix-blend-mode: screen;
+  opacity: var(--holo-opacity, 0.75);
+
+  --foil-hole: linear-gradient(#000 0 0) 5cqw 17.4cqw / 90cqw 62cqw no-repeat;
+  -webkit-mask: linear-gradient(#000 0 0), var(--foil-hole);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0), var(--foil-hole);
+  mask-composite: exclude;
+}
+
+.cov-card--compact[data-foil='reverse']::after,
+.cov-card--compact[data-foil='cosmos']::after {
+  --foil-hole: linear-gradient(#000 0 0) 5cqw 17.4cqw / 90cqw 104cqw no-repeat;
+}
+
+/* --- cosmos: a starburst field ------------------------------------------- */
+
+/*
+ * The top of the ladder stops being a brighter version of the tier below and
+ * becomes a different material, the way Diamond does on the rim.
+ *
+ * The field is layered radial gradients at deliberately off-grid positions and
+ * three different cell sizes, so the tiling never resolves into a lattice —
+ * the same lesson the hammered rim taught: a single regular grid reads as
+ * polka dots, and it is the disagreement between scales that reads as random.
+ *
+ * It sits under the sweep and shares its mask, so the artwork stays clean and
+ * readable while the border and background carry the effect.
+ */
+.cov-card[data-foil='cosmos']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4.5cqw;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--foil-cosmos);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+
+  --foil-hole: linear-gradient(#000 0 0) 5cqw 17.4cqw / 90cqw 62cqw no-repeat;
+  -webkit-mask: linear-gradient(#000 0 0), var(--foil-hole);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0), var(--foil-hole);
+  mask-composite: exclude;
+}
+
+.cov-card--compact[data-foil='cosmos']::before {
+  --foil-hole: linear-gradient(#000 0 0) 5cqw 17.4cqw / 90cqw 104cqw no-repeat;
 }
 
 /* ----------------------------------------------------------- in play */
