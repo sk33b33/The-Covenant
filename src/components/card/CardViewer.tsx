@@ -1,5 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
+import {
+  AnimatePresence,
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from 'framer-motion'
 import { CloseIcon } from '@/art/icons'
 import { RarityMark } from '@/art/RarityMark'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
@@ -31,7 +38,13 @@ import { usePeek } from '@/store/peek'
  * Mounted once, in App. Everything else opens it through the peek store.
  */
 
-const MAX_TILT = 13
+/** Degrees at the card's edge. Pronounced enough that the card visibly turns
+ *  in space and the rim sweeps light across its whole travel. */
+const MAX_TILT = 18
+
+/** Tight and fast: a smoothing filter on a value that already tracks the
+ *  thumb, not an animation chasing it. */
+const TILT_SPRING = { stiffness: 420, damping: 34, mass: 0.5 }
 
 export function CardViewer() {
   const card = usePeek((s) => s.card)
@@ -73,9 +86,46 @@ function Viewer({
   count: number | undefined
   close: () => void
 }) {
-  const [tilt, setTilt] = useState({ x: 0, y: 0 })
   const frameRef = useRef<HTMLDivElement>(null)
   const reduced = useRef(false)
+
+  /*
+   * The tilt runs entirely on motion values, never on React state.
+   *
+   * It used to setState on every pointermove, which re-rendered this component
+   * and the whole Card tree beneath it — nameplate, artwork, orb, every attack
+   * row, the footer's SVGs — sixty times a second. That was the jank. And the
+   * rotation was a spring `animate` target, so each move re-aimed a spring that
+   * was already in flight: it chased the thumb and never arrived.
+   *
+   * Now the pointer writes a raw value, a spring smooths it, and the result is
+   * applied straight to the element. React does not re-render at all while the
+   * card is turning, and the spring damps a value that already tracks the
+   * pointer rather than pursuing a moving target.
+   */
+  const px = useMotionValue(0)
+  const py = useMotionValue(0)
+
+  const sx = useSpring(px, TILT_SPRING)
+  const sy = useSpring(py, TILT_SPRING)
+
+  const rotateY = useTransform(sx, (v) => v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
+
+  // The sheen sweeps opposite the tilt, as a real foil catches light, and the
+  // rim's specular turns with it so the metal reads as a struck edge rather
+  // than a printed line. Both ride the same springs as the rotation, so the
+  // light and the card move as one object.
+  const holoAngle = useMotionTemplate`${useTransform(sx, (v) => 115 + v * 46)}deg`
+  const rimBase = useMotionTemplate`${useTransform(
+    [sx, sy] as const,
+    ([x = 0, y = 0]: number[]) => 218 + x * 34 - y * 18,
+  )}deg`
+  const lit = useTransform([sx, sy] as const, ([x = 0, y = 0]: number[]) =>
+    Math.min(1, Math.hypot(x, y)),
+  )
+  const holoOpacity = useTransform(lit, (v) => 0.5 + v * 0.45)
+  const glint = useTransform(lit, (v) => 0.15 + v * 0.85)
 
   useEffect(() => {
     reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -98,35 +148,27 @@ function Viewer({
     if (reduced.current) return
     const onOrient = (e: DeviceOrientationEvent) => {
       if (e.gamma === null || e.beta === null) return
-      setTilt({
-        x: clamp(-(e.beta - 45) / 3, -MAX_TILT, MAX_TILT),
-        y: clamp(e.gamma / 3, -MAX_TILT, MAX_TILT),
-      })
+      px.set(clamp(e.gamma / 40, -1, 1))
+      py.set(clamp(-(e.beta - 45) / 40, -1, 1))
     }
     window.addEventListener('deviceorientation', onOrient)
     return () => window.removeEventListener('deviceorientation', onOrient)
-  }, [])
+  }, [px, py])
 
-  const onPointer = (e: React.PointerEvent) => {
+  const track = (e: React.PointerEvent) => {
     if (reduced.current) return
     const el = frameRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width - 0.5
-    const py = (e.clientY - r.top) / r.height - 0.5
-    setTilt({ x: -py * MAX_TILT * 2, y: px * MAX_TILT * 2 })
+    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge.
+    px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
+    py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
   }
 
-  // Touch fires no pointerleave, so without this the card stays tilted where
-  // the thumb left it and never springs back.
-  const level = () => setTilt({ x: 0, y: 0 })
-
-  // The sheen sweeps opposite the tilt, as a real foil catches light, and the
-  // rim's specular turns with it so the metal reads as a struck edge rather
-  // than a printed line.
-  const holoAngle = 115 + tilt.y * 3.4
-  const holoOpacity = 0.5 + Math.min(1, (Math.abs(tilt.x) + Math.abs(tilt.y)) / MAX_TILT) * 0.45
-  const rimAngle = 218 + tilt.y * 2.6 - tilt.x * 1.4
+  const level = () => {
+    px.set(0)
+    py.set(0)
+  }
 
   const metal = RARITY_METAL[card.rarity]
 
@@ -155,38 +197,71 @@ function Viewer({
       </div>
 
       <div
-        className="scroll-y flex-1 flex flex-col items-center justify-center px-8 pb-8 gap-5"
+        className="scroll-y flex-1 flex flex-col items-center justify-center px-4 pb-6 gap-1"
         onClick={(e) => e.stopPropagation()}
       >
+        {/*
+         * The card carries its own padding inside the scroller.
+         *
+         * `.scroll-y` sets overflow-y, and the Overflow spec computes the other
+         * axis to `auto` alongside it — so this box clips horizontally as well
+         * as vertically. Turned in 3D the card's near corners project outward
+         * and its lifted shadow reaches 48px further still; with the card
+         * previously running nearly edge to edge, both were being sliced. The
+         * padding here is the clearance, and it is why the card is no longer
+         * the full width of the screen.
+         */}
         <motion.div
           ref={frameRef}
-          className="w-full max-w-[320px] shrink-0"
-          style={{ perspective: '1100px' }}
+          className="w-full max-w-[300px] shrink-0 px-2 py-6"
+          style={{
+            perspective: '1100px',
+            // Without this a vertical drag on the card scrolls this container
+            // instead of turning the card, which is why tilt barely worked by
+            // touch at all.
+            touchAction: 'none',
+          }}
           initial={{ scale: 0.82, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          onPointerMove={onPointer}
+          onPointerMove={track}
+          // Capture, so a drag keeps turning the card after it leaves the
+          // card's own bounds instead of stopping dead at the edge.
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            track(e)
+          }}
+          onPointerUp={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId)
+            level()
+          }}
           onPointerLeave={level}
-          onPointerUp={level}
           onPointerCancel={level}
         >
+          {/*
+            The custom properties ride the motion element, not the Card.
+            framer-motion only subscribes a motion value on a component it
+            owns, and Card is a plain function that spreads `style` onto an
+            article — handed motion values there, React stringified them and
+            the rim sat frozen at its rest angle. Set here they inherit down to
+            the rim and the sheen, which is what `inherits: true` on each
+            @property is for.
+          */}
           <motion.div
-            animate={{ rotateX: tilt.x, rotateY: tilt.y }}
-            transition={{ type: 'spring', stiffness: 170, damping: 18 }}
-            style={{ transformStyle: 'preserve-3d' }}
+            style={
+              {
+                rotateX,
+                rotateY,
+                transformStyle: 'preserve-3d',
+                '--holo-angle': holoAngle,
+                '--holo-opacity': holoOpacity,
+                '--rim-base': rimBase,
+                '--rim-glint': glint,
+              } as React.ComponentProps<typeof motion.div>['style']
+            }
           >
-            <Card
-              card={card}
-              style={
-                {
-                  '--holo-angle': `${holoAngle}deg`,
-                  '--holo-opacity': holoOpacity,
-                  '--rim-angle': `${rimAngle}deg`,
-                  boxShadow: 'var(--shadow-card-lifted)',
-                } as React.CSSProperties
-              }
-            />
+            <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
           </motion.div>
         </motion.div>
 
@@ -218,7 +293,7 @@ function Viewer({
           // greyed-out unavailable attack faded into the background entirely —
           // which is exactly the row whose reason you need to read.
           <div
-            className="on-dark w-full max-w-[320px] shrink-0 rounded-lg p-3"
+            className="on-dark w-full max-w-[300px] shrink-0 rounded-lg p-3 mt-3"
             style={{
               background: 'var(--overlay-tray)',
               boxShadow:

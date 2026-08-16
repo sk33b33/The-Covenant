@@ -95,14 +95,16 @@ export function BoardFigure({
       aria-label={`${card.name}, ${remaining} of ${hp} HP`}
     >
       <div
-        className="rounded-[8%]"
         style={{
           boxShadow: selected
             ? '0 0 0 2.5px var(--gold-bright), 0 0 18px rgba(229,192,140,.55)'
             : targetable
               ? '0 0 0 2px rgba(210,84,58,.9), 0 0 16px rgba(210,84,58,.45)'
               : undefined,
-          borderRadius: '8%',
+          // Traces the card's corner rather than a rounder ellipse of its own.
+          // A percentage radius resolves per-axis, so `8%` on a 63:88 card drew
+          // a ring that cut visibly across each corner of the card inside it.
+          borderRadius: '4.5% / 3.22%',
         }}
       >
         <PressableCard card={card} compact noHolo inPlay noPeek={noPeek} />

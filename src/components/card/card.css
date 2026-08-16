@@ -13,13 +13,21 @@
  * that.
  */
 
+/*
+ * No `overflow: hidden` here, deliberately.
+ *
+ * The rim sits at inset 0 with this same radius, so a clip on the card would
+ * put an antialiased arc exactly on top of the metal's outer edge and shave it
+ * — the rim thinned and vanished at all four corners, on every card, which is
+ * what "the corners are cut off" was. The two layers that were relying on this
+ * clip carry their own radius instead; the artwork window already clips itself.
+ */
 .cov-card {
   container-type: inline-size;
   position: relative;
   aspect-ratio: 63 / 88;
   width: 100%;
   border-radius: 4.5cqw;
-  overflow: hidden;
   isolation: isolate;
   user-select: none;
   background: #100b06;
@@ -31,6 +39,7 @@
 .cov-card__ground {
   position: absolute;
   inset: 0;
+  border-radius: 4.5cqw;
   background:
     radial-gradient(120% 90% at 50% 8%, rgba(229, 192, 140, 0.16), transparent 55%),
     linear-gradient(168deg, #2a2112 0%, #14100a 46%, #241b0e 100%);
@@ -55,7 +64,18 @@
   inset: 0;
   border-radius: 4.5cqw;
   border: 2.6cqw solid transparent;
-  background: var(--metal-rim, var(--metal-copper)) border-box;
+  /*
+   * Three layers, and the order is the whole trick: the planished dimples and
+   * the grain sit on top as pure light and shade, the metal's own tone beneath
+   * them. That is what makes one finish serve seven metals — the texture never
+   * carries colour, so it cannot drift between rarities, and the colour never
+   * carries texture, so a new metal is a single gradient.
+   */
+  background:
+    var(--metal-hammer),
+    var(--metal-grain),
+    var(--metal-rim, var(--metal-copper)) border-box;
+  background-blend-mode: overlay, soft-light, normal;
   /* Paints the border box and knocks out the padding box, leaving a ring. */
   -webkit-mask:
     linear-gradient(#000 0 0) padding-box,
@@ -64,6 +84,32 @@
   mask-composite: exclude;
   pointer-events: none;
   z-index: 4;
+}
+
+/*
+ * The travelling highlight, on its own element so its opacity can ride the
+ * tilt without touching the metal beneath.
+ *
+ * `screen` rather than a plain overlay: a specular adds light to whatever it
+ * crosses, so it brightens copper's shadowed side without washing platinum's
+ * lit side to flat white. At rest it sits at a low floor, which is what stops
+ * a stationary card looking like unlit plastic.
+ */
+.cov-card__glint {
+  position: absolute;
+  inset: 0;
+  border-radius: 4.5cqw;
+  border: 2.6cqw solid transparent;
+  background: var(--metal-glint) border-box;
+  -webkit-mask:
+    linear-gradient(#000 0 0) padding-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  mix-blend-mode: screen;
+  opacity: var(--rim-glint, 0.15);
+  pointer-events: none;
+  z-index: 5;
 }
 
 /* A dark hairline seating the metal against the card. Without it the pale
@@ -127,24 +173,43 @@
  * once — a dozen continuous repaints, for a drift too small to see at 64px.
  * The cards you actually look at are the ones that turn. */
 @media (prefers-reduced-motion: no-preference) {
-  .cov-card[data-metal='diamond']:not(.cov-card--compact) .cov-card__rim,
-  .cov-card[data-metal='diamond']:not(.cov-card--compact) .cov-card__rim::after {
+  .cov-card[data-metal='diamond']:not(.cov-card--compact) {
     animation: cov-rim-turn 9s linear infinite;
   }
 }
 
 @keyframes cov-rim-turn {
   to {
-    --rim-angle: 578deg;
+    --rim-drift: 360deg;
   }
 }
 
-/* The angle has to be registered for the keyframe above to interpolate it —
- * an unregistered custom property jumps from start to end instead. */
-@property --rim-angle {
+/*
+ * Two properties, not one, and this is why: a CSS animation outranks an inline
+ * style, so while the drift animated the same property the viewer writes,
+ * Diamond was the single rarity whose rim ignored the tilt completely. Split in
+ * two they compose — the tilt writes --rim-base, the drift animates
+ * --rim-drift, and every gradient reads their sum.
+ *
+ * Both must be registered or they interpolate as strings: an unregistered
+ * custom property jumps from start value to end value with nothing in between.
+ */
+@property --rim-base {
   syntax: '<angle>';
   inherits: true;
   initial-value: 218deg;
+}
+
+@property --rim-drift {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+@property --rim-glint {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.15;
 }
 
 /* ------------------------------------------------------------- nameplate */
@@ -462,6 +527,8 @@
   content: '';
   position: absolute;
   inset: 0;
+  /* Its own radius, since the card no longer clips — see .cov-card. */
+  border-radius: 4.5cqw;
   z-index: 3;
   pointer-events: none;
   background: linear-gradient(
@@ -510,7 +577,8 @@
  * only rarity cue a compact card has — disappears into the edge. The two inner
  * hairlines go the other way: below a pixel they alias into noise, so they are
  * dropped rather than rendered badly. */
-.cov-card--compact .cov-card__rim {
+.cov-card--compact .cov-card__rim,
+.cov-card--compact .cov-card__glint {
   border-width: 3.4cqw;
 }
 

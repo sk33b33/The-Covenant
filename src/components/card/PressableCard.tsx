@@ -100,8 +100,13 @@ export function PressableCard({
       {held && (
         <span
           aria-hidden="true"
-          className="absolute inset-0 rounded-[4.5%] pointer-events-none"
+          className="absolute inset-0 pointer-events-none"
           style={{
+            // Traces the card's own corner. The card's 4.5cqw is a length, so
+            // both axes get the same radius; a bare `4.5%` here would resolve
+            // per-axis and draw an ellipse that cuts across the corner. On a
+            // 63:88 card the matching vertical radius is 4.5 × 63/88.
+            borderRadius: '4.5% / 3.22%',
             // A ring that closes as the hold completes. Drawn with a conic
             // gradient masked to the edge, so it traces the card's own outline
             // instead of sitting on top of the art.

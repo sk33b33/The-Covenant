@@ -73,10 +73,11 @@
    * mid-tone with deep shadow, platinum is uniformly pale with shallow shadow,
    * so platinum reads as lighter overall rather than merely cleaner.
    */
-  --rim-angle: 218deg;
+  --rim-base: 218deg;
+  --rim-drift: 0deg;
 
   --metal-copper: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #7a4630, #b06f4c, #e8ab86, #b06f4c, #7a4630, #a86747, #dda07c, #8a5238, #7a4630
   );
   --metal-copper-hi: #e8ab86;
@@ -84,7 +85,7 @@
   --metal-copper-lo: #6b3c28;
 
   --metal-bronze: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #5c4f26, #8f7c3c, #cbb87a, #8f7c3c, #5c4f26, #877436, #c0ad70, #66582a, #5c4f26
   );
   --metal-bronze-hi: #cbb87a;
@@ -92,7 +93,7 @@
   --metal-bronze-lo: #4e4320;
 
   --metal-iron: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #3f464e, #6e7780, #b0bac4, #6e7780, #3f464e, #67707a, #a3adb8, #474e56, #3f464e
   );
   --metal-iron-hi: #b0bac4;
@@ -100,7 +101,7 @@
   --metal-iron-lo: #363c43;
 
   --metal-silver: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #6b757d, #a8b4bd, #f6fafd, #a8b4bd, #6b757d, #9fabb5, #eaf1f6, #747e86, #6b757d
   );
   --metal-silver-hi: #f6fafd;
@@ -108,7 +109,7 @@
   --metal-silver-lo: #5c666e;
 
   --metal-gold: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #8a6216, #d3a83e, #fff3c4, #d3a83e, #8a6216, #c89e37, #ffeab0, #966d1c, #8a6216
   );
   --metal-gold-hi: #fff3c4;
@@ -116,7 +117,7 @@
   --metal-gold-lo: #7a5410;
 
   --metal-platinum: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #9aa4ac, #d6dee4, #ffffff, #d6dee4, #9aa4ac, #cdd6dd, #fbfdff, #a6b0b8, #9aa4ac
   );
   --metal-platinum-hi: #ffffff;
@@ -126,12 +127,87 @@
   /* Not a metal, and deliberately so: the top tier stops being a better
    * version of the tier below and becomes a different material. */
   --metal-diamond: conic-gradient(
-    from var(--rim-angle),
+    from calc(var(--rim-base) + var(--rim-drift)),
     #a9cbe8, #ffffff, #c3b2ee, #ffffff, #f4b6d5, #ffffff, #aeeae0, #ffffff, #a9cbe8
   );
   --metal-diamond-hi: #ffffff;
   --metal-diamond-mid: #cfe0f0;
   --metal-diamond-lo: #92aec6;
+
+  /*
+   * The finish, shared by every metal.
+   *
+   * Planished: hand-worked dimples, the way a smith's beaten bowl carries
+   * them. Period-correct against the oil-painting art, and — the reason it
+   * beats a uniform brushed sheet here — each facet catches the travelling
+   * highlight separately, so tilting the card makes light crawl over the edge
+   * instead of sliding across it in one piece.
+   *
+   * Three overlapping radial grids, and the cell size is the whole battle. The
+   * rim is only about 4px wide on a thumbnail and 8px in the viewer, so a cell
+   * larger than that shows a single slice of one dimple and reads as a
+   * diagonal stripe — which is exactly what a 13px grid did on the first pass.
+   * At 5px a dimple fits across the rim and reads as one. The third grid runs
+   * at 7px and off-phase so the tiling never lines up into a visible lattice.
+   *
+   * These carry no colour of their own — they are light and shade only, blended
+   * over whichever --metal-* tone sits beneath. One finish, seven metals.
+   */
+  --metal-hammer:
+    radial-gradient(
+        circle at 32% 30%,
+        rgba(255, 255, 255, 0.5) 0%,
+        rgba(255, 255, 255, 0.14) 30%,
+        rgba(0, 0, 0, 0.32) 58%,
+        rgba(0, 0, 0, 0.12) 74%,
+        transparent 82%
+      )
+      0 0 / 5px 5px,
+    radial-gradient(
+        circle at 70% 68%,
+        rgba(255, 255, 255, 0.34) 0%,
+        rgba(255, 255, 255, 0.08) 26%,
+        rgba(0, 0, 0, 0.26) 54%,
+        transparent 78%
+      )
+      2.5px 2.5px / 5px 5px,
+    radial-gradient(
+        circle at 50% 50%,
+        rgba(255, 255, 255, 0.22) 0%,
+        rgba(0, 0, 0, 0.18) 52%,
+        transparent 76%
+      )
+      1px 3px / 7px 7px;
+
+  /* A whisper, only enough to break the dimples' regularity. Anything more
+   * and it reads as machined crosshatch, which is the opposite of beaten. */
+  --metal-grain:
+    repeating-linear-gradient(
+      27deg,
+      rgba(255, 255, 255, 0.03) 0px,
+      rgba(255, 255, 255, 0.03) 1px,
+      rgba(0, 0, 0, 0.028) 1px,
+      rgba(0, 0, 0, 0.028) 2px
+    );
+
+  /* The travelling specular. A narrow bright wedge swept around the ring by
+   * --rim-base, so the highlight moves with the card rather than sitting on
+   * it. Its strength rides --rim-glint, which the viewer raises with the tilt. */
+  --metal-glint: conic-gradient(
+    from calc(var(--rim-base) + var(--rim-drift) + 90deg),
+    transparent 0deg,
+    transparent 26deg,
+    rgba(255, 255, 255, 0.72) 40deg,
+    rgba(255, 255, 255, 0.92) 45deg,
+    rgba(255, 255, 255, 0.72) 50deg,
+    transparent 64deg,
+    transparent 206deg,
+    rgba(255, 255, 255, 0.36) 222deg,
+    rgba(255, 255, 255, 0.5) 226deg,
+    rgba(255, 255, 255, 0.36) 230deg,
+    transparent 246deg,
+    transparent 360deg
+  );
 
   /* Trays and panels laid over a full-screen dark surface — the card viewer
    * over the battle mat, where the app's own --surface would be the wrong
@@ -140,8 +216,8 @@
   --overlay-tray-edge: rgba(229, 192, 140, 0.22);
 
   /* Halos for the two top tiers, so a chase card lifts off the binder grid. */
-  --metal-platinum-glow: 0 0 14px -2px rgba(210, 224, 236, 0.55);
-  --metal-diamond-glow: 0 0 20px -2px rgba(198, 226, 248, 0.68);
+  --metal-platinum-glow: 0 0 12px -4px rgba(210, 224, 236, 0.42);
+  --metal-diamond-glow: 0 0 16px -4px rgba(198, 226, 248, 0.5);
 
   /* ---- Energy types ---------------------------------------------- */
   --energy-light: #f2d675;

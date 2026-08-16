@@ -82,6 +82,7 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
     >
       <div className="cov-card__ground" />
       <div className="cov-card__rim" />
+      <div className="cov-card__glint" />
 
       {/* ------------------------------------------------------ nameplate */}
       <header className="cov-card__nameplate">
