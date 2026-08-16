@@ -65,17 +65,15 @@
   border-radius: 4.5cqw;
   border: 2.6cqw solid transparent;
   /*
-   * Three layers, and the order is the whole trick: the planished dimples and
-   * the grain sit on top as pure light and shade, the metal's own tone beneath
-   * them. That is what makes one finish serve seven metals — the texture never
-   * carries colour, so it cannot drift between rarities, and the colour never
-   * carries texture, so a new metal is a single gradient.
+   * The tone conic, alone. Polished, not textured.
+   *
+   * A hammered finish did give the rim a surface, but a beaten surface is one
+   * that scatters: every dimple broke the specular into fragments, so the
+   * highlight crawled across the edge instead of sliding along it and the
+   * metal never read as bright. An unbroken surface is what reflects, and it
+   * leaves the travelling band in .cov-card__glint free to do the work.
    */
-  background:
-    var(--metal-hammer),
-    var(--metal-grain),
-    var(--metal-rim, var(--metal-copper)) border-box;
-  background-blend-mode: overlay, soft-light, normal;
+  background: var(--metal-rim, var(--metal-copper)) border-box;
   /* Paints the border box and knocks out the padding box, leaving a ring. */
   -webkit-mask:
     linear-gradient(#000 0 0) padding-box,

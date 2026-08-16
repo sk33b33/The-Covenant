@@ -27,13 +27,17 @@ import { usePeek } from '@/store/peek'
  * your Active Figure mid-match, which also carries its attacks underneath, so
  * one tap still both inspects and acts.
  *
- * The card tilts toward the pointer or the device's gyroscope, and both the
- * holo sheen and the metal rim track the tilt: that pairing is what makes a
- * rare card feel like a physical foil rather than a picture of one. Release
- * and it springs back level. Motion is dropped entirely under
- * `prefers-reduced-motion`, and the gyroscope is only used where the browser
- * grants it without a permission prompt — asking for one on looking at a card
- * would be worse than the effect is worth.
+ * The card leans toward your thumb, and both the holo sheen and the metal rim
+ * track that lean: the pairing is what makes a rare card feel like a physical
+ * foil rather than a picture of one. Release and it springs back level. Motion
+ * is dropped entirely under `prefers-reduced-motion`.
+ *
+ * Touch is the only input. The gyroscope drove this too once, which meant a
+ * card turned on its own while you were reading it.
+ *
+ * The overlay never scrolls. Everything is sized to fit the viewport instead,
+ * because a screen that shifts under the gesture turning it is worse than a
+ * card rendered slightly smaller.
  *
  * Mounted once, in App. Everything else opens it through the peek store.
  */
@@ -158,18 +162,9 @@ function Viewer({
     }
   }, [close])
 
-  // Device orientation, where it is available without a permission prompt.
-  useEffect(() => {
-    if (reduced.current) return
-    const onOrient = (e: DeviceOrientationEvent) => {
-      if (e.gamma === null || e.beta === null) return
-      px.set(clamp(e.gamma / 40, -1, 1))
-      py.set(clamp(-(e.beta - 45) / 40, -1, 1))
-    }
-    window.addEventListener('deviceorientation', onOrient)
-    return () => window.removeEventListener('deviceorientation', onOrient)
-  }, [px, py])
-
+  // Touch is the only thing that turns the card. There is deliberately no
+  // `deviceorientation` listener: driving the same tilt from the gyroscope
+  // meant a card could turn on its own while you were looking at it.
   const track = (e: React.PointerEvent) => {
     if (reduced.current) return
     const el = frameRef.current
@@ -185,17 +180,53 @@ function Viewer({
     py.set(0)
   }
 
+  /*
+   * The scrim closes on a tap, not on any click.
+   *
+   * A drag that begins beside the card still ends in a click on the scrim, so
+   * reaching past the card to turn it made the card vanish instead. Ten pixels
+   * of travel is the same tolerance the hold gesture uses to tell a press from
+   * a scroll.
+   */
+  const down = useRef({ x: 0, y: 0 })
+  const closeIfTap = (e: React.MouseEvent) => {
+    if (Math.hypot(e.clientX - down.current.x, e.clientY - down.current.y) > 10) return
+    close()
+  }
+
   const metal = RARITY_METAL[card.rarity]
+
+  /*
+   * Everything on screen that is not the card: the close-button row, the
+   * rarity and verse block, and the padding between them. Measured, not
+   * guessed — 180px leaves the card as large as it can be at 568px tall while
+   * still fitting, and lets a tall phone reach the 300px cap.
+   *
+   * The tray term has to be the same `dvh` the tray is capped at, not a fixed
+   * pixel count. A Figure with a long attack list fills that cap exactly, and
+   * a constant would have fitted the short lists and overflowed the long ones
+   * on precisely the screens where it matters most.
+   */
+  const chrome = actions.length > 0 ? 'calc(180px + 30dvh)' : '180px'
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: 'var(--scrim)', backdropFilter: 'blur(6px)' }}
+      className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+      style={{
+        background: 'var(--scrim)',
+        backdropFilter: 'blur(6px)',
+        // Nothing here scrolls, and no gesture may chain out to the page
+        // underneath either.
+        overscrollBehavior: 'contain',
+      }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
-      onClick={close}
+      onPointerDown={(e) => {
+        down.current = { x: e.clientX, y: e.clientY }
+      }}
+      onClick={closeIfTap}
       role="dialog"
       aria-modal="true"
       aria-label={card.name}
@@ -211,29 +242,36 @@ function Viewer({
         </button>
       </div>
 
+      {/*
+        Locked. This was a `.scroll-y`, and while the card itself carries
+        touch-action: none, a drag beginning on the padding beside it — or
+        continuing past its edge — still moved the whole screen. Tilting a card
+        should never shift the thing being tilted, so the column does not
+        scroll at all and the contents are sized to fit instead.
+      */}
       <div
-        className="scroll-y flex-1 flex flex-col items-center justify-center px-4 pb-6 gap-1"
+        className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pb-6 gap-1 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/*
-         * The card carries its own padding inside the scroller.
+         * Three bounds on the width, and the last is what makes the lock work:
+         * the design cap, the screen's width, and the height left after the
+         * header, the rarity block and the actions tray. A tall phone gets the
+         * full 300px; a short one gets a smaller card with everything still on
+         * screen and nothing scrolling. 63/88 is the card's own ratio, so the
+         * height bound converts cleanly into a width.
          *
-         * `.scroll-y` sets overflow-y, and the Overflow spec computes the other
-         * axis to `auto` alongside it — so this box clips horizontally as well
-         * as vertically. Turned in 3D the card's near corners project outward
-         * and its lifted shadow reaches 48px further still; with the card
-         * previously running nearly edge to edge, both were being sliced. The
-         * padding here is the clearance, and it is why the card is no longer
-         * the full width of the screen.
+         * The padding is tilt clearance: turned in 3D the near corners project
+         * outward and the lifted shadow reaches 48px further still.
          */}
         <motion.div
           ref={frameRef}
-          className="w-full max-w-[300px] shrink-0 px-2 py-6"
+          className="shrink-0 px-2 py-4"
           style={{
+            width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
             perspective: '1100px',
-            // Without this a vertical drag on the card scrolls this container
-            // instead of turning the card, which is why tilt barely worked by
-            // touch at all.
+            // Without this a vertical drag on the card would scroll an ancestor
+            // instead of turning the card.
             touchAction: 'none',
           }}
           initial={{ scale: 0.82, opacity: 0 }}
@@ -313,6 +351,13 @@ function Viewer({
               background: 'var(--overlay-tray)',
               boxShadow:
                 'inset 0 0 0 1px var(--overlay-tray-edge), 0 12px 30px -12px rgba(0,0,0,.8)',
+              // The only scroller in the viewer, for a Figure with a long list.
+              // Capped so it can never crowd the card out, and contained so
+              // scrolling it moves nothing but itself.
+              maxHeight: '30dvh',
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
             }}
           >
             {actionsNote && (

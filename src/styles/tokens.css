@@ -135,77 +135,29 @@
   --metal-diamond-lo: #92aec6;
 
   /*
-   * The finish, shared by every metal.
+   * The travelling specular, swept around the ring by --rim-base so the
+   * highlight moves with the card rather than sitting on it. Its strength
+   * rides --rim-glint, which the viewer raises with the tilt.
    *
-   * Planished: hand-worked dimples, the way a smith's beaten bowl carries
-   * them. Period-correct against the oil-painting art, and — the reason it
-   * beats a uniform brushed sheet here — each facet catches the travelling
-   * highlight separately, so tilting the card makes light crawl over the edge
-   * instead of sliding across it in one piece.
-   *
-   * Three overlapping radial grids, and the cell size is the whole battle. The
-   * rim is only about 4px wide on a thumbnail and 8px in the viewer, so a cell
-   * larger than that shows a single slice of one dimple and reads as a
-   * diagonal stripe — which is exactly what a 13px grid did on the first pass.
-   * At 5px a dimple fits across the rim and reads as one. The third grid runs
-   * at 7px and off-phase so the tiling never lines up into a visible lattice.
-   *
-   * These carry no colour of their own — they are light and shade only, blended
-   * over whichever --metal-* tone sits beneath. One finish, seven metals.
+   * Narrow and hard-edged: a 6° ramp into a 3° core. A soft wide band reads as
+   * sheen, which was the right shape against a surface that scattered light
+   * and the wrong one against a polished rim — polished metal throws a tight,
+   * bright line, and the tightness is what makes it read as a reflection
+   * rather than a glow. The opposite band is dimmer, as a second bounce is.
    */
-  --metal-hammer:
-    radial-gradient(
-        circle at 32% 30%,
-        rgba(255, 255, 255, 0.5) 0%,
-        rgba(255, 255, 255, 0.14) 30%,
-        rgba(0, 0, 0, 0.32) 58%,
-        rgba(0, 0, 0, 0.12) 74%,
-        transparent 82%
-      )
-      0 0 / 5px 5px,
-    radial-gradient(
-        circle at 70% 68%,
-        rgba(255, 255, 255, 0.34) 0%,
-        rgba(255, 255, 255, 0.08) 26%,
-        rgba(0, 0, 0, 0.26) 54%,
-        transparent 78%
-      )
-      2.5px 2.5px / 5px 5px,
-    radial-gradient(
-        circle at 50% 50%,
-        rgba(255, 255, 255, 0.22) 0%,
-        rgba(0, 0, 0, 0.18) 52%,
-        transparent 76%
-      )
-      1px 3px / 7px 7px;
-
-  /* A whisper, only enough to break the dimples' regularity. Anything more
-   * and it reads as machined crosshatch, which is the opposite of beaten. */
-  --metal-grain:
-    repeating-linear-gradient(
-      27deg,
-      rgba(255, 255, 255, 0.03) 0px,
-      rgba(255, 255, 255, 0.03) 1px,
-      rgba(0, 0, 0, 0.028) 1px,
-      rgba(0, 0, 0, 0.028) 2px
-    );
-
-  /* The travelling specular. A narrow bright wedge swept around the ring by
-   * --rim-base, so the highlight moves with the card rather than sitting on
-   * it. Its strength rides --rim-glint, which the viewer raises with the tilt. */
   --metal-glint: conic-gradient(
     from calc(var(--rim-base) + var(--rim-drift) + 90deg),
     transparent 0deg,
-    transparent 26deg,
-    rgba(255, 255, 255, 0.72) 40deg,
-    rgba(255, 255, 255, 0.92) 45deg,
-    rgba(255, 255, 255, 0.72) 50deg,
-    transparent 64deg,
-    transparent 206deg,
-    rgba(255, 255, 255, 0.36) 222deg,
-    rgba(255, 255, 255, 0.5) 226deg,
-    rgba(255, 255, 255, 0.36) 230deg,
-    transparent 246deg,
+    transparent 36deg,
+    rgba(255, 255, 255, 0.55) 42deg,
+    rgba(255, 255, 255, 1) 45deg,
+    rgba(255, 255, 255, 0.55) 48deg,
+    transparent 54deg,
+    transparent 214deg,
+    rgba(255, 255, 255, 0.34) 220deg,
+    rgba(255, 255, 255, 0.68) 224deg,
+    rgba(255, 255, 255, 0.34) 228deg,
+    transparent 234deg,
     transparent 360deg
   );
 
