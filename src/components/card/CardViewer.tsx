@@ -109,17 +109,32 @@ function Viewer({
   const sx = useSpring(px, TILT_SPRING)
   const sy = useSpring(py, TILT_SPRING)
 
-  const rotateY = useTransform(sx, (v) => v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
+  /*
+   * The card leans toward the finger: touch the right edge and that edge comes
+   * up to meet you, touch the top and the top tips forward.
+   *
+   * That is the opposite of the "press it flat" convention, and it is worth
+   * naming because the signs look wrong at a glance. A positive rotateY sends
+   * the *right* edge away from the viewer, so following the finger on that
+   * side means negating it; a positive rotateX sends the *top* edge away, so
+   * following the finger there means not negating it.
+   */
+  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
 
-  // The sheen sweeps opposite the tilt, as a real foil catches light, and the
-  // rim's specular turns with it so the metal reads as a struck edge rather
-  // than a printed line. Both ride the same springs as the rotation, so the
-  // light and the card move as one object.
-  const holoAngle = useMotionTemplate`${useTransform(sx, (v) => 115 + v * 46)}deg`
+  /*
+   * The light is derived from the rotation, not from the pointer.
+   *
+   * Both were driven off the pointer before, which meant flipping the tilt
+   * silently sent the highlight sweeping against the surface instead of across
+   * it — the sort of mismatch that reads as "wrong" without being nameable.
+   * Taking the rotation as the input makes the two impossible to desynchronise:
+   * whichever way the card faces, the sheen and the rim's specular follow it.
+   */
+  const holoAngle = useMotionTemplate`${useTransform(rotateY, (v) => 115 + v * 2.6)}deg`
   const rimBase = useMotionTemplate`${useTransform(
-    [sx, sy] as const,
-    ([x = 0, y = 0]: number[]) => 218 + x * 34 - y * 18,
+    [rotateY, rotateX] as const,
+    ([y = 0, x = 0]: number[]) => 218 + y * 1.9 + x,
   )}deg`
   const lit = useTransform([sx, sy] as const, ([x = 0, y = 0]: number[]) =>
     Math.min(1, Math.hypot(x, y)),
