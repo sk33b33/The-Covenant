@@ -304,7 +304,10 @@
      * ring's subscription. The packs behind recede rather than disappearing,
      * so the ring reads as a carousel and not as a stack of cards. */
     opacity: calc(1 - var(--pack-d, 0) * 0.55);
-    filter: drop-shadow(0 12px 22px rgba(40, 28, 10, 0.45));
+    /* No drop-shadow here: the photo is a real cutout now, with a crimped,
+     * unevenly bulging silhouette, and a shadow that follows every peak and
+     * valley of that edge reads as a dark smudge behind the pack rather than
+     * a clean contact shadow — worse than doing without one. */
   }
 
   /* Registered so `calc(var(--pack-i) * var(--ring-step))` resolves as a real
