@@ -5,9 +5,16 @@
  * drawn variants. What told the packs apart on a real shelf was never the
  * wrapper stock — it was the name struck across the middle of it. The name
  * here lands in the exact band the photograph already left plain for it,
- * measured off the source image: 65.1% to 71.5% of the height clears the tree
+ * measured off the source image: 72.8% to 79.7% of the height clears the tree
  * medallion's finial above it and the stat panel's border below it, on every
  * pack, at every size.
+ *
+ * The photo's studio backdrop is cut out (see the pipeline note in
+ * PackWrapper.tsx), so the wrapper is a real silhouette rather than a
+ * rectangle — there is nothing left to clip or box-frame here. Every caller's
+ * own `filter: drop-shadow` (the ring in global.css, the sealed pack in
+ * PackOpen) now hugs that silhouette automatically, which is also why none is
+ * set here: a shadow inside PackWrapper would stack under a caller's own.
  *
  * `container-type: inline-size` and `cqw` units carry the same discipline as
  * the card frame (card.css): one set of rules serves an 86px Shop thumbnail
@@ -17,13 +24,8 @@
 .cov-pack {
   position: relative;
   width: 100%;
-  aspect-ratio: 720 / 1019;
-  border-radius: 4.5cqw;
-  overflow: hidden;
+  aspect-ratio: 620 / 789;
   container-type: inline-size;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .cov-pack__photo {
@@ -31,7 +33,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* The container is sized to the image's own ratio, so this never actually
+     crops — `contain` just says plainly that nothing should. */
+  object-fit: contain;
 }
 
 .cov-pack__plate {
@@ -39,8 +43,8 @@
   z-index: 0;
   left: 8%;
   right: 8%;
-  top: 65.1%;
-  height: 6.4%;
+  top: 72.8%;
+  height: 6.9%;
   display: flex;
   align-items: center;
   justify-content: center;
