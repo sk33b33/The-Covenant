@@ -27,6 +27,12 @@ export type Route =
   | { name: 'story-map' }
   | { name: 'story-encounter'; encounterId: string }
   | { name: 'battle'; encounterId?: string; deckId?: string }
+  /** Wherever a real screen doesn't exist yet. `icon` picks from a small fixed
+   *  set in App.tsx rather than carrying a React node, so a route stays a
+   *  plain, serialisable value like every other one here. */
+  | { name: 'coming-soon'; title: string; icon: ComingSoonIcon }
+
+export type ComingSoonIcon = 'mail' | 'gifts'
 
 interface NavStore {
   /** Bottom of the stack is the current tab; anything above is layered over it. */

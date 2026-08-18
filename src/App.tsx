@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon } from '@/art/icons'
+import { BattleIcon, GiftIcon, MailIcon } from '@/art/icons'
 import { CardViewer } from '@/components/card/CardViewer'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
@@ -18,7 +18,14 @@ import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
-import { useNav, type Route } from '@/store/nav'
+import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
+
+/** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
+ *  so the route itself stays a plain value (see the type in store/nav.ts). */
+const COMING_SOON_ICON: Record<ComingSoonIcon, React.ReactNode> = {
+  mail: <MailIcon size={44} />,
+  gifts: <GiftIcon size={44} />,
+}
 
 export default function App() {
   const route = useNav((s) => s.route)
@@ -89,6 +96,8 @@ function routeKey(route: Route): string {
       return `pack:${route.packId}`
     case 'story-encounter':
       return `enc:${route.encounterId}`
+    case 'coming-soon':
+      return `soon:${route.title}`
     default:
       return route.name
   }
@@ -139,6 +148,16 @@ function Screen({ route }: { route: Route }) {
 
     case 'story-encounter':
       return <StoryEncounter encounterId={route.encounterId} />
+
+    case 'coming-soon':
+      return (
+        <Placeholder
+          withBack
+          icon={COMING_SOON_ICON[route.icon]}
+          title={route.title}
+          note="This screen is part of a later milestone."
+        />
+      )
 
     default:
       return (

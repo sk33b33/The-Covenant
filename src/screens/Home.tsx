@@ -222,10 +222,14 @@ function Header() {
 
         {/* pr-1 keeps the badge inside the viewport. */}
         <div className="flex gap-1.5 pr-1">
-          <IconButton label="Mail">
+          <IconButton label="Mail" onClick={() => go({ name: 'coming-soon', title: 'Mail', icon: 'mail' })}>
             <MailIcon size={19} />
           </IconButton>
-          <IconButton label="Gifts" badge>
+          <IconButton
+            label="Gifts"
+            badge
+            onClick={() => go({ name: 'coming-soon', title: 'Gifts', icon: 'gifts' })}
+          >
             <GiftIcon size={19} />
           </IconButton>
         </div>
@@ -247,13 +251,16 @@ function IconButton({
   children,
   label,
   badge,
+  onClick,
 }: {
   children: React.ReactNode
   label: string
   badge?: boolean
+  onClick?: () => void
 }) {
   return (
     <button
+      onClick={onClick}
       className="relative neu w-9 h-9 rounded-pill grid place-items-center text-ink-muted"
       aria-label={label}
     >
