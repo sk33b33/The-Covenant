@@ -16,9 +16,20 @@
  *   else          immutable: a hashed filename that exists in the cache can
  *                 never be stale, and going to the network for it would waste
  *                 the one thing mobile users are short of.
+ *
+ * That "immutable" assumption holds for hashed bundle filenames by
+ * construction, but art under public/ (card faces, key art, pack wrappers,
+ * the entry chime) is referenced by a plain, unhashed path — see lib/asset.ts
+ * for why. When one of those files is revised in place rather than added,
+ * its URL doesn't change, so a device that already cached the old bytes would
+ * keep serving them forever: cache-first never re-checks the network, and
+ * nothing here was bumping VERSION to say otherwise. Bump it — right below —
+ * whenever an existing art or audio file's *content* changes, not just when
+ * new ones are added. `activate` deletes anything not carrying the current
+ * VERSION, which is what actually forces a fresh fetch.
  */
 
-const VERSION = 'covenant-v1'
+const VERSION = 'covenant-v2'
 const SHELL = `${VERSION}-shell`
 
 /*
