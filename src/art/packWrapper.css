@@ -1,0 +1,82 @@
+/*
+ * The booster pack wrapper.
+ *
+ * One photograph, shared by every Genesis pack, rather than three procedurally
+ * drawn variants. What told the packs apart on a real shelf was never the
+ * wrapper stock — it was the name struck across the middle of it. The name
+ * here lands in the exact band the photograph already left plain for it,
+ * measured off the source image: 65.1% to 71.5% of the height clears the tree
+ * medallion's finial above it and the stat panel's border below it, on every
+ * pack, at every size.
+ *
+ * `container-type: inline-size` and `cqw` units carry the same discipline as
+ * the card frame (card.css): one set of rules serves an 86px Shop thumbnail
+ * and the carousel's largest pack alike.
+ */
+
+.cov-pack {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 720 / 1019;
+  border-radius: 4.5cqw;
+  overflow: hidden;
+  container-type: inline-size;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.cov-pack__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cov-pack__plate {
+  position: absolute;
+  z-index: 0;
+  left: 8%;
+  right: 8%;
+  top: 65.1%;
+  height: 6.4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.8cqw;
+}
+
+/* A faint pool of colour under the name, tinted per pack theme — the same
+   role a coloured foil stamp would play on a real wrapper shared across a
+   set. It sits behind the gems and the name, not tinting the photo itself. */
+.cov-pack__glow {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 58% 130% at 50% 50%, var(--pack-glow, transparent) 0%, transparent 75%),
+    radial-gradient(
+      ellipse 60% 100% at 50% 50%,
+      rgba(10, 7, 4, 0.88) 0%,
+      rgba(10, 7, 4, 0.58) 58%,
+      transparent 100%
+    );
+}
+
+.cov-pack__name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 7.6cqw;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.cov-pack__gem {
+  flex: none;
+  width: 1.7cqw;
+  height: 1.7cqw;
+  transform: rotate(45deg);
+  background: var(--gold-leaf);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+}

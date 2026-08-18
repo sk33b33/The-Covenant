@@ -144,7 +144,7 @@ export function PackOpen({ packId, source }: { packId: string; source: 'free' | 
     >
       <AnimatePresence mode="wait">
         {phase === 'sealed' && (
-          <Sealed key="sealed" packId={pack.id} setCode={set.code} onTear={tear} onBack={back} />
+          <Sealed key="sealed" packId={pack.id} onTear={tear} onBack={back} />
         )}
 
         {phase === 'revealing' && pull && (
@@ -178,12 +178,10 @@ export function PackOpen({ packId, source }: { packId: string; source: 'free' | 
 
 function Sealed({
   packId,
-  setCode,
   onTear,
   onBack,
 }: {
   packId: string
-  setCode: string
   onTear: () => void
   onBack: () => void
 }) {
@@ -212,7 +210,7 @@ function Sealed({
         animate={{ y: [0, -8, 0] }}
         transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <PackWrapper pack={pack} setCode={setCode} />
+        <PackWrapper pack={pack} />
       </motion.div>
 
       <div className="text-center" style={{ color: '#f0dcbc' }}>

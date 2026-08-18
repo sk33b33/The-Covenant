@@ -417,7 +417,7 @@ function PackCarousel({
               aria-label={`${pack.name} pack`}
               aria-current={i === active ? 'true' : undefined}
             >
-              <PackWrapper pack={pack} setCode={GENESIS.code} />
+              <PackWrapper pack={pack} />
             </button>
           ))}
         </div>

@@ -90,7 +90,7 @@ export function Shop() {
             <Panel key={pack.id} className="p-3">
               <div className="flex items-center gap-4">
                 <div className="w-[86px] shrink-0">
-                  <PackWrapper pack={pack} setCode={GENESIS.code} />
+                  <PackWrapper pack={pack} />
                 </div>
 
                 <div className="flex-1 min-w-0">
