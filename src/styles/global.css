@@ -300,22 +300,40 @@
      * orbits, recedes and comes back round. */
     transform: rotateY(calc(var(--pack-i) * var(--ring-step, 120deg)))
       translateZ(var(--ring-r)) rotateY(calc(var(--pack-face, 0deg) * -1));
-    /* --pack-d is 0 facing the viewer and 1 side-on, written each frame by the
-     * ring's subscription. The packs behind recede rather than disappearing,
-     * so the ring reads as a carousel and not as a stack of cards. */
-    opacity: calc(1 - var(--pack-d, 0) * 0.55);
     /* No drop-shadow here: the photo is a real cutout now, with a crimped,
      * unevenly bulging silhouette, and a shadow that follows every peak and
      * valley of that edge reads as a dark smudge behind the pack rather than
      * a clean contact shadow — worse than doing without one. */
   }
 
+  /*
+   * The recede-with-angle fade lives on this inner, untransformed element
+   * rather than on .cov-ring-pack itself. An element with opacity below 1
+   * inside a preserve-3d context has to be flattened into its own layer to
+   * blend correctly — the spec requires it — which breaks proper depth
+   * interleaving with its siblings on some renderers and showed up as a dark
+   * seam along the edge of whichever pack was fading. Fading a plain child
+   * instead leaves .cov-ring-pack itself at full opacity, so it never has to
+   * be flattened out of the 3D scene it's part of.
+   */
+  .cov-ring-pack .cov-pack {
+    /* --pack-d is 0 facing the viewer and 1 side-on, written each frame by
+     * the ring's subscription. The packs behind recede rather than
+     * disappearing, so the ring reads as a carousel and not as a stack of
+     * cards. */
+    opacity: calc(1 - var(--pack-d, 0) * 0.55);
+  }
+
   /* Registered so `calc(var(--pack-i) * var(--ring-step))` resolves as a real
    * angle. An unregistered custom property substitutes as a raw token, which
    * happens to work in Chrome and is not something to rely on. */
+  /* Inherits, unlike its neighbours below — .cov-pack, one level down, reads
+   * this to drive its own opacity (see the comment by that rule), and a
+   * non-inheriting property set inline on the parent never reaches a child
+   * at all, registered or not. */
   @property --pack-d {
     syntax: '<number>';
-    inherits: false;
+    inherits: true;
     initial-value: 0;
   }
 
