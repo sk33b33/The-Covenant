@@ -4,22 +4,26 @@ Cut a booster-pack product photo out of its studio backdrop.
 
     python3 scripts/cutout-pack.py source.png public/art/packs/wrapper.webp
 
-rembg's matte alone is not enough here: on this photo its alpha ramp fades
-over roughly 40px of a ~1050px-wide image, which reads as a soft dark halo
-once the pack sits on anything but a near-black page — exactly the "there's
-a background on the pack" complaint this script exists to fix. Two things
-are done on top of the raw matte:
+Two sources have gone through this so far, and they needed different amounts
+of help:
 
-  1. A levels stretch on the alpha channel collapses that 40px ramp back down
-     to a normal few-pixel antialiased edge.
-  2. Colour decontamination recovers the true foreground colour for whatever
-     short ramp remains, so the edge doesn't carry a tint of the (near-black)
-     backdrop it was cut from. Without this, partially-transparent edge
-     pixels still show blended background colour, which reads as a dark
-     fringe on a light page.
+  - A plain product photo on a near-black backdrop. rembg's own matte was not
+    enough on its own: its alpha ramp faded over roughly 40px of a ~1050px
+    wide image, which read as a soft dark halo once the pack sat on anything
+    but a near-black page. On top of the raw matte this does a levels stretch
+    (collapses that 40px ramp back to a normal few-pixel antialiased edge)
+    and colour decontamination (recovers the true foreground colour for
+    whatever short ramp remains, so the edge doesn't carry a tint of the
+    backdrop it was cut from — without it, partially-transparent edge pixels
+    still show blended background colour).
+  - A photo that already arrives as a clean RGBA cutout needs none of that;
+    reprocessing it through the same stretch would misjudge its already-tight
+    edge as more of the soft halo above and cut into real antialiasing that
+    was never contaminated. Detected automatically (see `already_cut`) and
+    passed straight through to the crop/resize/export step.
 
-The result is cropped to its own bounding box — no reason to ship a large
-transparent margin — and written as an alpha-channel webp.
+Either way the result is cropped to its own bounding box — no reason to ship
+a large transparent margin — and written as an alpha-channel webp.
 """
 
 import argparse
@@ -28,18 +32,25 @@ from pathlib import Path
 
 from PIL import Image, ImageFilter
 
-try:
-    import numpy as np
-except ImportError:
-    sys.exit("Needs numpy: pip install numpy")
 
-try:
-    from rembg import remove, new_session
-except ImportError:
-    sys.exit("Needs rembg + onnxruntime: pip install rembg onnxruntime")
+def already_cut(source: Image.Image) -> bool:
+    """True if the source carries a real alpha matte rather than being opaque."""
+    if source.mode != "RGBA":
+        return False
+    lo, hi = source.split()[-1].getextrema()
+    return lo < 16  # some real transparency somewhere, not just a stray pixel
 
 
-def cutout(source: Image.Image) -> Image.Image:
+def matte(source: Image.Image) -> Image.Image:
+    try:
+        import numpy as np
+    except ImportError:
+        sys.exit("Needs numpy: pip install numpy")
+    try:
+        from rembg import remove, new_session
+    except ImportError:
+        sys.exit("Needs rembg + onnxruntime: pip install rembg onnxruntime")
+
     session = new_session("u2net")
     raw = remove(source.convert("RGB"), session=session)
 
@@ -51,8 +62,8 @@ def cutout(source: Image.Image) -> Image.Image:
     # output, which may already carry some blending).
     bg_color = np.median(src[alpha0 < 8], axis=0)
 
-    # Stretch the ramp. These bounds are tuned to this photo's matte, not a
-    # universal constant — re-check the edge profile (see the plan/PR notes)
+    # Stretch the ramp. These bounds are tuned to the soft-matte photo
+    # described above, not a universal constant — re-check the edge profile
     # if this is re-run against a differently lit source.
     low, high = 50.0, 170.0
     alpha1 = np.clip((alpha0 - low) / (high - low), 0.0, 1.0)
@@ -87,7 +98,12 @@ def main() -> None:
     if not args.source.is_file():
         sys.exit(f"No such file: {args.source}")
 
-    out = cutout(Image.open(args.source))
+    source = Image.open(args.source)
+    if already_cut(source):
+        print(f"{args.source} already has a clean alpha matte — skipping rembg")
+        out = source.convert("RGBA")
+    else:
+        out = matte(source)
 
     w, h = out.size
     mask = out.split()[-1].point(lambda p: 255 if p > 8 else 0)

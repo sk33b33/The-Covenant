@@ -5,13 +5,13 @@
  * drawn variants. What told the packs apart on a real shelf was never the
  * wrapper stock — it was the name struck across the middle of it. The name
  * here lands in the exact band the photograph already left plain for it,
- * measured off the source image: 72.8% to 79.7% of the height clears the tree
+ * measured off the source image: 63.2% to 68.4% of the height clears the tree
  * medallion's finial above it and the stat panel's border below it, on every
  * pack, at every size.
  *
- * The photo's studio backdrop is cut out (see the pipeline note in
- * PackWrapper.tsx), so the wrapper is a real silhouette rather than a
- * rectangle — there is nothing left to clip or box-frame here. Every caller's
+ * The photo's studio backdrop is cut out (see scripts/cutout-pack.py), so the
+ * wrapper is a real silhouette rather than a rectangle — there is nothing
+ * left to clip or box-frame here. Every caller's
  * own `filter: drop-shadow` (the ring in global.css, the sealed pack in
  * PackOpen) now hugs that silhouette automatically, which is also why none is
  * set here: a shadow inside PackWrapper would stack under a caller's own.
@@ -24,7 +24,7 @@
 .cov-pack {
   position: relative;
   width: 100%;
-  aspect-ratio: 620 / 789;
+  aspect-ratio: 620 / 939;
   container-type: inline-size;
 }
 
@@ -43,8 +43,8 @@
   z-index: 0;
   left: 8%;
   right: 8%;
-  top: 72.8%;
-  height: 6.9%;
+  top: 63.2%;
+  height: 5.2%;
   display: flex;
   align-items: center;
   justify-content: center;
