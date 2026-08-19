@@ -315,18 +315,51 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const activeSlotRef = useRef<HTMLDivElement>(null)
   const benchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
 
+  // A drop target padded a few px beyond its own box, so a drop that lands
+  // just outside a slot's visible edge — an easy miss on a small touchscreen
+  // target — still counts, rather than silently snapping back to hand with no
+  // explanation.
+  const DROP_PAD = 14
+  const within = (el: HTMLDivElement | null, point: { x: number; y: number }) => {
+    if (!el) return false
+    const r = el.getBoundingClientRect()
+    return (
+      point.x >= r.left - DROP_PAD &&
+      point.x <= r.right + DROP_PAD &&
+      point.y >= r.top - DROP_PAD &&
+      point.y <= r.bottom + DROP_PAD
+    )
+  }
+
+  const slotAt = (point: { x: number; y: number }): HTMLDivElement | null => {
+    if (within(activeSlotRef.current, point)) return activeSlotRef.current
+    return benchSlotRefs.current.find((el) => within(el, point)) ?? null
+  }
+
+  // The live "will this land here?" highlight is applied straight to the DOM
+  // rather than through React state. A card in hand fires this on every frame
+  // of the drag, and re-rendering the whole board that often turned out to be
+  // enough to make framer's own drag recognition occasionally drop the
+  // gesture entirely — the highlight is worth showing, but not at the cost of
+  // the drag itself sometimes silently failing to register.
+  const lastHighlighted = useRef<HTMLDivElement | null>(null)
+  const setHighlight = (el: HTMLDivElement | null) => {
+    if (lastHighlighted.current === el) return
+    lastHighlighted.current?.querySelector('.cov-slot-outline')?.classList.remove('cov-slot-drag-target')
+    el?.querySelector('.cov-slot-outline')?.classList.add('cov-slot-drag-target')
+    lastHighlighted.current = el
+  }
+
+  const handleHandDrag = (point: { x: number; y: number }) => setHighlight(slotAt(point))
+
   const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
-    const within = (el: HTMLDivElement | null) => {
-      if (!el) return false
-      const r = el.getBoundingClientRect()
-      return point.x >= r.left && point.x <= r.right && point.y >= r.top && point.y <= r.bottom
+    const el = slotAt(point)
+    setHighlight(null)
+    if (el === activeSlotRef.current) placeActive(index)
+    else {
+      const slot = benchSlotRefs.current.indexOf(el)
+      if (el && slot !== -1) placeBench(index, slot)
     }
-    if (within(activeSlotRef.current)) {
-      placeActive(index)
-      return
-    }
-    const slot = benchSlotRefs.current.findIndex(within)
-    if (slot !== -1) placeBench(index, slot)
   }
 
   /* --------------------------------------------------------------- action */
@@ -364,11 +397,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           so the two halves meet at the mat's clash ring instead of being
           pushed to the screen edges.
 
-          Each side is a mirror of the other: the deck, the discard pile and
-          the points/time chip all sit in one right-aligned row — the same
-          row, not a pile row on the left with a badge floating in the corner
-          — top for the opponent, bottom for you, on the same shared
-          container so "mirrored" is one rule applied twice rather than two
+          Each side's row spans the full width with its two pieces at
+          opposite ends rather than clustered on one side: the opponent's
+          points/time chip sits at the far left with their piles at the far
+          right, and yours is the mirror of that — piles far left, chip far
+          right — so the two rows read as one rule applied twice, not two
           hand-tuned layouts. */}
       {/* The hand tray below is positioned outside the flex flow (an absolute
           overlay pinned to the bottom) rather than as a flex sibling, so this
@@ -380,7 +413,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           asymmetrically only at the bottom, which is what pushed every piece
           of this board, deck and discard piles included, above the line. */}
       <div
-        className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 overflow-hidden"
+        className="relative z-10 flex-1 flex flex-col items-center justify-center gap-1 min-h-0 px-3 overflow-hidden"
         style={{
           paddingTop: `calc(${HAND_TRAY_CALC} / 2 + env(safe-area-inset-top, 0px))`,
           paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
@@ -393,21 +426,25 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
         <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
 
-        <div className="w-full flex items-center justify-end gap-2 pr-0.5">
-          <PileCount label="Deck" count={foe.deck.length} small />
-          <PileCount label="Disc" count={foe.discard.length} small />
+        <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
+          <div className="flex items-center gap-2">
+            <PileCount label="Deck" count={foe.deck.length} small />
+            <PileCount label="Disc" count={foe.discard.length} small />
+          </div>
         </div>
 
         {/* Extra clearance: attached energy hangs below a Figure's card edge
             and would otherwise sit on top of the banner. */}
-        <div className="flex items-center justify-center py-1.5 w-full">
+        <div className="flex items-center justify-center py-0.5 w-full">
           <TurnBanner state={state} myTurn={myTurn} seconds={clocks.turn} />
         </div>
 
-        <div className="w-full flex items-center justify-end gap-2 pr-0.5">
-          <PileCount label="Deck" count={you.deck.length} small />
-          <PileCount label="Disc" count={you.discard.length} small />
+        <div className="w-full flex items-center justify-between gap-2 px-0.5">
+          <div className="flex items-center gap-2">
+            <PileCount label="Deck" count={you.deck.length} small />
+            <PileCount label="Disc" count={you.discard.length} small />
+          </div>
           <StatsChip points={you.points} seconds={clocks.you} />
         </div>
 
@@ -465,6 +502,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               if (state.phase !== 'setup') openHandCard(index)
             }}
             onDropEnd={handleHandDragEnd}
+            onDragMove={handleHandDrag}
           />
 
           {/* Altar, with the small popup action trigger stacked above it. */}
@@ -651,6 +689,7 @@ function PlayerHand({
   playable,
   onTap,
   onDropEnd,
+  onDragMove,
 }: {
   hand: string[]
   setupActive: number | null
@@ -661,6 +700,7 @@ function PlayerHand({
   playable: Map<number, Action[]>
   onTap: (index: number, isBasic: boolean) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
+  onDragMove: (point: { x: number; y: number }) => void
 }) {
   const count = hand.length
   const mid = (count - 1) / 2
@@ -668,8 +708,8 @@ function PlayerHand({
   // hand sizes this game actually deals: the old cap saturated at max spread
   // for anything up to eight or nine cards, so drawing a card never visibly
   // tightened the fan until a hand was already unusually large.
-  const rotateStep = count > 1 ? Math.min(14, Math.max(2.5, 40 / count)) : 0
-  const spanStep = count > 1 ? Math.min(46, Math.max(14, 160 / count)) : 0
+  const rotateStep = count > 1 ? Math.min(10, Math.max(2, 30 / count)) : 0
+  const spanStep = count > 1 ? Math.min(34, Math.max(10, 120 / count)) : 0
 
   return (
     <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
@@ -701,7 +741,12 @@ function PlayerHand({
             drag={draggable}
             dragSnapToOrigin
             dragElastic={0.35}
-            whileDrag={{ zIndex: 40, scale: 1.1 }}
+            // Straightens to upright the instant a card lifts off the fan,
+            // rather than carrying its resting tilt around under the thumb —
+            // a card you're holding reads as held, not still leaning the way
+            // it happened to sit in the hand.
+            whileDrag={{ zIndex: 40, scale: 1.1, rotate: 0 }}
+            onDrag={(_event, info: PanInfo) => onDragMove(info.point)}
             onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
             onClick={() => onTap(index, isBasic)}
             whileTap={{ scale: 0.95 }}

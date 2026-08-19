@@ -360,4 +360,27 @@
     inherits: false;
     initial-value: 0deg;
   }
+
+  /*
+   * Setup's drag-over highlight on an empty Active/Bench slot.
+   *
+   * Driven by toggling this class directly on the slot's own DOM node from
+   * the drag handler — not from React state — because a card in hand is
+   * dragged dozens of times a second, and a state update on every one of
+   * those frames re-renders the whole board mid-gesture. Framer's own drag
+   * recognition sometimes lost the gesture entirely under that churn, so the
+   * highlight has to reach the DOM without asking React to re-render
+   * anything while a drag is in progress.
+   */
+  .cov-slot-outline {
+    transition: border-color 150ms, box-shadow 150ms, background-color 150ms;
+  }
+
+  .cov-slot-outline.cov-slot-drag-target {
+    border: 2px solid var(--gold-bright);
+    box-shadow:
+      0 0 0 2px rgba(229, 192, 140, 0.25),
+      0 0 16px rgba(229, 192, 140, 0.55);
+    background: rgba(229, 192, 140, 0.1);
+  }
 }

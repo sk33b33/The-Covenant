@@ -129,14 +129,18 @@ export function BattleMat({
   )
 }
 
-/** An empty slot outline, sized by its container. */
+/** An empty slot outline, sized by its container.
+ *
+ *  Carries the stable `cov-slot-outline` class a drag handler targets
+ *  directly (see global.css) to show a live "will this land here?" highlight
+ *  while a card in hand is being dragged over it — toggled straight on the
+ *  DOM node rather than through a React prop, so a drag in progress never has
+ *  to re-render the board just to light up the slot it's hovering. */
 export function SlotOutline({ label }: { label?: string }) {
   return (
     <span
-      className="absolute inset-0 rounded-[8%] pointer-events-none grid place-items-center"
-      style={{
-        border: '1.5px dashed rgba(229,192,140,.26)',
-      }}
+      className="cov-slot-outline absolute inset-0 rounded-[8%] pointer-events-none grid place-items-center"
+      style={{ border: '1.5px dashed rgba(229,192,140,.26)' }}
     >
       {label && (
         <span
