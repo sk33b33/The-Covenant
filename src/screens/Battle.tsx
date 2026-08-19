@@ -3,7 +3,7 @@ import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { CheckIcon } from '@/art/icons'
+import { CheckIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -31,6 +31,15 @@ import type { FigureInPlay, MatchState } from '@/engine/types'
 const ACTIVE_W = 96
 const BENCH_W = 60
 const HAND_W = 68
+
+/** Tall enough for a lifted card plus the fan's own arc and a picked card's
+ *  badge, at the widest hands this game deals. */
+const HAND_HEIGHT = 112
+
+// The hand tray sits outside the flex flow (see the board container below),
+// so nothing else reserves its footprint automatically any more — anything
+// that needs to know its height, or clear it, reads this one calc.
+const HAND_TRAY_CALC = `calc(${HAND_HEIGHT}px + 8px + env(safe-area-inset-bottom, 0px))`
 
 export interface BattleProps extends MatchConfig {
   /** Shown in the opponent's nameplate. */
@@ -160,19 +169,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       return { active: cleared.active, bench }
     })
 
-  /** The tap fallback: first tap becomes Active, later taps fill the next
-   *  open Bench slot in order, and tapping a placed card again clears it. */
-  const toggleSetupPick = (index: number) =>
-    setSetup((prev) => {
-      if (prev.active === index || prev.bench.includes(index)) return clearPick(prev, index)
-      if (prev.active === null) return { active: index, bench: prev.bench }
-
-      const open = prev.bench.indexOf(null)
-      if (open === -1) return prev
-      const bench = [...prev.bench]
-      bench[open] = index
-      return { active: prev.active, bench }
-    })
+  /** The small reset button: clears every setup pick so a misdropped card can
+   *  be dragged again from a clean hand instead of dragged a second time onto
+   *  the slot it is already sitting in. */
+  const resetSetup = () => setSetup({ active: null, bench: Array(RULES.BENCH_SIZE).fill(null) })
 
   const startBattle = () => {
     if (setupActive === null) return
@@ -370,7 +370,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           side's own outer corner — top-right for the opponent, bottom-right
           for you, on the same shared container so "mirrored" is one rule
           applied twice rather than two hand-tuned layouts. */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 pt-safe overflow-hidden">
+      {/* The hand tray below is positioned outside the flex flow (an absolute
+          overlay pinned to the bottom) rather than as a flex sibling, so this
+          board area spans the *entire* screen instead of (screen − hand tray
+          height). Padding top and bottom by half the tray's height keeps the
+          centred content the same size it always was — nothing shrinks — but
+          re-centres it on the screen's true midpoint, which is where the
+          mat's own halfway line is drawn. A flex sibling ate that clearance
+          asymmetrically only at the bottom, which is what pushed every piece
+          of this board, deck and discard piles included, above the line. */}
+      <div
+        className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 overflow-hidden"
+        style={{
+          paddingTop: `calc(${HAND_TRAY_CALC} / 2 + env(safe-area-inset-top, 0px))`,
+          paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
+        }}
+      >
         <CornerStats corner="top" points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
 
         <div className="flex gap-1.5">
@@ -434,7 +449,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       </div>
 
       {/* ------------------------------------------------------------ hand */}
-      <div className="relative z-10 px-3 pb-safe pb-2">
+      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-safe pb-2">
         <div className="flex items-end gap-1">
           <PlayerHand
             hand={you.hand}
@@ -444,9 +459,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             setupPhase={state.phase === 'setup'}
             myTurn={myTurn}
             playable={actionsFor.byHand}
-            onTap={(index, isBasic) =>
-              state.phase === 'setup' ? isBasic && toggleSetupPick(index) : openHandCard(index)
-            }
+            onTap={(index) => {
+              // Setup places cards by drag only now — a tap during setup used
+              // to auto-assign the next open slot, but that made the drag
+              // gesture redundant instead of authoritative. Outside setup, a
+              // tap still opens the card's own sheet of plays.
+              if (state.phase !== 'setup') openHandCard(index)
+            }}
             onDropEnd={handleHandDragEnd}
           />
 
@@ -467,6 +486,21 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {state.phase === 'setup' && (
+              <button
+                onClick={resetSetup}
+                disabled={setupActive === null && benchCount === 0}
+                className="rounded-pill w-8 h-8 grid place-items-center"
+                style={{
+                  background: 'var(--bg-sunk)',
+                  opacity: setupActive === null && benchCount === 0 ? 0.4 : 1,
+                }}
+                aria-label="Reset setup picks"
+              >
+                <ResetIcon size={14} className="text-ink-faint" />
+              </button>
+            )}
 
             <button
               onClick={() => setActionOpen((v) => !v)}
@@ -568,9 +602,17 @@ function CornerStats({
     <div
       className={cx(
         'absolute right-2 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1',
-        corner === 'top' ? 'top-2' : 'bottom-2',
+        corner === 'top' && 'top-2',
       )}
-      style={{ background: 'rgba(10,7,3,.55)', border: '1px solid rgba(229,192,140,.25)' }}
+      style={{
+        background: 'rgba(10,7,3,.55)',
+        border: '1px solid rgba(229,192,140,.25)',
+        // The board now spans the full screen (see the container above), so
+        // `bottom-2` would sit right behind the hand tray instead of above
+        // it — this clears the tray by the same 8px the top badge sits from
+        // the top edge.
+        ...(corner === 'bottom' ? { bottom: `calc(${HAND_TRAY_CALC} + 8px)` } : {}),
+      }}
     >
       <span className="flex gap-1" aria-label={`${points} of ${RULES.POINTS_TO_WIN} points`}>
         {Array.from({ length: RULES.POINTS_TO_WIN }, (_, i) => (
@@ -595,10 +637,6 @@ function CornerStats({
     </div>
   )
 }
-
-/** Tall enough for a lifted card plus the fan's own arc and a picked card's
- *  badge, at the widest hands this game deals. */
-const HAND_HEIGHT = 112
 
 /**
  * The hand, fanned rather than scrolled.
@@ -638,8 +676,12 @@ function PlayerHand({
 }) {
   const count = hand.length
   const mid = (count - 1) / 2
-  const rotateStep = count > 1 ? Math.min(7, 56 / (count - 1)) : 0
-  const spanStep = count > 1 ? Math.min(34, 220 / (count - 1)) : 0
+  // Divided by count rather than count-1, and with no flat ceiling for the
+  // hand sizes this game actually deals: the old cap saturated at max spread
+  // for anything up to eight or nine cards, so drawing a card never visibly
+  // tightened the fan until a hand was already unusually large.
+  const rotateStep = count > 1 ? Math.min(14, Math.max(2.5, 40 / count)) : 0
+  const spanStep = count > 1 ? Math.min(46, Math.max(14, 160 / count)) : 0
 
   return (
     <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>

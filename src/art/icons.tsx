@@ -196,6 +196,14 @@ export const MinusIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** Reset/undo: a circular arrow sweeping back to start. */
+export const ResetIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M19 12a7 7 0 1 1-2.1-5" />
+    <path d="M19 4.6v4.4h-4.4" />
+  </Icon>
+)
+
 /* ------------------------------------------------------------- currencies */
 
 /** Talents: a stack of coins. */
