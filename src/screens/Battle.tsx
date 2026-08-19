@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { ScrollIcon } from '@/art/icons'
+import { CheckIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -52,13 +52,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // two independent pieces of state and set from a stale closure, three taps
   // inside one React batch all saw `active` as null and overwrote each other,
   // so a player who tapped quickly started with an empty Bench.
-  const [setup, setSetup] = useState<{ active: number | null; bench: number[] }>({
+  const [setup, setSetup] = useState<{ active: number | null; bench: (number | null)[] }>({
     active: null,
-    bench: [],
+    bench: Array(RULES.BENCH_SIZE).fill(null),
   })
   const setupActive = setup.active
   const setupBench = setup.bench
-  const [logOpen, setLogOpen] = useState(false)
+  const [actionOpen, setActionOpen] = useState(false)
 
   const you = state.players.you
   const foe = state.players.foe
@@ -71,6 +71,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const timer = setTimeout(clearError, 2600)
     return () => clearTimeout(timer)
   }, [error, clearError])
+
+  // The SETUP action removes the placed cards from hand, which shifts every
+  // later card's index down — so a picked-card's hand index left sitting in
+  // local state would start pointing at a different card the moment setup
+  // ends, mislabelling it ACTIVE or BENCH in the fan for the rest of the
+  // match. Nothing in this state is worth keeping once it has been spent.
+  useEffect(() => {
+    if (state.phase !== 'setup') setSetup({ active: null, bench: Array(RULES.BENCH_SIZE).fill(null) })
+  }, [state.phase])
 
   const recordBattle = useProfile((s) => s.recordBattle)
   const [recorded, setRecorded] = useState(false)
@@ -130,31 +139,49 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       return isFigure(card) && card.stage === 'basic'
     })
 
+  // Bench is a fixed-length array of hand indices, one slot at a time — the
+  // shape a drag has to target a *specific* slot, not just "the bench" as an
+  // unordered set. Clearing a card's previous position before placing it
+  // anywhere new is what makes both the drag drop and the tap fallback below
+  // safe to call unconditionally: a card can never end up picked twice.
+  const clearPick = (prev: typeof setup, index: number) => ({
+    active: prev.active === index ? null : prev.active,
+    bench: prev.bench.map((i) => (i === index ? null : i)),
+  })
+
+  const placeActive = (index: number) =>
+    setSetup((prev) => ({ ...clearPick(prev, index), active: index }))
+
+  const placeBench = (index: number, slot: number) =>
+    setSetup((prev) => {
+      const cleared = clearPick(prev, index)
+      const bench = [...cleared.bench]
+      bench[slot] = index
+      return { active: cleared.active, bench }
+    })
+
+  /** The tap fallback: first tap becomes Active, later taps fill the next
+   *  open Bench slot in order, and tapping a placed card again clears it. */
   const toggleSetupPick = (index: number) =>
     setSetup((prev) => {
-      // First pick becomes the Active Figure.
+      if (prev.active === index || prev.bench.includes(index)) return clearPick(prev, index)
       if (prev.active === null) return { active: index, bench: prev.bench }
 
-      // Tapping the Active again releases it; the first benched Figure, if
-      // any, steps up so the board never loses its Active spot.
-      if (prev.active === index) {
-        return { active: prev.bench[0] ?? null, bench: prev.bench.slice(1) }
-      }
-
-      if (prev.bench.includes(index)) {
-        return { active: prev.active, bench: prev.bench.filter((i) => i !== index) }
-      }
-
-      if (prev.bench.length < RULES.BENCH_SIZE) {
-        return { active: prev.active, bench: [...prev.bench, index] }
-      }
-
-      return prev
+      const open = prev.bench.indexOf(null)
+      if (open === -1) return prev
+      const bench = [...prev.bench]
+      bench[open] = index
+      return { active: prev.active, bench }
     })
 
   const startBattle = () => {
     if (setupActive === null) return
-    dispatch({ type: 'SETUP', player: 'you', active: setupActive, bench: setupBench })
+    // The SETUP action only ever fills Bench slots in submission order —
+    // there is no "specific slot" at this stage of the game, only a count —
+    // so a sparse { null, 3, null } compacts to [3] here without losing
+    // anything the reducer would have cared about.
+    const bench = setupBench.filter((i): i is number => i !== null)
+    dispatch({ type: 'SETUP', player: 'you', active: setupActive, bench })
   }
 
   /* ------------------------------------------------------------- sheets */
@@ -281,36 +308,70 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setSheet({ title: 'The Altar', subtitle: 'One energy may be attached each turn', options })
   }
 
+  /* --------------------------------------------------------------- drag */
+
+  // Drop targets for the setup-phase hand drag: the Active slot and each
+  // Bench slot's own wrapping element, measured at drop time rather than
+  // cached, since the mat reflows with the viewport and with orientation.
+  const activeSlotRef = useRef<HTMLDivElement>(null)
+  const benchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
+    const within = (el: HTMLDivElement | null) => {
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      return point.x >= r.left && point.x <= r.right && point.y >= r.top && point.y <= r.bottom
+    }
+    if (within(activeSlotRef.current)) {
+      placeActive(index)
+      return
+    }
+    const slot = benchSlotRefs.current.findIndex(within)
+    if (slot !== -1) placeBench(index, slot)
+  }
+
+  /* --------------------------------------------------------------- action */
+
+  // What the small popup above the Altar offers, if anything. Promote has
+  // its own instruction on the turn banner and its own targetable Bench
+  // glow — nothing for this button to add there.
+  const benchCount = setupBench.filter((i) => i !== null).length
+  const actionLabel =
+    state.phase === 'setup'
+      ? setupActive === null
+        ? null
+        : benchCount === 0
+          ? 'Start Battle — no Bench'
+          : `Start Battle — ${benchCount} on the Bench`
+      : !mustPromote && myTurn
+        ? 'End Turn'
+        : null
+
+  const runAction = () => {
+    if (state.phase === 'setup') startBattle()
+    else if (myTurn) dispatch({ type: 'END_TURN' })
+    setActionOpen(false)
+  }
+
   /* ------------------------------------------------------------- render */
 
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
       <BattleMat theme={themeType} />
 
-      {/* --------------------------------------------------------- opponent */}
-      <div className="relative z-10 px-3 pt-safe">
-        <PlayerBar
-          name={opponentName}
-          points={foe.points}
-          seconds={clocks.foe}
-          active={state.current === 'foe'}
-          thinking={aiThinking}
-        />
-      </div>
-
       {/* Both halves push their Active Figure toward the centre ring, so the
           clash reads as happening in the middle of the mat rather than leaving
-          a dead band between the two boards. */}
-      {/* The board is one centred block, so the two halves meet at the mat's
-          clash ring instead of being pushed to the screen edges with a dead
-          band between them. */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 overflow-hidden">
-        {/* Opponent's piles sit on their own side; in the centre they read as
-            belonging to nobody. */}
-        <div className="w-full flex justify-end gap-1.5 pr-0.5">
-          <PileCount label="Deck" count={foe.deck.length} small />
-          <PileCount label="Disc" count={foe.discard.length} small />
-        </div>
+          a dead band between the two boards. The board is one centred block,
+          so the two halves meet at the mat's clash ring instead of being
+          pushed to the screen edges.
+
+          Each side is a mirror of the other: piles sit just off the mat's own
+          centreline on the left, and the points/time badge sits in that
+          side's own outer corner — top-right for the opponent, bottom-right
+          for you, on the same shared container so "mirrored" is one rule
+          applied twice rather than two hand-tuned layouts. */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 pt-safe overflow-hidden">
+        <CornerStats corner="top" points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
 
         <div className="flex gap-1.5">
           {foe.bench.map((figure, i) => (
@@ -319,101 +380,108 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
         <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
 
+        <div className="w-full flex justify-start pl-0.5">
+          <PileCount label="Deck" count={foe.deck.length} small />
+          <PileCount label="Disc" count={foe.discard.length} small />
+        </div>
+
         {/* Extra clearance: attached energy hangs below a Figure's card edge
             and would otherwise sit on top of the banner. */}
-        <div className="flex items-center justify-center py-2.5 w-full">
+        <div className="flex items-center justify-center py-1.5 w-full">
           <TurnBanner state={state} myTurn={myTurn} seconds={clocks.turn} />
         </div>
 
-        <BoardFigure
-          figure={you.active}
-          width={ACTIVE_W}
-          emptyLabel="Active"
-          onClick={you.active && myTurn ? openActive : undefined}
-          selected={Boolean(you.active && myTurn)}
-          noPeek={Boolean(you.active && myTurn)}
-        />
+        <div className="w-full flex justify-start pl-0.5">
+          <PileCount label="Deck" count={you.deck.length} small />
+          <PileCount label="Disc" count={you.discard.length} small />
+        </div>
+
+        <div ref={activeSlotRef} className="shrink-0">
+          <BoardFigure
+            figure={you.active}
+            width={ACTIVE_W}
+            emptyLabel="Active"
+            onClick={you.active && myTurn ? openActive : undefined}
+            selected={Boolean(you.active && myTurn)}
+            noPeek={Boolean(you.active && myTurn)}
+          />
+        </div>
         <div className="flex gap-1.5 mt-1">
           {you.bench.map((figure, i) => (
-            <BoardFigure
+            <div
               key={i}
-              figure={figure}
-              width={BENCH_W}
-              emptyLabel=""
-              targetable={mustPromote && figure !== null}
-              onClick={
-                mustPromote && figure
-                  ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
-                  : undefined
-              }
-            />
+              className="shrink-0"
+              ref={(el) => {
+                benchSlotRefs.current[i] = el
+              }}
+            >
+              <BoardFigure
+                figure={figure}
+                width={BENCH_W}
+                emptyLabel=""
+                targetable={mustPromote && figure !== null}
+                onClick={
+                  mustPromote && figure
+                    ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
+                    : undefined
+                }
+              />
+            </div>
           ))}
         </div>
+
+        <CornerStats corner="bottom" points={you.points} seconds={clocks.you} />
       </div>
 
       {/* ------------------------------------------------------------ hand */}
       <div className="relative z-10 px-3 pb-safe pb-2">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="scroll-x flex gap-1.5 pb-1 items-end" style={{ minHeight: 96 }}>
-              {you.hand.map((cardId, index) => {
-                const pickedActive = setupActive === index
-                const pickedBench = setupBench.includes(index)
-                const isBasic = basicsInHand.some((b) => b.index === index)
-                const setupPhase = state.phase === 'setup'
+        <div className="flex items-end gap-1">
+          <PlayerHand
+            hand={you.hand}
+            setupActive={setupActive}
+            setupBench={setupBench}
+            basicsInHand={basicsInHand}
+            setupPhase={state.phase === 'setup'}
+            myTurn={myTurn}
+            playable={actionsFor.byHand}
+            onTap={(index, isBasic) =>
+              state.phase === 'setup' ? isBasic && toggleSetupPick(index) : openHandCard(index)
+            }
+            onDropEnd={handleHandDragEnd}
+          />
 
-                return (
-                  <motion.button
-                    key={`${cardId}-${index}`}
-                    layout
-                    onClick={() =>
-                      setupPhase ? isBasic && toggleSetupPick(index) : openHandCard(index)
-                    }
-                    className="shrink-0 relative"
-                    style={{ width: HAND_W }}
-                    animate={{ y: pickedActive || pickedBench ? -10 : 0 }}
-                    whileTap={{ scale: 0.95 }}
-                    disabled={setupPhase && !isBasic}
-                  >
-                    <div
-                      className="rounded-[8%]"
-                      style={{
-                        opacity: setupPhase && !isBasic ? 0.4 : 1,
-                        boxShadow: pickedActive
-                          ? '0 0 0 2.5px var(--gold-bright)'
-                          : pickedBench
-                            ? '0 0 0 2px rgba(229,192,140,.6)'
-                            : actionsFor.byHand.has(index) && myTurn
-                              ? '0 0 0 1.5px rgba(229,192,140,.4)'
-                              : undefined,
-                      }}
-                    >
-                      <PressableCard card={requireCard(cardId)} compact noHolo />
-                    </div>
-                    {pickedActive && (
-                      <span
-                        className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                        style={{ background: 'var(--gold)', color: '#241a0e' }}
-                      >
-                        ACTIVE
-                      </span>
-                    )}
-                    {pickedBench && (
-                      <span
-                        className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                        style={{ background: 'rgba(229,192,140,.75)', color: '#241a0e' }}
-                      >
-                        BENCH
-                      </span>
-                    )}
-                  </motion.button>
-                )
-              })}
-            </div>
-          </div>
+          {/* Altar, with the small popup action trigger stacked above it. */}
+          <div className="relative flex flex-col items-center gap-1.5 shrink-0">
+            <AnimatePresence>
+              {actionOpen && actionLabel && (
+                <motion.div
+                  className="absolute bottom-full mb-2 right-0 whitespace-nowrap"
+                  initial={{ opacity: 0, y: 6, scale: 0.92 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.92 }}
+                  transition={{ type: 'spring', stiffness: 460, damping: 32 }}
+                >
+                  <Button variant="gold" className="!px-4 !py-2 text-sm" onClick={runAction}>
+                    {actionLabel}
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {/* Altar and piles */}
-          <div className="flex flex-col items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setActionOpen((v) => !v)}
+              disabled={!actionLabel}
+              className="rounded-pill w-9 h-9 grid place-items-center"
+              style={{
+                background: actionLabel ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                opacity: actionLabel ? 1 : 0.5,
+              }}
+              aria-label={actionLabel ?? 'No action available'}
+              aria-expanded={actionOpen}
+            >
+              <CheckIcon size={16} className={actionLabel ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
+            </button>
+
             <button
               onClick={openAltar}
               disabled={!myTurn || you.altar === null}
@@ -432,52 +500,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
               )}
             </button>
-            <div className="flex gap-1">
-              <PileCount label="Deck" count={you.deck.length} small />
-              <PileCount label="Disc" count={you.discard.length} small />
-            </div>
           </div>
-        </div>
-
-        <PlayerBar
-          name="You"
-          points={you.points}
-          seconds={clocks.you}
-          active={myTurn}
-          className="mt-2"
-        />
-
-        {/* ------------------------------------------------------- controls */}
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => setLogOpen(true)}
-            className="rounded-pill w-11 h-11 grid place-items-center shrink-0"
-            style={{ background: 'var(--surface)' }}
-            aria-label="Battle log"
-          >
-            <ScrollIcon size={19} className="text-ink-muted" />
-          </button>
-
-          {state.phase === 'setup' ? (
-            <Button variant="gold" block disabled={setupActive === null} onClick={startBattle}>
-              {setupActive === null
-                ? 'Tap a Basic Figure'
-                : setupBench.length === 0
-                  ? 'Start Battle — no Bench'
-                  : `Start Battle — ${setupBench.length} on the Bench`}
-            </Button>
-          ) : mustPromote ? (
-            <div
-              className="flex-1 rounded-pill grid place-items-center text-sm font-medium"
-              style={{ background: 'var(--bg-sunk)', color: 'var(--gold-bright)' }}
-            >
-              Choose a Figure to step up
-            </div>
-          ) : (
-            <Button variant="gold" block disabled={!myTurn} onClick={() => dispatch({ type: 'END_TURN' })}>
-              {myTurn ? 'End Turn' : aiThinking ? 'Opponent is thinking…' : 'Waiting…'}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -509,8 +532,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         />
       )}
 
-      {logOpen && <BattleLog state={state} onClose={() => setLogOpen(false)} />}
-
       <AnimatePresence>
         {state.phase === 'ended' && (
           <Result state={state} onExit={onExit} />
@@ -522,57 +543,174 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
 /* --------------------------------------------------------------- pieces */
 
-function PlayerBar({
-  name,
+/**
+ * Points and time left, with no name attached — the name lived in a full-width
+ * bar across the top and bottom of the mat; without it, this is small enough
+ * to tuck into a corner of the board instead. `corner` places it in that
+ * side's own outer corner, top for the opponent and bottom for you, on the
+ * same mat so the two read as one mirrored rule rather than two bars.
+ */
+function CornerStats({
+  corner,
   points,
   seconds,
-  active,
   thinking,
-  className,
 }: {
-  name: string
+  corner: 'top' | 'bottom'
   points: number
   seconds: number
-  active: boolean
   thinking?: boolean
-  className?: string
 }) {
   const minutes = Math.floor(seconds / 60)
   const rest = seconds % 60
 
   return (
     <div
-      className={cx('flex items-center gap-2.5 rounded-pill px-3 py-1.5', className)}
-      style={{
-        background: active ? 'rgba(229,192,140,.14)' : 'rgba(10,7,3,.5)',
-        border: `1px solid ${active ? 'rgba(229,192,140,.4)' : 'transparent'}`,
-      }}
+      className={cx(
+        'absolute right-2 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1',
+        corner === 'top' ? 'top-2' : 'bottom-2',
+      )}
+      style={{ background: 'rgba(10,7,3,.55)', border: '1px solid rgba(229,192,140,.25)' }}
     >
-      <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--ink)' }}>
-        {name}
-        {thinking && <span className="text-ink-faint"> · thinking</span>}
-      </span>
-
-      {/* Points as filled pips, so the race to three is readable at a glance. */}
       <span className="flex gap-1" aria-label={`${points} of ${RULES.POINTS_TO_WIN} points`}>
         {Array.from({ length: RULES.POINTS_TO_WIN }, (_, i) => (
           <span
             key={i}
-            className="w-2.5 h-2.5 rounded-pill"
+            className="w-2 h-2 rounded-pill"
             style={{
               background: i < points ? 'var(--gold-bright)' : 'rgba(229,192,140,.2)',
-              boxShadow: i < points ? '0 0 6px rgba(229,192,140,.6)' : undefined,
+              boxShadow: i < points ? '0 0 5px rgba(229,192,140,.6)' : undefined,
             }}
           />
         ))}
       </span>
 
       <span
-        className="text-xs font-numeric tabular-nums"
-        style={{ color: seconds < 60 ? '#ef8f7c' : 'var(--ink-muted)' }}
+        className="text-[11px] font-numeric tabular-nums"
+        style={{ color: seconds < 60 ? '#ef8f7c' : 'rgba(229,192,140,.75)' }}
       >
         {minutes}:{String(rest).padStart(2, '0')}
+        {thinking && '…'}
       </span>
+    </div>
+  )
+}
+
+/** Tall enough for a lifted card plus the fan's own arc and a picked card's
+ *  badge, at the widest hands this game deals. */
+const HAND_HEIGHT = 112
+
+/**
+ * The hand, fanned rather than scrolled.
+ *
+ * Each card is rotated and lifted by its distance from the centre — framer's
+ * own `rotate`/`y` style keys, not a plain CSS `transform` string, so a drag's
+ * own x/y compose with the fan's static pose instead of one overwriting the
+ * other. Spread narrows as the hand grows, so a big hand fans within the same
+ * width a small one does rather than spilling past the Altar column.
+ *
+ * Long-press-to-peek is switched off for the whole phase (`noPeek`) rather
+ * than only on the cards that can be dragged: a hold that starts sizing up a
+ * drag and a hold that is patiently timing out to open the viewer are the
+ * same gesture for the first several hundred milliseconds, and setup is about
+ * placing a card, not reading one.
+ */
+function PlayerHand({
+  hand,
+  setupActive,
+  setupBench,
+  basicsInHand,
+  setupPhase,
+  myTurn,
+  playable,
+  onTap,
+  onDropEnd,
+}: {
+  hand: string[]
+  setupActive: number | null
+  setupBench: (number | null)[]
+  basicsInHand: { cardId: string; index: number }[]
+  setupPhase: boolean
+  myTurn: boolean
+  playable: Map<number, Action[]>
+  onTap: (index: number, isBasic: boolean) => void
+  onDropEnd: (index: number, point: { x: number; y: number }) => void
+}) {
+  const count = hand.length
+  const mid = (count - 1) / 2
+  const rotateStep = count > 1 ? Math.min(7, 56 / (count - 1)) : 0
+  const spanStep = count > 1 ? Math.min(34, 220 / (count - 1)) : 0
+
+  return (
+    <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
+      {hand.map((cardId, index) => {
+        const pickedActive = setupActive === index
+        const pickedBench = setupBench.includes(index)
+        const isBasic = basicsInHand.some((b) => b.index === index)
+        const draggable = setupPhase && isBasic
+        const offset = index - mid
+
+        return (
+          <motion.button
+            key={`${cardId}-${index}`}
+            className="absolute bottom-0"
+            style={{
+              width: HAND_W,
+              left: '50%',
+              marginLeft: offset * spanStep - HAND_W / 2,
+              zIndex: index,
+              transformOrigin: 'bottom center',
+            }}
+            animate={{
+              // A card further from the centre dips a little further down, so
+              // the row reads as a fan held from below rather than a straight
+              // line of tilted cards.
+              rotate: offset * rotateStep,
+              y: (pickedActive || pickedBench ? -14 : 0) + offset * offset * 1.4,
+            }}
+            drag={draggable}
+            dragSnapToOrigin
+            dragElastic={0.35}
+            whileDrag={{ zIndex: 40, scale: 1.1 }}
+            onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
+            onClick={() => onTap(index, isBasic)}
+            whileTap={{ scale: 0.95 }}
+            disabled={setupPhase && !isBasic}
+          >
+            <div
+              className="rounded-[8%]"
+              style={{
+                opacity: setupPhase && !isBasic ? 0.4 : 1,
+                boxShadow: pickedActive
+                  ? '0 0 0 2.5px var(--gold-bright)'
+                  : pickedBench
+                    ? '0 0 0 2px rgba(229,192,140,.6)'
+                    : playable.has(index) && myTurn
+                      ? '0 0 0 1.5px rgba(229,192,140,.4)'
+                      : undefined,
+              }}
+            >
+              <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
+            </div>
+            {pickedActive && (
+              <span
+                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
+                style={{ background: 'var(--gold)', color: '#241a0e' }}
+              >
+                ACTIVE
+              </span>
+            )}
+            {pickedBench && (
+              <span
+                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
+                style={{ background: 'rgba(229,192,140,.75)', color: '#241a0e' }}
+              >
+                BENCH
+              </span>
+            )}
+          </motion.button>
+        )
+      })}
     </div>
   )
 }
@@ -604,9 +742,11 @@ function TurnBanner({
   myTurn: boolean
   seconds: number
 }) {
+  // Setup carries no label at all: the mat's own slot outlines and the fanned
+  // hand are the instruction now, not a line of copy above them.
   const label =
     state.phase === 'setup'
-      ? 'Choose your opening board'
+      ? null
       : state.phase === 'promote'
         ? state.promoting === 'you'
           ? 'Choose a Figure'
@@ -617,30 +757,20 @@ function TurnBanner({
 
   return (
     <div className="flex flex-col items-center gap-0.5 flex-1">
-      <span
-        className="font-display text-sm tracking-wide"
-        style={{ color: myTurn ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
-      >
-        {label}
-      </span>
+      {label && (
+        <span
+          className="font-display text-sm tracking-wide"
+          style={{ color: myTurn ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
+        >
+          {label}
+        </span>
+      )}
       {state.phase === 'main' && (
         <span
           className="text-[10px] font-numeric tabular-nums"
           style={{ color: seconds <= 10 ? '#ef8f7c' : 'rgba(229,192,140,.45)' }}
         >
           {seconds}s · turn {state.turn}
-        </span>
-      )}
-
-      {/* Opening with no Bench loses to the first knockout, which is a harsh
-          way to learn the rule. The prompt says so up front. */}
-      {state.phase === 'setup' && (
-        <span
-          className="text-[10px] text-center px-6 leading-snug"
-          style={{ color: 'rgba(229,192,140,.5)' }}
-        >
-          Tap a Basic Figure for the Active spot, then up to {RULES.BENCH_SIZE} more for your
-          Bench. With no Bench, one knockout ends the match.
         </span>
       )}
     </div>
@@ -698,27 +828,6 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
         </motion.div>
       </div>
     </motion.div>
-  )
-}
-
-function BattleLog({ state, onClose }: { state: MatchState; onClose: () => void }) {
-  return (
-    <ActionSheet
-      title="Battle log"
-      subtitle={`Turn ${state.turn}`}
-      options={[...state.log]
-        .reverse()
-        .slice(0, 40)
-        .map((entry, i) => ({
-          id: `log-${i}`,
-          label: entry.text,
-          detail: `Turn ${entry.turn} · ${entry.player === 'you' ? 'you' : 'opponent'}`,
-          disabled: true,
-          reason: `Turn ${entry.turn} · ${entry.player === 'you' ? 'you' : 'opponent'}`,
-          onSelect: () => {},
-        }))}
-      onClose={onClose}
-    />
   )
 }
 
