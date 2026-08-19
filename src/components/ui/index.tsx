@@ -141,9 +141,9 @@ export function Badge({ count, className }: { count?: number; className?: string
   return (
     <span
       className={cx(
-        'absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1',
+        'absolute -top-0.5 -right-0.5 min-w-[13px] h-[13px] px-[3px]',
         'rounded-pill bg-[var(--negative)] text-white',
-        'text-[11px] font-bold leading-[18px] text-center',
+        'text-[8px] font-bold leading-[13px] text-center',
         'ring-2 ring-[var(--bg)]',
         className,
       )}

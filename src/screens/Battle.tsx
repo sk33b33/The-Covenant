@@ -12,7 +12,6 @@ import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
-import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
 import { BoardFigure } from './battle/BoardFigure'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -365,11 +364,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           so the two halves meet at the mat's clash ring instead of being
           pushed to the screen edges.
 
-          Each side is a mirror of the other: piles sit just off the mat's own
-          centreline on the left, and the points/time badge sits in that
-          side's own outer corner — top-right for the opponent, bottom-right
-          for you, on the same shared container so "mirrored" is one rule
-          applied twice rather than two hand-tuned layouts. */}
+          Each side is a mirror of the other: the deck, the discard pile and
+          the points/time chip all sit in one right-aligned row — the same
+          row, not a pile row on the left with a badge floating in the corner
+          — top for the opponent, bottom for you, on the same shared
+          container so "mirrored" is one rule applied twice rather than two
+          hand-tuned layouts. */}
       {/* The hand tray below is positioned outside the flex flow (an absolute
           overlay pinned to the bottom) rather than as a flex sibling, so this
           board area spans the *entire* screen instead of (screen − hand tray
@@ -386,8 +386,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
         }}
       >
-        <CornerStats corner="top" points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
-
         <div className="flex gap-1.5">
           {foe.bench.map((figure, i) => (
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
@@ -395,9 +393,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
         <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
 
-        <div className="w-full flex justify-start pl-0.5">
+        <div className="w-full flex items-center justify-end gap-2 pr-0.5">
           <PileCount label="Deck" count={foe.deck.length} small />
           <PileCount label="Disc" count={foe.discard.length} small />
+          <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
         </div>
 
         {/* Extra clearance: attached energy hangs below a Figure's card edge
@@ -406,9 +405,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           <TurnBanner state={state} myTurn={myTurn} seconds={clocks.turn} />
         </div>
 
-        <div className="w-full flex justify-start pl-0.5">
+        <div className="w-full flex items-center justify-end gap-2 pr-0.5">
           <PileCount label="Deck" count={you.deck.length} small />
           <PileCount label="Disc" count={you.discard.length} small />
+          <StatsChip points={you.points} seconds={clocks.you} />
         </div>
 
         <div ref={activeSlotRef} className="shrink-0">
@@ -444,8 +444,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             </div>
           ))}
         </div>
-
-        <CornerStats corner="bottom" points={you.points} seconds={clocks.you} />
       </div>
 
       {/* ------------------------------------------------------------ hand */}
@@ -584,13 +582,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
  * side's own outer corner, top for the opponent and bottom for you, on the
  * same mat so the two read as one mirrored rule rather than two bars.
  */
-function CornerStats({
-  corner,
+function StatsChip({
   points,
   seconds,
   thinking,
 }: {
-  corner: 'top' | 'bottom'
   points: number
   seconds: number
   thinking?: boolean
@@ -600,18 +596,10 @@ function CornerStats({
 
   return (
     <div
-      className={cx(
-        'absolute right-2 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1',
-        corner === 'top' && 'top-2',
-      )}
+      className="shrink-0 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1"
       style={{
         background: 'rgba(10,7,3,.55)',
         border: '1px solid rgba(229,192,140,.25)',
-        // The board now spans the full screen (see the container above), so
-        // `bottom-2` would sit right behind the hand tray instead of above
-        // it — this clears the tray by the same 8px the top badge sits from
-        // the top edge.
-        ...(corner === 'bottom' ? { bottom: `calc(${HAND_TRAY_CALC} + 8px)` } : {}),
       }}
     >
       <span className="flex gap-1" aria-label={`${points} of ${RULES.POINTS_TO_WIN} points`}>

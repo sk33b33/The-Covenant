@@ -162,7 +162,7 @@ export function Home() {
       {/* Missions floats above the tab bar, as in the reference. */}
       <button
         onClick={() => go({ name: 'missions' })}
-        className="fixed right-4 z-30 neu rounded-pill w-16 h-16 grid place-items-center"
+        className="fixed right-4 z-30 neu rounded-pill w-12 h-12 grid place-items-center"
         // Matches .pb-safe's floor, not the raw inset: the bar pads itself with
         // max(--s-3, safe-area), so on a phone reporting no inset this button
         // would otherwise sit 12px into the bar.
@@ -171,8 +171,8 @@ export function Home() {
         }}
         aria-label="Missions"
       >
-        <ScrollIcon size={24} className="text-[var(--gold-deep)]" />
-        <span className="text-[9px] font-medium mt-0.5 text-ink-muted">Missions</span>
+        <ScrollIcon size={18} className="text-[var(--gold-deep)]" />
+        <span className="text-[7px] font-medium mt-0.5 text-ink-muted">Missions</span>
         <Badge />
       </button>
     </div>
