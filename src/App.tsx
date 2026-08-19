@@ -45,10 +45,18 @@ export default function App() {
 
   // The splash is an overlay, so the interface beneath it is already painted —
   // chrome included. That is what the art dissolves *to*.
+  //
+  // Deck Builder owns its full height exactly like these three do — its own
+  // Save bar is pinned to the bottom of a plain h-full column, with no
+  // pb-tabbar clearance built in, because it was built assuming the tab bar
+  // would not be there. Without this exclusion the fixed tab bar sits on top
+  // of that Save bar, and "Save deck" is not reachable at all: a legal deck
+  // can be built and never actually saved.
   const showChrome =
     route.name !== 'battle' &&
     route.name !== 'pack-open' &&
-    route.name !== 'story-encounter'
+    route.name !== 'story-encounter' &&
+    route.name !== 'deck-builder'
 
   return (
     <div className="h-full bg-bg text-ink">

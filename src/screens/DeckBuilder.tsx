@@ -305,7 +305,15 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
       {/* ------------------------------------------------------------ save */}
       <div className="px-4 pb-safe pb-3 pt-2 shrink-0" style={{ background: 'var(--bg)' }}>
         <Button variant="gold" block disabled={!validation.legal} onClick={save}>
-          {validation.legal ? 'Save deck' : `${RULES.DECK_SIZE - cards.length} more cards needed`}
+          {validation.legal
+            ? 'Save deck'
+            : cards.length < RULES.DECK_SIZE
+              ? `${RULES.DECK_SIZE - cards.length} more cards needed`
+              : /* The deck is full but still illegal for some other reason —
+                   too few Basics, no energy declared. That reason is already
+                   spelled out above; repeating "0 more cards needed" here
+                   would just be wrong. */
+                'Deck not ready'}
         </Button>
       </div>
     </div>
