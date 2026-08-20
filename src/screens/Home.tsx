@@ -49,6 +49,17 @@ export function Home() {
   return (
     <div className="scroll-y h-full">
       <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
+        {/* The mark, not the profile button — a small fixed lockup so the
+            game's identity is on screen even before anything else has
+            loaded in, the way a masthead sits above a page rather than
+            inside it. */}
+        <div className="flex items-center gap-1.5 pt-1">
+          <TreeMark size={16} className="text-[var(--gold-bright)]" />
+          <span className="font-display text-[11px] tracking-[0.28em] uppercase text-ink-muted">
+            Covenant
+          </span>
+        </div>
+
         <Header />
 
         {/* ---------------------------------------------------- hero panel */}

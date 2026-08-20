@@ -84,7 +84,7 @@ export function BoardFigure({
       layoutId={figure.uid}
       onClick={onClick}
       disabled={!onClick}
-      className={cx('relative shrink-0 block', className)}
+      className={cx('cov-figure-card relative shrink-0 block', className)}
       style={{ width }}
       animate={targetable ? { scale: [1, 1.04, 1] } : { scale: 1 }}
       transition={

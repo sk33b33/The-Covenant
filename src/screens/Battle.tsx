@@ -346,12 +346,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // of the drag, and re-rendering the whole board that often turned out to be
   // enough to make framer's own drag recognition occasionally drop the
   // gesture entirely — the highlight is worth showing, but not at the cost of
-  // the drag itself sometimes silently failing to register.
+  // the drag itself sometimes silently failing to register. The same slot
+  // refs serve two different drags — a hand card looking for an empty Active
+  // or Bench slot during setup, and (below) the Altar looking for an occupied
+  // one to attach to — so this checks for either child rather than assuming
+  // which one is present.
   const lastHighlighted = useRef<HTMLDivElement | null>(null)
   const setHighlight = (el: HTMLDivElement | null) => {
     if (lastHighlighted.current === el) return
-    lastHighlighted.current?.querySelector('.cov-slot-outline')?.classList.remove('cov-slot-drag-target')
-    el?.querySelector('.cov-slot-outline')?.classList.add('cov-slot-drag-target')
+    lastHighlighted.current
+      ?.querySelector('.cov-slot-outline, .cov-figure-card')
+      ?.classList.remove('cov-slot-drag-target')
+    el?.querySelector('.cov-slot-outline, .cov-figure-card')?.classList.add('cov-slot-drag-target')
     lastHighlighted.current = el
   }
 
@@ -365,6 +371,26 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       const slot = benchSlotRefs.current.indexOf(el)
       if (el && slot !== -1) placeBench(index, slot)
     }
+  }
+
+  /** The Figure a drop target's own ref currently belongs to, if any — the
+   *  Active slot's ref and each Bench slot's ref outlive whichever Figure
+   *  (or nothing) currently occupies them. */
+  const figureAt = (el: HTMLDivElement | null): FigureInPlay | null => {
+    if (el === activeSlotRef.current) return you.active
+    const slot = benchSlotRefs.current.indexOf(el)
+    return slot !== -1 ? (you.bench[slot] ?? null) : null
+  }
+
+  const handleAltarDrag = (point: { x: number; y: number }) => {
+    const figure = figureAt(slotAt(point))
+    setHighlight(figure && actionsFor.byUid.has(figure.uid) ? slotAt(point) : null)
+  }
+
+  const handleAltarDragEnd = (point: { x: number; y: number }) => {
+    const figure = figureAt(slotAt(point))
+    setHighlight(null)
+    if (figure && actionsFor.byUid.has(figure.uid)) dispatch({ type: 'ATTACH', uid: figure.uid })
   }
 
   /* --------------------------------------------------------------- action */
@@ -558,16 +584,27 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               <CheckIcon size={16} className={actionLabel ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
             </button>
 
-            <button
+            <motion.button
               onClick={openAltar}
               disabled={!myTurn || you.altar === null}
-              className="rounded-pill grid place-items-center transition-transform"
+              className="relative rounded-pill grid place-items-center"
               style={{
                 width: 46,
                 height: 46,
                 background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
                 boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
               }}
+              // Dragging is additive, the same way a hold is additive over a
+              // tap everywhere else in this game: the sheet the tap opens
+              // still lists every Figure and still works exactly as before,
+              // this is just a shortcut for when the target is already on
+              // screen and obvious.
+              drag={myTurn && you.altar !== null}
+              dragSnapToOrigin
+              dragElastic={0.35}
+              whileDrag={{ zIndex: 2000, scale: 1.15 }}
+              onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
+              onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
               aria-label={you.altar ? `Altar: ${you.altar} energy ready` : 'Altar empty'}
             >
               {you.altar ? (
@@ -575,7 +612,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               ) : (
                 <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
               )}
-            </button>
+            </motion.button>
           </div>
         </div>
       </div>
@@ -813,7 +850,10 @@ function PileCount({ label, count, small }: { label: string; count: number; smal
   const size = small ? 26 : 34
   return (
     <div className="flex flex-col items-center gap-0.5">
-      <div className="relative rounded-sm overflow-hidden" style={{ width: size }}>
+      <div
+        className="relative rounded-sm overflow-hidden"
+        style={{ width: size, aspectRatio: '63/88' }}
+      >
         {count > 0 ? (
           <CardBack />
         ) : (
