@@ -12,6 +12,7 @@ import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
+import { asset } from '@/lib/asset'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
 import { BoardFigure } from './battle/BoardFigure'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -804,8 +805,13 @@ function PlayerHand({
             whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
             onDrag={(_event, info: PanInfo) => onDragMove(info.point)}
             onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
-            onClick={() => onTap(index, isBasic)}
-            whileTap={{ scale: 0.95 }}
+            // Setup is drag-only, full stop — a tap here used to be a no-op
+            // already, but the button still visibly pressed down under a
+            // finger, which reads as "this does something" even when it
+            // doesn't. No click handler and no press animation is what
+            // actually looks like a card that can only be dragged.
+            onClick={setupPhase ? undefined : () => onTap(index, isBasic)}
+            whileTap={setupPhase ? undefined : { scale: 0.95 }}
             disabled={setupPhase && !isBasic}
           >
             <div
@@ -928,22 +934,35 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
       exit={{ opacity: 0 }}
     >
       <div className="flex flex-col items-center gap-6">
-        <motion.div
-          className="rounded-pill grid place-items-center"
-          style={{
-            width: 108,
-            height: 108,
-            background: 'var(--gold-leaf)',
-            boxShadow: '0 12px 40px rgba(0,0,0,.6)',
-          }}
-          initial={{ rotateX: 0 }}
-          animate={{ rotateX: heads ? 1800 : 1980 }}
-          transition={{ duration: 1.9, ease: [0.18, 0.9, 0.3, 1] }}
-        >
-          <span className="font-display text-2xl font-bold" style={{ color: '#3a2a07' }}>
-            {heads ? 'H' : 'T'}
-          </span>
-        </motion.div>
+        <div style={{ width: 108, height: 108, perspective: 600 }}>
+          <motion.div
+            className="relative w-full h-full"
+            style={{ transformStyle: 'preserve-3d' }}
+            initial={{ rotateX: 0 }}
+            animate={{ rotateX: heads ? 1800 : 1980 }}
+            transition={{ duration: 1.9, ease: [0.18, 0.9, 0.3, 1] }}
+          >
+            {/* Heads: the Covenant mark, facing the viewer at rest. */}
+            <div
+              className="absolute inset-0 rounded-pill overflow-hidden"
+              style={{ backfaceVisibility: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.6)' }}
+            >
+              <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+            {/* Tails: the book, pre-rotated so it faces the viewer once the
+                parent has turned the rest of the way around. */}
+            <div
+              className="absolute inset-0 rounded-pill overflow-hidden"
+              style={{
+                backfaceVisibility: 'hidden',
+                transform: 'rotateX(180deg)',
+                boxShadow: '0 12px 40px rgba(0,0,0,.6)',
+              }}
+            >
+              <img src={asset('art/coin-tails.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+          </motion.div>
+        </div>
 
         <motion.div
           className="text-center"
