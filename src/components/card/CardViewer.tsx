@@ -8,6 +8,7 @@ import {
   useTransform,
 } from 'framer-motion'
 import { RarityMark } from '@/art/RarityMark'
+import { cx } from '@/lib/cx'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
 import { Card } from './Card'
 import {
@@ -354,11 +355,15 @@ function Viewer({
           )}
         </div>
 
-        {actions.length > 0 && (
+        {(actions.length > 0 || actionsNote) && (
           // A solid tray, not options floating on the scrim. Over a blurred
           // battle mat the option rows alone had almost no edge, and a
           // greyed-out unavailable attack faded into the background entirely —
-          // which is exactly the row whose reason you need to read.
+          // which is exactly the row whose reason you need to read. A bench
+          // Figure has a note (its live HP and energy) but nothing in the
+          // pool yet gives it an action from there, so the tray has to open
+          // on the note alone rather than gate on an actions list that may be
+          // empty for a perfectly normal reason.
           <div
             className="on-dark w-full max-w-[300px] shrink-0 rounded-lg p-3 mt-3"
             style={{
@@ -375,9 +380,13 @@ function Viewer({
             }}
           >
             {actionsNote && (
-              <p className="text-xs text-ink-muted px-1 pb-2 tabular-nums">{actionsNote}</p>
+              <p
+                className={cx('text-xs text-ink-muted px-1 tabular-nums', actions.length > 0 && 'pb-2')}
+              >
+                {actionsNote}
+              </p>
             )}
-            <ActionList options={actions} onChosen={close} />
+            {actions.length > 0 && <ActionList options={actions} onChosen={close} />}
           </div>
         )}
       </div>

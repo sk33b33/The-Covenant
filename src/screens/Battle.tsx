@@ -301,6 +301,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     })
   }
 
+  const openBench = (i: number) => {
+    const figure = you.bench[i]
+    if (!figure || !myTurn) return
+
+    const card = figureCard(figure)
+
+    // No sheet, and (for now) no actions: nothing in the card pool has an
+    // ability usable from the bench yet, so there is nothing to list beneath
+    // it. The tap still lifts the card into the viewer for its tilt and its
+    // live HP/energy — the same reason a bench Figure exists to look at, even
+    // before it has something to press a second gesture to do.
+    peek(card, {
+      actionsNote: `${Math.max(0, card.hp - figure.damage)} of ${card.hp} HP · ${figure.energy.length} energy`,
+    })
+  }
+
   const openAltar = () => {
     if (!myTurn || you.altar === null) return
 
@@ -511,8 +527,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 onClick={
                   mustPromote && figure
                     ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
-                    : undefined
+                    : figure && myTurn
+                      ? () => openBench(i)
+                      : undefined
                 }
+                noPeek={Boolean(figure && myTurn && !mustPromote)}
               />
             </div>
           ))}
