@@ -7,7 +7,6 @@ import {
   useSpring,
   useTransform,
 } from 'framer-motion'
-import { CloseIcon } from '@/art/icons'
 import { RarityMark } from '@/art/RarityMark'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
 import { Card } from './Card'
@@ -217,10 +216,13 @@ function Viewer({
   const metal = RARITY_METAL[card.rarity]
 
   /*
-   * Everything on screen that is not the card: the close-button row, the
-   * rarity and verse block, and the padding between them. Measured, not
+   * Everything on screen that is not the card: the rarity and verse block,
+   * the top safe-area inset, and the padding around them. Measured, not
    * guessed — 180px leaves the card as large as it can be at 568px tall while
-   * still fitting, and lets a tall phone reach the 300px cap.
+   * still fitting, and lets a tall phone reach the 300px cap. There's no
+   * close button any more, but the term is still a real (if now slightly
+   * generous) upper bound rather than a tight one, and generous is the safe
+   * direction for a cap.
    *
    * The tray term has to be the same `dvh` the tray is capped at, not a fixed
    * pixel count. A Figure with a long attack list fills that cap exactly, and
@@ -251,28 +253,20 @@ function Viewer({
       aria-modal="true"
       aria-label={card.name}
     >
-      <div className="flex justify-end pt-safe px-4">
-        <button
-          onClick={close}
-          className="w-10 h-10 rounded-pill grid place-items-center mt-2"
-          style={{ background: 'rgba(255,253,248,.14)', color: '#fdfaf3' }}
-          aria-label="Close"
-        >
-          <CloseIcon size={20} />
-        </button>
-      </div>
-
       {/*
         Locked. This was a `.scroll-y`, and while the card itself carries
         touch-action: none, a drag beginning on the padding beside it — or
         continuing past its edge — still moved the whole screen. Tilting a card
         should never shift the thing being tilted, so the column does not
         scroll at all and the contents are sized to fit instead.
+
+        No `stopPropagation` here on purpose — closing on a tap anywhere,
+        card included, is the whole point now that there's no close button.
+        It's still safe for the tilt gesture: `closeIfTap` on the scrim only
+        fires when the pointer barely moved, so a real drag that turns the
+        card in 3D never closes it, only a plain tap does.
       */}
-      <div
-        className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pb-6 gap-1 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pt-safe pb-6 gap-1 overflow-hidden">
         {/*
          * Three bounds on the width, and the last is what makes the lock work:
          * the design cap, the screen's width, and the height left after the
