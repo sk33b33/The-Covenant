@@ -366,15 +366,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   // What the small popup above the Altar offers, if anything. Promote has
   // its own instruction on the turn banner and its own targetable Bench
-  // glow — nothing for this button to add there.
+  // glow — nothing for this button to add there. The label itself stays
+  // fixed — "Start Match" or "End Turn" — rather than folding in a Bench
+  // count: a label that changes shape as picks are made read as a second
+  // status readout competing with the picks' own badges in the hand.
   const benchCount = setupBench.filter((i) => i !== null).length
   const actionLabel =
     state.phase === 'setup'
       ? setupActive === null
         ? null
-        : benchCount === 0
-          ? 'Start Battle — no Bench'
-          : `Start Battle — ${benchCount} on the Bench`
+        : 'Start Match'
       : !mustPromote && myTurn
         ? 'End Turn'
         : null
@@ -709,7 +710,11 @@ function PlayerHand({
   // for anything up to eight or nine cards, so drawing a card never visibly
   // tightened the fan until a hand was already unusually large.
   const rotateStep = count > 1 ? Math.min(10, Math.max(2, 30 / count)) : 0
-  const spanStep = count > 1 ? Math.min(34, Math.max(10, 120 / count)) : 0
+  // The floor keeps a very large hand from packing so tight that neighbours
+  // bury most of each other's card — the z-index rule below is what actually
+  // guarantees a draggable card stays tappable regardless of overlap, this
+  // just keeps the overlap itself from getting absurd at extreme hand sizes.
+  const spanStep = count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0
 
   return (
     <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
@@ -728,7 +733,16 @@ function PlayerHand({
               width: HAND_W,
               left: '50%',
               marginLeft: offset * spanStep - HAND_W / 2,
-              zIndex: index,
+              // A tight fan means neighbours overlap enough that a card's own
+              // centre can sit *under* the card next to it. Ordering by hand
+              // position alone put a non-draggable neighbour on top of a
+              // basic Figure often enough that a tap meant for the Figure
+              // landed on the inert card covering it instead — nothing
+              // happened, and it looked like the drag itself had failed.
+              // Draggable cards now always win the stacking order over
+              // non-draggable ones, so the card you can actually act on is
+              // never the one buried underneath.
+              zIndex: (draggable ? 1000 : 0) + index,
               transformOrigin: 'bottom center',
             }}
             animate={{
@@ -745,7 +759,7 @@ function PlayerHand({
             // rather than carrying its resting tilt around under the thumb —
             // a card you're holding reads as held, not still leaning the way
             // it happened to sit in the hand.
-            whileDrag={{ zIndex: 40, scale: 1.1, rotate: 0 }}
+            whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
             onDrag={(_event, info: PanInfo) => onDragMove(info.point)}
             onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
             onClick={() => onTap(index, isBasic)}
