@@ -35,11 +35,14 @@ import type { FigureInPlay, MatchState } from '@/engine/types'
 // hand, just one level up.
 const ACTIVE_W = 80
 const BENCH_W = 48
-const HAND_W = 68
+// Smaller than before on purpose: a smaller card overlaps its neighbour by
+// less at the same fan spacing, which is real breathing room around each
+// card's own tappable centre, not just a smaller footprint.
+const HAND_W = 54
 
-/** Tall enough for a lifted card plus the fan's own arc and a picked card's
- *  badge, at the widest hands this game deals. */
-const HAND_HEIGHT = 112
+/** Tall enough for a lifted card plus the fan's own arc, at the widest hands
+ *  this game deals — scaled down along with HAND_W. */
+const HAND_HEIGHT = 90
 
 // The hand tray sits outside the flex flow (see the board container below),
 // so nothing else reserves its footprint automatically any more — anything
@@ -829,22 +832,6 @@ function PlayerHand({
             >
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
-            {pickedActive && (
-              <span
-                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                style={{ background: 'var(--gold)', color: '#241a0e' }}
-              >
-                ACTIVE
-              </span>
-            )}
-            {pickedBench && (
-              <span
-                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                style={{ background: 'rgba(229,192,140,.75)', color: '#241a0e' }}
-              >
-                BENCH
-              </span>
-            )}
           </motion.button>
         )
       })}
