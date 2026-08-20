@@ -19,6 +19,7 @@ import {
   type Card as CardData,
 } from '@/game/types'
 import { usePeek } from '@/store/peek'
+import { useSettings } from '@/store/settings'
 
 /**
  * The card, held up to the light.
@@ -31,7 +32,8 @@ import { usePeek } from '@/store/peek'
  * table, and both the holo sheen and the metal rim track that lean: the
  * pairing is what makes a rare card feel like a physical foil rather than a
  * picture of one. Release and it springs back level. Motion is dropped
- * entirely under `prefers-reduced-motion`.
+ * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
+ * "Simplify effects" switch in Menu → Graphics.
  *
  * Touch is the only input. The gyroscope drove this too once, which meant a
  * card turned on its own while you were reading it.
@@ -148,8 +150,24 @@ function Viewer({
   // is bright before you move it, and only *changes* when you do.
   const glint = useTransform(lit, (v) => 0.38 + v * 0.62)
 
+  // Two sources feed the same flag: the OS's own prefers-reduced-motion, and
+  // the player's "Simplify effects" switch in Menu → Graphics. Read directly
+  // rather than through the `useReducedMotion` hook because this is consulted
+  // from `track`, which runs on every pointermove and cannot afford a
+  // re-render — so the media query and the store are both subscribed to once,
+  // outside React, and only the ref they write is read on the hot path.
   useEffect(() => {
-    reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => {
+      reduced.current = mq.matches || useSettings.getState().reducedMotion
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    const unsubscribe = useSettings.subscribe(sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      unsubscribe()
+    }
   }, [])
 
   // Escape closes, and the body must not scroll behind the overlay.

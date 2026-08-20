@@ -1,4 +1,5 @@
 import { asset } from './asset'
+import { useSettings } from '@/store/settings'
 
 /**
  * The entry sound.
@@ -54,6 +55,10 @@ export function playChime(): void {
   preloadChime()
   const audio = el
   if (!audio) return
+
+  // The mute switch in Menu → Audio. Checked here, at the one place every
+  // sound in the game funnels through, rather than at each call site.
+  if (useSettings.getState().muted) return
 
   // A second tap must not restart it, and must not double it up over itself.
   if (!audio.paused) return

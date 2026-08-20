@@ -6,6 +6,7 @@ import { ECONOMY, RULES } from '@/game/config'
 import { clearAll } from '@/store/persist'
 import { useNav } from '@/store/nav'
 import { useProfile } from '@/store/profile'
+import { useSettings } from '@/store/settings'
 import { applyTheme, resolveTheme, type Theme } from '@/lib/theme'
 import { cx } from '@/lib/cx'
 
@@ -23,6 +24,10 @@ export function Menu() {
 
   const [theme, setTheme] = useState<Theme>(resolveTheme)
   const [confirmReset, setConfirmReset] = useState(false)
+  const reducedMotion = useSettings((s) => s.reducedMotion)
+  const setReducedMotion = useSettings((s) => s.setReducedMotion)
+  const muted = useSettings((s) => s.muted)
+  const setMuted = useSettings((s) => s.setMuted)
 
   useEffect(() => applyTheme(theme), [theme])
 
@@ -88,6 +93,60 @@ export function Menu() {
             The card art is dark and warm, so dark is where this game wants to
             live. Your phone's setting picks the first time; after that this
             does.
+          </p>
+        </Panel>
+
+        {/* -------------------------------------------------------- graphics */}
+        <h2 className="font-display text-md mt-6 mb-2 px-1">Graphics</h2>
+        <Panel className="p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {([false, true] as const).map((simplified) => (
+              <button
+                key={String(simplified)}
+                onClick={() => setReducedMotion(simplified)}
+                aria-pressed={reducedMotion === simplified}
+                className={cx(
+                  'rounded-md py-3 text-sm transition-all',
+                  reducedMotion === simplified ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
+                )}
+                style={{ background: reducedMotion === simplified ? 'var(--bg-sunk)' : 'var(--surface)' }}
+              >
+                {reducedMotion === simplified && (
+                  <CheckIcon size={13} className="inline mr-1 -mt-0.5" />
+                )}
+                {simplified ? 'Simplified' : 'Full'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ink-muted mt-2.5 leading-snug">
+            Simplified drops the pack carousel's spring and the card viewer's
+            3D tilt. Your phone's own reduced-motion setting does the same
+            automatically; this is for when you want it off regardless.
+          </p>
+        </Panel>
+
+        {/* ----------------------------------------------------------- audio */}
+        <h2 className="font-display text-md mt-6 mb-2 px-1">Audio</h2>
+        <Panel className="p-3">
+          <div className="grid grid-cols-2 gap-2">
+            {([false, true] as const).map((mute) => (
+              <button
+                key={String(mute)}
+                onClick={() => setMuted(mute)}
+                aria-pressed={muted === mute}
+                className={cx(
+                  'rounded-md py-3 text-sm transition-all',
+                  muted === mute ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
+                )}
+                style={{ background: muted === mute ? 'var(--bg-sunk)' : 'var(--surface)' }}
+              >
+                {muted === mute && <CheckIcon size={13} className="inline mr-1 -mt-0.5" />}
+                {mute ? 'Muted' : 'Sound on'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-ink-muted mt-2.5 leading-snug">
+            Mutes the entry chime, and anything else the game plays.
           </p>
         </Panel>
 

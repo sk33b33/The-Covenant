@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
+import { motion, useMotionValue, useSpring } from 'framer-motion'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { PackWrapper } from '@/art/PackWrapper'
 import {
   BinderIcon,
@@ -9,7 +10,6 @@ import {
   ScrollIcon,
   ShopIcon,
   TalentIcon,
-  TreeMark,
 } from '@/art/icons'
 import { Badge, Button, Chip, Panel, Progress } from '@/components/ui'
 import { GENESIS } from '@/data/sets'
@@ -52,9 +52,9 @@ export function Home() {
         {/* The mark, not the profile button — a small fixed lockup so the
             game's identity is on screen even before anything else has
             loaded in, the way a masthead sits above a page rather than
-            inside it. */}
-        <div className="flex items-center gap-3 pt-1">
-          <TreeMark size={32} className="text-[var(--gold-bright)]" />
+            inside it. Name only — the tree glyph doubled up with the one
+            already on the profile button just below it. */}
+        <div className="flex items-center pt-1">
           <span className="font-display text-[22px] tracking-[0.28em] uppercase text-ink-muted">
             Covenant
           </span>
@@ -208,12 +208,6 @@ function Header() {
           className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
           aria-label="Open profile"
         >
-          <span
-            className="grid place-items-center w-11 h-11 rounded-pill shrink-0 shadow-raised"
-            style={{ background: 'var(--gold-leaf)' }}
-          >
-            <TreeMark size={23} className="text-[#3a2a07]" />
-          </span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold truncate leading-tight">
               {profile.name}
