@@ -27,8 +27,13 @@ import type { FigureInPlay, MatchState } from '@/engine/types'
  * a legal one.
  */
 
-const ACTIVE_W = 96
-const BENCH_W = 60
+// Smaller than the original size on purpose: shrinking the Active card and
+// Bench slots on both sides frees up real vertical room on the board, so nothing
+// packed this tightly risks the rows themselves running into each other or into
+// the hand tray below — the same class of overlap that was hiding cards in the
+// hand, just one level up.
+const ACTIVE_W = 80
+const BENCH_W = 48
 const HAND_W = 68
 
 /** Tall enough for a lifted card plus the fan's own arc and a picked card's
