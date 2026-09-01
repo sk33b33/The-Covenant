@@ -80,8 +80,23 @@ export function BoardFigure({
 
   return (
     <motion.button
-      layout
-      layoutId={figure.uid}
+      // No `layout`/`layoutId` here any more. A promotion moves this same
+      // Figure — same uid — from a Bench slot to the Active one in a single
+      // commit, with no `AnimatePresence` staging the old instance's exit;
+      // React just unmounts it there and mounts a new one here. That is
+      // exactly the shape framer's shared-layout projection is built to
+      // bridge, but bridging it while the outgoing instance still had an
+      // *infinite* `animate` loop in flight (the pulsing ring every
+      // `targetable` Bench Figure carries during a pending promotion) asked
+      // the projection system to compute a FLIP transform off a transform
+      // that was still being driven by a competing, never-completing
+      // animation. This game already has one documented case of framer's own
+      // gesture tracking destabilising under exactly this kind of
+      // interference (see the drag-highlight comment above `setHighlight`
+      // in Battle.tsx) — the promotion-freeze reports match that failure
+      // mode closely enough, and this combination has no correctness or
+      // requested-feature purpose, only an unrequested cosmetic cross-fade,
+      // to be worth the risk.
       onClick={onClick}
       disabled={!onClick}
       className={cx('cov-figure-card relative shrink-0 block', className)}
