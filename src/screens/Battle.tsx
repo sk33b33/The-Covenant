@@ -317,21 +317,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     })
   }
 
-  const openAltar = () => {
-    if (!myTurn || you.altar === null) return
-
-    const options: SheetOption[] = figuresInPlay(you).map((figure) => ({
-      id: `attach-${figure.uid}`,
-      label: `Attach to ${requireCard(figure.cardId).name}`,
-      detail: you.active?.uid === figure.uid ? 'Active' : 'Bench',
-      disabled: !actionsFor.byUid.has(figure.uid),
-      reason: 'Energy has already been attached this turn',
-      onSelect: () => dispatch({ type: 'ATTACH', uid: figure.uid }),
-    }))
-
-    setSheet({ title: 'The Altar', subtitle: 'One energy may be attached each turn', options })
-  }
-
   /* --------------------------------------------------------------- drag */
 
   // Drop targets for the setup-phase hand drag: the Active slot and each
@@ -607,35 +592,47 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               <CheckIcon size={16} className={actionLabel ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
             </button>
 
-            <motion.button
-              onClick={openAltar}
-              disabled={!myTurn || you.altar === null}
-              className="relative rounded-pill grid place-items-center"
-              style={{
-                width: 46,
-                height: 46,
-                background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
-              }}
-              // Dragging is additive, the same way a hold is additive over a
-              // tap everywhere else in this game: the sheet the tap opens
-              // still lists every Figure and still works exactly as before,
-              // this is just a shortcut for when the target is already on
-              // screen and obvious.
-              drag={myTurn && you.altar !== null}
-              dragSnapToOrigin
-              dragElastic={0.35}
-              whileDrag={{ zIndex: 2000, scale: 1.15 }}
-              onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
-              onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
-              aria-label={you.altar ? `Altar: ${you.altar} energy ready` : 'Altar empty'}
-            >
-              {you.altar ? (
-                <EnergyOrb type={you.altar} size={30} />
-              ) : (
-                <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
+            <div className="relative grid place-items-center">
+              {/* Charged glow: energy is attached by dragging the orb onto a
+                  Figure now, so this is the zone's only "something's here"
+                  tell besides the orb itself sitting on top of it. */}
+              {you.altar && (
+                <div
+                  className="cov-altar-glow absolute rounded-full pointer-events-none"
+                  style={{
+                    width: 46,
+                    height: 46,
+                    background: 'radial-gradient(circle, rgba(229,192,140,.55), transparent 70%)',
+                  }}
+                />
               )}
-            </motion.button>
+
+              <motion.button
+                disabled={!myTurn || you.altar === null}
+                className="relative rounded-pill grid place-items-center"
+                style={{
+                  width: 46,
+                  height: 46,
+                  background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                  boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
+                }}
+                // No tap-to-sheet any more — dragging the orb onto a Figure is
+                // the only way to attach energy now.
+                drag={myTurn && you.altar !== null}
+                dragSnapToOrigin
+                dragElastic={0.35}
+                whileDrag={{ zIndex: 2000, scale: 1.15 }}
+                onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
+                onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
+                aria-label={you.altar ? `Altar: ${you.altar} energy ready — drag onto a Figure` : 'Altar empty'}
+              >
+                {you.altar ? (
+                  <EnergyOrb type={you.altar} size={30} />
+                ) : (
+                  <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
+                )}
+              </motion.button>
+            </div>
           </div>
         </div>
       </div>
