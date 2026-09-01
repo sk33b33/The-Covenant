@@ -466,8 +466,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
           <div className="flex items-center gap-2">
-            <PileCount label="Deck" count={foe.deck.length} small />
-            <PileCount label="Disc" count={foe.discard.length} small />
+            <PileCount kind="deck" count={foe.deck.length} />
+            <PileCount kind="discard" count={foe.discard.length} cardIds={foe.discard} />
           </div>
         </div>
 
@@ -479,8 +479,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <div className="flex items-center gap-2">
-            <PileCount label="Deck" count={you.deck.length} small />
-            <PileCount label="Disc" count={you.discard.length} small />
+            <PileCount kind="deck" count={you.deck.length} />
+            <PileCount kind="discard" count={you.discard.length} cardIds={you.discard} />
           </div>
           <StatsChip points={you.points} seconds={clocks.you} />
         </div>
@@ -855,24 +855,120 @@ function PlayerHand({
   )
 }
 
-function PileCount({ label, count, small }: { label: string; count: number; small?: boolean }) {
-  const size = small ? 26 : 34
+/**
+ * A pile of face-down cards — the deck, or the discard.
+ *
+ * No text label any more; the pile reads by its art alone, and a tap answers
+ * the question a label used to. On the deck that's a count, shown as a
+ * digit over the card back and left to fade on its own rather than needing a
+ * second tap to dismiss. On the discard it's the pile itself, fanned open
+ * into a scrollable strip — public information in a card game, worth more
+ * than a number.
+ */
+function PileCount({
+  kind,
+  count,
+  cardIds,
+}: {
+  kind: 'deck' | 'discard'
+  count: number
+  cardIds?: string[]
+}) {
+  // Twice the card's former 26px width — the size the layout otherwise
+  // reserved for a label underneath now goes to the pile itself.
+  const size = 52
+
+  const [revealed, setRevealed] = useState(false)
+  const fadeTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(fadeTimer.current), [])
+
+  const tap = () => {
+    if (count === 0) return
+    if (kind === 'discard') {
+      setRevealed((v) => !v)
+      return
+    }
+    setRevealed(true)
+    clearTimeout(fadeTimer.current)
+    fadeTimer.current = setTimeout(() => setRevealed(false), 2200)
+  }
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div
+    <>
+      <button
+        onClick={tap}
+        disabled={count === 0}
         className="relative rounded-sm overflow-hidden"
         style={{ width: size, aspectRatio: '63/88' }}
+        aria-label={
+          kind === 'deck' ? `Deck: ${count} card${count === 1 ? '' : 's'} left` : `Discard: ${count} card${count === 1 ? '' : 's'}`
+        }
       >
         {count > 0 ? (
           <CardBack />
         ) : (
-          <div style={{ aspectRatio: '63/88', background: 'rgba(10,7,3,.4)', borderRadius: 3 }} />
+          <div className="absolute inset-0 rounded-sm" style={{ background: 'rgba(10,7,3,.4)' }} />
         )}
-      </div>
-      <span className="text-[8px] tabular-nums" style={{ color: 'rgba(229,192,140,.55)' }}>
-        {label} {count}
-      </span>
-    </div>
+
+        <AnimatePresence>
+          {kind === 'deck' && revealed && (
+            <motion.span
+              className="absolute inset-0 grid place-items-center font-numeric tabular-nums"
+              style={{ fontSize: 18, color: '#fdfaf3', textShadow: '0 1px 6px rgba(0,0,0,.85)' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.6 } }}
+            >
+              {count}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </button>
+
+      {kind === 'discard' && (
+        <AnimatePresence>
+          {revealed && <DiscardStrip cardIds={cardIds ?? []} onClose={() => setRevealed(false)} />}
+        </AnimatePresence>
+      )}
+    </>
+  )
+}
+
+/** The discard pile opened into a horizontal strip. Sits below the card
+ *  viewer's own z-index, deliberately: tapping a card in the strip opens it
+ *  in the viewer on top, and closing that viewer leaves this strip open
+ *  rather than dismissing both at once. */
+function DiscardStrip({ cardIds, onClose }: { cardIds: string[]; onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-40 flex items-end"
+      style={{ background: 'rgba(8,6,3,.82)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="w-full pb-safe pt-3 px-3"
+        style={{ background: 'var(--surface-raised)', borderTop: '1px solid rgba(229,192,140,.25)' }}
+        initial={{ y: 60 }}
+        animate={{ y: 0 }}
+        exit={{ y: 60 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-center text-[11px] tracking-wide mb-2" style={{ color: 'rgba(229,192,140,.6)' }}>
+          Discard · {cardIds.length} card{cardIds.length === 1 ? '' : 's'}
+        </p>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {cardIds.map((id, i) => (
+            <div key={i} className="shrink-0" style={{ width: 64 }}>
+              <PressableCard card={requireCard(id)} compact standalone />
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
