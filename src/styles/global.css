@@ -420,4 +420,26 @@
   .cov-altar-glow {
     animation: cov-pulse-glow 2.4s ease-in-out infinite;
   }
+
+  /* Marks a Basic in hand as viable to place the moment setup begins — a
+   * pulsing ring rather than the pile's radial pulse, since it has to trace
+   * a card's rounded-rectangle edge instead of sitting inside a circle. */
+  @keyframes cov-hand-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 1.5px rgba(229, 192, 140, 0.55),
+        0 0 6px rgba(229, 192, 140, 0.3);
+    }
+    50% {
+      box-shadow:
+        0 0 0 2px var(--gold-bright),
+        0 0 16px rgba(229, 192, 140, 0.75);
+    }
+  }
+
+  .cov-hand-glow {
+    border-radius: 8%;
+    animation: cov-hand-pulse 2s ease-in-out infinite;
+  }
 }

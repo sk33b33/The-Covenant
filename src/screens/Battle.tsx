@@ -13,6 +13,7 @@ import { isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
+import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
 import { BoardFigure } from './battle/BoardFigure'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -81,6 +82,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const foe = state.players.foe
   const myTurn = state.phase === 'main' && state.current === 'you'
   const mustPromote = state.phase === 'promote' && state.promoting === 'you'
+  const setupPhase = state.phase === 'setup'
 
   // Errors are transient; a stale one under a later action reads as a new bug.
   useEffect(() => {
@@ -366,18 +368,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     lastHighlighted.current = el
   }
 
-  const handleHandDrag = (point: { x: number; y: number }) => setHighlight(slotAt(point))
-
-  const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
-    const el = slotAt(point)
-    setHighlight(null)
-    if (el === activeSlotRef.current) placeActive(index)
-    else {
-      const slot = benchSlotRefs.current.indexOf(el)
-      if (el && slot !== -1) placeBench(index, slot)
-    }
-  }
-
   /** The Figure a drop target's own ref currently belongs to, if any — the
    *  Active slot's ref and each Bench slot's ref outlive whichever Figure
    *  (or nothing) currently occupies them. */
@@ -385,6 +375,52 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (el === activeSlotRef.current) return you.active
     const slot = benchSlotRefs.current.indexOf(el)
     return slot !== -1 ? (you.bench[slot] ?? null) : null
+  }
+
+  /**
+   * What a hand card dropped at this point would actually do, mid-battle.
+   *
+   * Setup places cards through its own local state — there is no Figure in
+   * play yet to evolve, and the legal-action list doesn't exist until SETUP
+   * is dispatched. Once the match is running, both drops a hand card can make
+   * are real dispatches: an empty Bench slot takes a Basic via PLAY_FIGURE, an
+   * occupied one (Active included) takes its next stage via ASCEND if the
+   * card in hand ascends from what's standing there. Reading the answer off
+   * `legal` rather than re-deriving eligibility here is what keeps a drag from
+   * ever being able to offer a move the engine wouldn't.
+   */
+  const legalHandDrop = (index: number, point: { x: number; y: number }) => {
+    const el = slotAt(point)
+    if (!el) return null
+    const actions = actionsFor.byHand.get(index) ?? []
+    const figure = figureAt(el)
+    const action = figure
+      ? actions.find((a) => a.type === 'ASCEND' && a.uid === figure.uid)
+      : actions.find((a) => a.type === 'PLAY_FIGURE' && el === benchSlotRefs.current[a.slot])
+    return action ? { el, action } : null
+  }
+
+  const handleHandDrag = (index: number, point: { x: number; y: number }) => {
+    if (setupPhase) {
+      setHighlight(slotAt(point))
+      return
+    }
+    setHighlight(legalHandDrop(index, point)?.el ?? null)
+  }
+
+  const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
+    setHighlight(null)
+    if (setupPhase) {
+      const el = slotAt(point)
+      if (el === activeSlotRef.current) placeActive(index)
+      else {
+        const slot = benchSlotRefs.current.indexOf(el)
+        if (el && slot !== -1) placeBench(index, slot)
+      }
+      return
+    }
+    const drop = legalHandDrop(index, point)
+    if (drop) dispatch(drop.action)
   }
 
   const handleAltarDrag = (point: { x: number; y: number }) => {
@@ -456,6 +492,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
         }}
       >
+        <OpponentHand count={foe.hand.length} />
+
         <div className="flex gap-1.5">
           {foe.bench.map((figure, i) => (
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
@@ -531,7 +569,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             setupActive={setupActive}
             setupBench={setupBench}
             basicsInHand={basicsInHand}
-            setupPhase={state.phase === 'setup'}
+            setupPhase={setupPhase}
             myTurn={myTurn}
             playable={actionsFor.byHand}
             onTap={(index) => {
@@ -539,7 +577,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               // to auto-assign the next open slot, but that made the drag
               // gesture redundant instead of authoritative. Outside setup, a
               // tap still opens the card's own sheet of plays.
-              if (state.phase !== 'setup') openHandCard(index)
+              if (!setupPhase) openHandCard(index)
             }}
             onDropEnd={handleHandDragEnd}
             onDragMove={handleHandDrag}
@@ -763,7 +801,7 @@ function PlayerHand({
   playable: Map<number, Action[]>
   onTap: (index: number, isBasic: boolean) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
-  onDragMove: (point: { x: number; y: number }) => void
+  onDragMove: (index: number, point: { x: number; y: number }) => void
 }) {
   const count = hand.length
   const mid = (count - 1) / 2
@@ -778,14 +816,29 @@ function PlayerHand({
   // just keeps the overlap itself from getting absurd at extreme hand sizes.
   const spanStep = count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0
 
+  // The lift a card gets as a thumb brushes across the fan without yet
+  // committing to a drag — the same tell a hand of real cards gives when
+  // you're riffling through it. Pointer enter/leave rather than framer's own
+  // `whileHover` because the latter is gated to non-touch pointers in some
+  // browsers, and this game is touch-first.
+  const [brushed, setBrushed] = useState<number | null>(null)
+
   return (
     <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
       {hand.map((cardId, index) => {
         const pickedActive = setupActive === index
         const pickedBench = setupBench.includes(index)
         const isBasic = basicsInHand.some((b) => b.index === index)
-        const draggable = setupPhase && isBasic
+        const actions = playable.get(index) ?? []
+        const draggable = setupPhase
+          ? isBasic
+          : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND')
         const offset = index - mid
+        // Only an unspent Basic during setup — the moment it's picked it has
+        // already been found, and a card already resting in the Active or
+        // Bench outline doesn't need to keep asking for a drag that would
+        // just undo the pick.
+        const glows = setupPhase && isBasic && !pickedActive && !pickedBench
 
         return (
           <motion.button
@@ -812,18 +865,31 @@ function PlayerHand({
               // the row reads as a fan held from below rather than a straight
               // line of tilted cards.
               rotate: offset * rotateStep,
-              y: (pickedActive || pickedBench ? -14 : 0) + offset * offset * 1.4,
+              y:
+                (pickedActive || pickedBench ? -14 : 0) +
+                offset * offset * 1.4 -
+                (brushed === index ? 10 : 0),
             }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            onPointerEnter={() => setBrushed(index)}
+            onPointerLeave={() => setBrushed((b) => (b === index ? null : b))}
             drag={draggable}
             dragSnapToOrigin
             dragElastic={0.35}
             // Straightens to upright the instant a card lifts off the fan,
             // rather than carrying its resting tilt around under the thumb —
             // a card you're holding reads as held, not still leaning the way
-            // it happened to sit in the hand.
+            // it happened to sit in the hand. Nothing here persists past the
+            // gesture: whileDrag and the brush lift above both fall away on
+            // their own the moment the interaction ends, so every card is
+            // back at exactly the spot its offset computes, holding nothing
+            // from what was just done to it.
             whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
-            onDrag={(_event, info: PanInfo) => onDragMove(info.point)}
-            onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
+            onDrag={(_event, info: PanInfo) => onDragMove(index, info.point)}
+            onDragEnd={(_event, info: PanInfo) => {
+              setBrushed(null)
+              onDropEnd(index, info.point)
+            }}
             // Setup is drag-only, full stop — a tap here used to be a no-op
             // already, but the button still visibly pressed down under a
             // finger, which reads as "this does something" even when it
@@ -834,7 +900,7 @@ function PlayerHand({
             disabled={setupPhase && !isBasic}
           >
             <div
-              className="rounded-[8%]"
+              className={cx('rounded-[8%]', glows && 'cov-hand-glow')}
               style={{
                 opacity: setupPhase && !isBasic ? 0.4 : 1,
                 boxShadow: pickedActive
@@ -849,6 +915,48 @@ function PlayerHand({
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
           </motion.button>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * The opponent's hand, face-down and unreachable — a count of cards fanned
+ * out the same way yours is, so the board reads as two hands at the table
+ * rather than one player's cards and the other's invisible ones. Smaller and
+ * inert: nothing here is a target for anything, it only tells you how many
+ * cards are left to worry about.
+ */
+function OpponentHand({ count }: { count: number }) {
+  if (count === 0) return null
+
+  const mid = (count - 1) / 2
+  const rotateStep = count > 1 ? Math.min(9, Math.max(2, 26 / count)) : 0
+  const spanStep = count > 1 ? Math.min(16, Math.max(8, 56 / count)) : 0
+  const width = 30
+
+  return (
+    <div className="relative shrink-0 pointer-events-none" style={{ height: 34, width: '100%' }}>
+      {Array.from({ length: count }, (_, index) => {
+        const offset = index - mid
+        return (
+          <div
+            key={index}
+            className="absolute top-0 rounded-[8%] overflow-hidden"
+            style={{
+              width,
+              aspectRatio: '63/88',
+              left: '50%',
+              marginLeft: offset * spanStep - width / 2,
+              transform: `translateY(${offset * offset * 1.1}px) rotate(${offset * rotateStep}deg)`,
+              transformOrigin: 'top center',
+              zIndex: count - Math.abs(offset),
+              boxShadow: '0 2px 8px rgba(0,0,0,.5)',
+            }}
+          >
+            <CardBack />
+          </div>
         )
       })}
     </div>
