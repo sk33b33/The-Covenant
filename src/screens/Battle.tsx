@@ -925,7 +925,7 @@ function TurnBanner({
 
 function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onDone, 2600)
+    const timer = setTimeout(onDone, 3200)
     return () => clearTimeout(timer)
   }, [onDone])
 
@@ -944,14 +944,14 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
           <motion.div
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d' }}
-            initial={{ rotateX: 0 }}
-            animate={{ rotateX: heads ? 1800 : 1980 }}
-            transition={{ duration: 1.9, ease: [0.18, 0.9, 0.3, 1] }}
+            initial={{ rotateY: 0 }}
+            animate={{ rotateY: heads ? 1800 : 1980 }}
+            transition={{ duration: 2.5, ease: [0.18, 0.9, 0.3, 1] }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div
               className="absolute inset-0 rounded-pill overflow-hidden"
-              style={{ backfaceVisibility: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.6)' }}
+              style={{ backfaceVisibility: 'hidden' }}
             >
               <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
             </div>
@@ -961,8 +961,7 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
               className="absolute inset-0 rounded-pill overflow-hidden"
               style={{
                 backfaceVisibility: 'hidden',
-                transform: 'rotateX(180deg)',
-                boxShadow: '0 12px 40px rgba(0,0,0,.6)',
+                transform: 'rotateY(180deg)',
               }}
             >
               <img src={asset('art/coin-tails.webp')} alt="" className="w-full h-full object-cover" />
@@ -974,7 +973,7 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
           className="text-center"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 2 }}
+          transition={{ delay: 2.6 }}
         >
           <p className="font-display text-lg" style={{ color: 'var(--gold-bright)' }}>
             {heads ? 'Heads' : 'Tails'}
