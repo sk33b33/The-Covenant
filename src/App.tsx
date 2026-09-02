@@ -18,6 +18,7 @@ import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
+import { playTap } from '@/lib/tap'
 import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
 
 /** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
@@ -42,6 +43,26 @@ export default function App() {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [back])
+
+  // The tap sound, for buttons and nothing else. One delegated listener
+  // here rather than an `onClick` threaded through every button in the
+  // app — this is the one place guaranteed to see every one of them, and
+  // the only way to add a new button anywhere and have it already make the
+  // sound without a second line of code. Capture phase, not bubble: a
+  // handful of overlays (the card viewer, action sheets) stop a click's
+  // propagation on their own content so a tap on the card doesn't also
+  // close the sheet behind it, which would otherwise take the sound with
+  // it for exactly the buttons inside those overlays. `closest` matches a
+  // real `<button>` or anything standing in for one via `role="button"`,
+  // and nothing else — not the mat, not a dragged card, not the scrim
+  // behind a sheet.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('button, [role="button"]')) playTap()
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [])
 
   // The splash is an overlay, so the interface beneath it is already painted —
   // chrome included. That is what the art dissolves *to*.
