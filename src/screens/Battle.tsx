@@ -59,8 +59,19 @@ export interface BattleProps extends MatchConfig {
 }
 
 export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinish, onExit, ...config }: BattleProps) {
-  const { state, dispatch, legal, error, clearError, aiThinking, clocks, coinSettled, settleCoin } =
-    useMatch(config)
+  const {
+    state,
+    dispatch,
+    legal,
+    error,
+    clearError,
+    aiThinking,
+    clocks,
+    coinSettled,
+    settleCoin,
+    simulating,
+    simulate,
+  } = useMatch(config)
 
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
@@ -80,8 +91,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   const you = state.players.you
   const foe = state.players.foe
-  const myTurn = state.phase === 'main' && state.current === 'you'
-  const mustPromote = state.phase === 'promote' && state.promoting === 'you'
+  // Simulate hands your side to the AI, so none of the manual controls that
+  // gate off `myTurn`/`mustPromote` should still answer to a tap once it's
+  // running — the two would otherwise race to act on the same turn.
+  const myTurn = state.phase === 'main' && state.current === 'you' && !simulating
+  const mustPromote = state.phase === 'promote' && state.promoting === 'you' && !simulating
   const setupPhase = state.phase === 'setup'
 
   // Errors are transient; a stale one under a later action reads as a new bug.
@@ -458,6 +472,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setActionOpen(false)
   }
 
+  // Simulate hands your side to the AI for the rest of the match — at the
+  // same pace it already plays the opponent at, not a fast-forward, so a
+  // hand-off partway through still reads as the same match continuing
+  // rather than cutting straight to a result. Offered any time there's
+  // still a match to play and nobody's already simulating it.
+  const canSimulate = !simulating && state.phase !== 'ended'
+  const runSimulate = () => {
+    simulate()
+    setActionOpen(false)
+  }
+
   /* ------------------------------------------------------------- render */
 
   return (
@@ -512,7 +537,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         {/* Extra clearance: attached energy hangs below a Figure's card edge
             and would otherwise sit on top of the banner. */}
         <div className="flex items-center justify-center py-0.5 w-full">
-          <TurnBanner state={state} myTurn={myTurn} seconds={clocks.turn} />
+          <TurnBanner state={state} myTurn={myTurn} simulating={simulating} seconds={clocks.turn} />
         </div>
 
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
@@ -571,6 +596,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             basicsInHand={basicsInHand}
             setupPhase={setupPhase}
             myTurn={myTurn}
+            simulating={simulating}
             playable={actionsFor.byHand}
             onTap={(index) => {
               // Setup places cards by drag only now — a tap during setup used
@@ -586,17 +612,28 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           {/* Altar, with the small popup action trigger stacked above it. */}
           <div className="relative flex flex-col items-center gap-1.5 shrink-0">
             <AnimatePresence>
-              {actionOpen && actionLabel && (
+              {actionOpen && (actionLabel || canSimulate) && (
                 <motion.div
-                  className="absolute bottom-full mb-2 right-0 whitespace-nowrap"
+                  className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-2 whitespace-nowrap"
                   initial={{ opacity: 0, y: 6, scale: 0.92 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.92 }}
                   transition={{ type: 'spring', stiffness: 460, damping: 32 }}
                 >
-                  <Button variant="gold" className="!px-4 !py-2 text-sm" onClick={runAction}>
-                    {actionLabel}
-                  </Button>
+                  {/* Above the primary action rather than below: it's the
+                      less common choice of the two, and shouldn't sit where
+                      a thumb reaching for "Start Match"/"End Turn" would
+                      land on it by accident. */}
+                  {canSimulate && (
+                    <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={runSimulate}>
+                      Simulate Match
+                    </Button>
+                  )}
+                  {actionLabel && (
+                    <Button variant="gold" className="!px-4 !py-2 text-sm" onClick={runAction}>
+                      {actionLabel}
+                    </Button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -618,16 +655,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
             <button
               onClick={() => setActionOpen((v) => !v)}
-              disabled={!actionLabel}
+              disabled={!actionLabel && !canSimulate}
               className="rounded-pill w-9 h-9 grid place-items-center"
               style={{
-                background: actionLabel ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                opacity: actionLabel ? 1 : 0.5,
+                background: actionLabel || canSimulate ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                opacity: actionLabel || canSimulate ? 1 : 0.5,
               }}
-              aria-label={actionLabel ?? 'No action available'}
+              aria-label={actionLabel ?? (canSimulate ? 'Simulate Match' : 'No action available')}
               aria-expanded={actionOpen}
             >
-              <CheckIcon size={16} className={actionLabel ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
+              <CheckIcon
+                size={16}
+                className={actionLabel || canSimulate ? 'text-[var(--gold-bright)]' : 'text-ink-faint'}
+              />
             </button>
 
             <div className="relative grid place-items-center">
@@ -798,6 +838,7 @@ function PlayerHand({
   basicsInHand,
   setupPhase,
   myTurn,
+  simulating,
   playable,
   onTap,
   onDropEnd,
@@ -809,6 +850,8 @@ function PlayerHand({
   basicsInHand: { cardId: string; index: number }[]
   setupPhase: boolean
   myTurn: boolean
+  /** The AI is playing this side now — every gesture here is inert. */
+  simulating: boolean
   playable: Map<number, Action[]>
   onTap: (index: number, isBasic: boolean) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
@@ -841,9 +884,11 @@ function PlayerHand({
         const pickedBench = setupBench.includes(index)
         const isBasic = basicsInHand.some((b) => b.index === index)
         const actions = playable.get(index) ?? []
-        const draggable = setupPhase
-          ? isBasic
-          : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND')
+        const draggable =
+          !simulating &&
+          (setupPhase
+            ? isBasic
+            : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'))
         const offset = index - mid
         // Only an unspent Basic during setup — the moment it's picked it has
         // already been found, and a card already resting in the Active or
@@ -905,10 +950,13 @@ function PlayerHand({
             // already, but the button still visibly pressed down under a
             // finger, which reads as "this does something" even when it
             // doesn't. No click handler and no press animation is what
-            // actually looks like a card that can only be dragged.
-            onClick={setupPhase ? undefined : () => onTap(index, isBasic)}
-            whileTap={setupPhase ? undefined : { scale: 0.95 }}
-            disabled={setupPhase && !isBasic}
+            // actually looks like a card that can only be dragged. Simulate
+            // gets the same treatment for the same reason: a tap that opened
+            // the play sheet mid-simulation could dispatch a real action out
+            // from under the AI turn about to land on this same card.
+            onClick={setupPhase || simulating ? undefined : () => onTap(index, isBasic)}
+            whileTap={setupPhase || simulating ? undefined : { scale: 0.95 }}
+            disabled={(setupPhase && !isBasic) || simulating}
           >
             <div
               className={cx('rounded-[8%]', glows && 'cov-hand-glow')}
@@ -1094,16 +1142,24 @@ function DiscardStrip({ cardIds, onClose }: { cardIds: string[]; onClose: () => 
 function TurnBanner({
   state,
   myTurn,
+  simulating,
   seconds,
 }: {
   state: MatchState
   myTurn: boolean
+  simulating: boolean
   seconds: number
 }) {
   // Setup carries no label at all: the mat's own slot outlines and the fanned
-  // hand are the instruction now, not a line of copy above them.
-  const label =
-    state.phase === 'setup'
+  // hand are the instruction now, not a line of copy above them. Simulating
+  // overrides that — with dragging disabled there's nothing left on screen
+  // to explain what's about to happen, so this becomes the only place that
+  // does. It stays fixed through the whole hand-off rather than swinging
+  // between "Your turn" and "Opponent's turn" as sides alternate, since
+  // neither is true any more in the sense a player would read them.
+  const label = simulating
+    ? 'Simulating…'
+    : state.phase === 'setup'
       ? null
       : state.phase === 'promote'
         ? state.promoting === 'you'
