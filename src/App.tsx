@@ -60,10 +60,44 @@ export default function App() {
 
   return (
     <div className="h-full bg-bg text-ink">
-      <AnimatePresence mode="wait" initial={false}>
+      {/*
+        No `mode="wait"` any more. It used to hold the outgoing screen
+        mounted until its exit fade reported itself complete, then swap in
+        the next one — the two never overlapped, at the cost of briefly
+        showing neither (the reason the splash below was pulled out of this
+        swap entirely). Leaving Battle after a match traced back to exactly
+        that wait: its exit fade would reach opacity 0 and then just stop —
+        the completion callback that "wait" mode needs never fired, so the
+        next screen never mounted and the finished match sat there forever,
+        faded to invisible but still covering the screen and eating taps.
+        Reproduced and confirmed repeatedly; the exact framer-motion
+        internal reason the callback doesn't fire wasn't pinned down, only
+        that this is where it happens and only this screen. Default (sync)
+        mode mounts the next screen immediately instead of waiting on the
+        outgoing one at all, which sidesteps the hang outright — the small
+        cost is that a route change can very briefly show both screens
+        layered rather than a clean cut, standard AnimatePresence behaviour
+        everywhere that doesn't ask for `wait`.
+
+        `fixed inset-0` on the screen itself is what makes that overlap
+        harmless rather than a new bug of its own. `<main>` used to be a
+        plain `h-full` block, fine when only one was ever in the DOM at a
+        time under `mode="wait"` — but with both the outgoing and incoming
+        screen mounted together, two ordinary block siblings each 100% of
+        the viewport stack vertically like any other block content: the
+        second one lands a full screen-height below the first, technically
+        present and clickable via coordinates but completely invisible
+        below the fold — which is exactly what turned up under test, a
+        BattleHub that "worked" yet rendered as a blank page. Pinning both
+        to the same fixed position instead makes two present screens
+        genuinely overlap — the correct thing for a full-screen surface —
+        with the later one in the DOM painting on top, so the incoming
+        screen is what a player actually sees.
+      */}
+      <AnimatePresence initial={false}>
         <motion.main
           key={routeKey(route)}
-          className="h-full"
+          className="h-full fixed inset-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

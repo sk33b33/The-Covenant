@@ -703,11 +703,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         />
       )}
 
-      <AnimatePresence>
-        {state.phase === 'ended' && (
-          <Result state={state} onExit={onExit} />
-        )}
-      </AnimatePresence>
+      {/*
+        No `AnimatePresence` here. `state.phase` is one-way — a match that
+        reaches 'ended' never leaves it, so Result never needs an exit
+        transition of its own; the only way it ever disappears is the whole
+        Battle screen unmounting when the player navigates away, which is a
+        transition the *App-level* route AnimatePresence already owns.
+        This was the first thing tried against the "Continue does nothing"
+        bug — a nested AnimatePresence whose child never gets its own exit
+        signal looked exactly like the kind of thing that could confuse an
+        ancestor AnimatePresence waiting on the whole subtree. Removing it
+        alone did not fix the bug (see App.tsx for what actually did — its
+        `mode="wait"`), but it still is not doing anything useful: Result
+        gets nothing from carrying an exit animation it can structurally
+        never run, so there is no reason to put it back.
+      */}
+      {state.phase === 'ended' && <Result state={state} onExit={onExit} />}
     </div>
   )
 }
@@ -1210,7 +1221,6 @@ function Result({ state, onExit }: { state: MatchState; onExit: () => void }) {
       style={{ background: 'rgba(8,6,3,.9)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
     >
       <motion.div
         className="text-center w-full max-w-[320px]"
