@@ -29,7 +29,7 @@
  * VERSION, which is what actually forces a fresh fetch.
  */
 
-const VERSION = 'covenant-v3'
+const VERSION = 'covenant-v4'
 const SHELL = `${VERSION}-shell`
 
 /*
