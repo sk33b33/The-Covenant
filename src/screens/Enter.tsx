@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import { asset } from '@/lib/asset'
 import { CHIME_S, playChime, preloadChime } from '@/lib/chime'
+import { playMusic, preloadMusic } from '@/lib/music'
 import { STARTER_CARD_IDS } from '@/data/starter'
 import { useCollection } from '@/store/collection'
 import { useDecks } from '@/store/decks'
@@ -72,6 +73,7 @@ export function Enter() {
   // download at the moment it is meant to be heard.
   useEffect(() => {
     preloadChime()
+    preloadMusic()
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current)
     }
@@ -81,6 +83,11 @@ export function Enter() {
     if (leaving) return
     setLeaving(true)
     playChime()
+    // This tap is the one gesture guaranteed to satisfy the browser's
+    // autoplay policy, so it's what unlocks the menu music loop too —
+    // App.tsx's route effect takes over from here, pausing and resuming it
+    // as the player moves in and out of battles.
+    playMusic()
 
     // First entry hands over a playable deck. Landing on an empty binder, an
     // empty deck list and an unusable Battle tab is three dead ends before the
