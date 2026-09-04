@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CheckIcon, ScrollIcon, SocialIcon, TreeMark } from '@/art/icons'
-import { Button, Panel } from '@/components/ui'
+import { Button, Panel, Slider } from '@/components/ui'
 import { CARDS } from '@/data/cards'
 import { ECONOMY, RULES } from '@/game/config'
 import { clearAll } from '@/store/persist'
@@ -26,8 +26,14 @@ export function Menu() {
   const [confirmReset, setConfirmReset] = useState(false)
   const reducedMotion = useSettings((s) => s.reducedMotion)
   const setReducedMotion = useSettings((s) => s.setReducedMotion)
-  const muted = useSettings((s) => s.muted)
-  const setMuted = useSettings((s) => s.setMuted)
+  const sfxMuted = useSettings((s) => s.sfxMuted)
+  const setSfxMuted = useSettings((s) => s.setSfxMuted)
+  const sfxVolume = useSettings((s) => s.sfxVolume)
+  const setSfxVolume = useSettings((s) => s.setSfxVolume)
+  const musicMuted = useSettings((s) => s.musicMuted)
+  const setMusicMuted = useSettings((s) => s.setMusicMuted)
+  const musicVolume = useSettings((s) => s.musicVolume)
+  const setMusicVolume = useSettings((s) => s.setMusicVolume)
 
   useEffect(() => applyTheme(theme), [theme])
 
@@ -127,27 +133,24 @@ export function Menu() {
 
         {/* ----------------------------------------------------------- audio */}
         <h2 className="font-display text-md mt-6 mb-2 px-1">Audio</h2>
-        <Panel className="p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {([false, true] as const).map((mute) => (
-              <button
-                key={String(mute)}
-                onClick={() => setMuted(mute)}
-                aria-pressed={muted === mute}
-                className={cx(
-                  'rounded-md py-3 text-sm transition-all',
-                  muted === mute ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
-                )}
-                style={{ background: muted === mute ? 'var(--bg-sunk)' : 'var(--surface)' }}
-              >
-                {muted === mute && <CheckIcon size={13} className="inline mr-1 -mt-0.5" />}
-                {mute ? 'Muted' : 'Sound on'}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-ink-muted mt-2.5 leading-snug">
-            Mutes the entry chime, and anything else the game plays.
-          </p>
+        <Panel className="p-3 space-y-4">
+          <AudioChannel
+            label="Sound Effects"
+            description="The button tap, and anything else that answers a touch."
+            muted={sfxMuted}
+            setMuted={setSfxMuted}
+            volume={sfxVolume}
+            setVolume={setSfxVolume}
+          />
+          <div className="h-px" style={{ background: 'var(--bg-sunk)' }} />
+          <AudioChannel
+            label="Game Music"
+            description="The entry chime."
+            muted={musicMuted}
+            setMuted={setMusicMuted}
+            volume={musicVolume}
+            setVolume={setMusicVolume}
+          />
         </Panel>
 
         {/* ----------------------------------------------------------- rules */}
@@ -231,6 +234,61 @@ function Tile({
       <span className="text-[var(--gold-deep)]">{icon}</span>
       <span className="font-display text-md">{label}</span>
     </button>
+  )
+}
+
+/** One audio channel's controls — mute toggle plus its own volume slider.
+ *  The slider stays visible but disabled while muted, rather than
+ *  disappearing: the level a player last set is still there to see, and
+ *  reads back immediately when they unmute rather than needing to be
+ *  rediscovered. */
+function AudioChannel({
+  label,
+  description,
+  muted,
+  setMuted,
+  volume,
+  setVolume,
+}: {
+  label: string
+  description: string
+  muted: boolean
+  setMuted: (v: boolean) => void
+  volume: number
+  setVolume: (v: number) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        <div className="grid grid-cols-2 gap-2 shrink-0">
+          {([false, true] as const).map((mute) => (
+            <button
+              key={String(mute)}
+              onClick={() => setMuted(mute)}
+              aria-pressed={muted === mute}
+              className={cx(
+                'rounded-md px-3 py-1.5 text-xs transition-all',
+                muted === mute ? 'shadow-pressed font-semibold' : 'shadow-raised-sm',
+              )}
+              style={{ background: muted === mute ? 'var(--bg-sunk)' : 'var(--surface)' }}
+            >
+              {muted === mute && <CheckIcon size={11} className="inline mr-1 -mt-0.5" />}
+              {mute ? 'Muted' : 'On'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-ink-muted mt-1 leading-snug">{description}</p>
+      <div className="mt-3">
+        <Slider
+          value={volume}
+          onChange={setVolume}
+          disabled={muted}
+          ariaLabel={`${label} volume`}
+        />
+      </div>
+    </div>
   )
 }
 

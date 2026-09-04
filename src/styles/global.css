@@ -442,4 +442,64 @@
     border-radius: 8%;
     animation: cov-hand-pulse 2s ease-in-out infinite;
   }
+
+  /*
+   * A volume slider: the sunk track from `.neu-sunk`, a raised thumb to
+   * match every other raised surface in the kit, and a gold fill up to
+   * wherever the thumb sits. Neither browser paints a filled native range
+   * track for free — the alternative is a second, duplicated `<progress>`
+   * element sitting under an invisible input, which then has to be kept in
+   * sync by hand. Reading `--fill` (set from React on every change) into
+   * the track's own gradient stop is the same amount of code without the
+   * second element.
+   */
+  .cov-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--gold-bright) var(--fill, 0%),
+      var(--bg-sunk) var(--fill, 0%)
+    );
+    box-shadow: var(--shadow-pressed);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .cov-slider:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .cov-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-raised-sm);
+    border: none;
+  }
+
+  .cov-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--surface-raised);
+    box-shadow: var(--shadow-raised-sm);
+    border: none;
+  }
+
+  /* Firefox paints this pseudo-element as the visible track rather than
+   * the input's own background, so it stays transparent and lets the
+   * gradient set above show through. */
+  .cov-slider::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: transparent;
+  }
 }

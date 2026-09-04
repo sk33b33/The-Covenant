@@ -134,6 +134,46 @@ export function Progress({ value, className, fill, label }: ProgressProps) {
   )
 }
 
+/* ------------------------------------------------------------------- slider */
+
+interface SliderProps {
+  /** 0–1. */
+  value: number
+  onChange: (value: number) => void
+  disabled?: boolean
+  ariaLabel: string
+}
+
+/**
+ * A volume slider, styled to sit on the same sunk track `Progress` uses
+ * rather than inventing a second "this is a level" language for the two to
+ * disagree on. The native `<input type="range">` carries the real drag
+ * gesture, keyboard arrows and screen-reader semantics for free; `.cov-slider`
+ * in global.css strips its default chrome and repaints the track and thumb
+ * to match, since neither browser gives a filled-track look for free without
+ * either a duplicated `<progress>` element or a live-updated CSS variable —
+ * the latter is what `--fill` here is for.
+ */
+export function Slider({ value, onChange, disabled, ariaLabel }: SliderProps) {
+  const pct = Math.round(Math.max(0, Math.min(1, value)) * 100)
+
+  return (
+    <input
+      type="range"
+      className="cov-slider"
+      min={0}
+      max={100}
+      step={1}
+      value={pct}
+      disabled={disabled}
+      onChange={(e) => onChange(Number(e.target.value) / 100)}
+      style={{ '--fill': `${pct}%` } as React.CSSProperties}
+      aria-label={ariaLabel}
+      aria-valuetext={`${pct}%`}
+    />
+  )
+}
+
 /* ------------------------------------------------------------------- badge */
 
 /** The small red count badge from the reference UI. */

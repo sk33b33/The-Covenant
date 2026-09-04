@@ -29,10 +29,10 @@ function audioContext(): AudioContext | null {
 }
 
 export function playTap(): void {
-  // The mute switch in Menu → Audio, same one the entry chime answers to —
-  // one control for every sound in the game rather than a second switch
-  // nobody would think to look for.
-  if (useSettings.getState().muted) return
+  // The Sound Effects channel in Menu → Audio — its own mute and its own
+  // volume, independent of Game Music.
+  const { sfxMuted, sfxVolume } = useSettings.getState()
+  if (sfxMuted || sfxVolume <= 0) return
 
   const audio = audioContext()
   if (!audio) return
@@ -50,9 +50,12 @@ export function playTap(): void {
 
   // Silent to a low peak in 4ms, back to silent by 70ms. Exponential ramps
   // can't target exactly zero, so both ends land just above it — inaudible,
-  // and it avoids the click a hard stop at a non-zero gain would leave.
+  // and it avoids the click a hard stop at a non-zero gain would leave. The
+  // peak itself scales with the slider; the floor stays a fixed near-zero
+  // epsilon regardless, since it's inaudible at any volume.
+  const peak = 0.08 * sfxVolume
   gain.gain.setValueAtTime(0.0001, now)
-  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.004)
+  gain.gain.exponentialRampToValueAtTime(peak, now + 0.004)
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07)
 
   osc.connect(gain)

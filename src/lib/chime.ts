@@ -56,15 +56,15 @@ export function playChime(): void {
   const audio = el
   if (!audio) return
 
-  // The mute switch in Menu → Audio. Checked here, at the one place every
-  // sound in the game funnels through, rather than at each call site.
-  if (useSettings.getState().muted) return
+  // The Game Music channel in Menu → Audio. Checked here, at the one place
+  // this sound funnels through, rather than at each call site.
+  if (useSettings.getState().musicMuted) return
 
   // A second tap must not restart it, and must not double it up over itself.
   if (!audio.paused) return
 
   audio.currentTime = 0
-  audio.volume = 1
+  audio.volume = useSettings.getState().musicVolume
   void audio.play().catch(() => {
     /* autoplay refused or the file never arrived — nothing depends on it */
   })
@@ -72,13 +72,21 @@ export function playChime(): void {
   const frame = () => {
     if (audio.paused) return
 
+    // Read live, not just at the moment `play()` was called — dragging the
+    // Game Music slider (or hitting Muted) while the chime is still ringing
+    // takes effect on the very next frame instead of waiting for the next
+    // time the sound is triggered.
+    const { musicMuted, musicVolume } = useSettings.getState()
+    const base = musicMuted ? 0 : musicVolume
+
     const total = Number.isFinite(audio.duration) ? audio.duration : CHIME_S
     const left = total - audio.currentTime
 
-    if (left <= FADE_S) {
-      const t = Math.min(1, Math.max(0, 1 - left / FADE_S))
-      audio.volume = Math.min(1, Math.max(0, 0.5 * (1 + Math.cos(Math.PI * t))))
-    }
+    const fade =
+      left <= FADE_S
+        ? Math.min(1, Math.max(0, 0.5 * (1 + Math.cos(Math.PI * Math.min(1, Math.max(0, 1 - left / FADE_S))))))
+        : 1
+    audio.volume = Math.min(1, Math.max(0, base * fade))
 
     if (left <= 0.02) {
       audio.pause()
