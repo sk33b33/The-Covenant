@@ -191,6 +191,28 @@ describe('energy', () => {
   })
 })
 
+/* ------------------------------------------------------------- hand limit */
+
+describe('the hand limit', () => {
+  it('sends a drawn card to discard once the hand is already at the cap', () => {
+    let state = started({ forceFirst: 'foe' })
+    // What matters here is the count, not which cards fill it.
+    state = {
+      ...state,
+      players: {
+        ...state.players,
+        you: { ...state.players.you, hand: Array(RULES.MAX_HAND).fill(DECK[0]) },
+      },
+    }
+    const discardBefore = state.players.you.discard.length
+
+    state = reduce(state, { type: 'END_TURN' }) // foe ends; you begin and draw
+
+    expect(state.players.you.hand).toHaveLength(RULES.MAX_HAND)
+    expect(state.players.you.discard).toHaveLength(discardBefore + 1)
+  })
+})
+
 /* --------------------------------------------------------------- ascension */
 
 describe('ascension', () => {

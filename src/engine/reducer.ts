@@ -4,6 +4,7 @@ import { createRng, type Rng } from '@/game/rng'
 import { WEAKNESS, isFigure, pointsFor } from '@/game/types'
 import { runEffect, type EffectContext } from './effects'
 import {
+  addToHand,
   applyStatus,
   benchCount,
   canPayCost,
@@ -193,7 +194,8 @@ export function damageFigure(
   }
 }
 
-/** Draws one card, or loses the match if the deck is empty. */
+/** Draws one card, or loses the match if the deck is empty. A hand already
+ *  at RULES.MAX_HAND sends the drawn card straight to discard instead. */
 function draw(state: MatchState, playerId: PlayerId, count = 1) {
   const player = state.players[playerId]
 
@@ -203,7 +205,7 @@ function draw(state: MatchState, playerId: PlayerId, count = 1) {
       endMatch(state, OPPONENT[playerId], 'deckout')
       return
     }
-    player.hand.push(card)
+    addToHand(player, card)
   }
 }
 

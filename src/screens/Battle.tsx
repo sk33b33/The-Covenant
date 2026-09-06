@@ -3,7 +3,7 @@ import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { CheckIcon, ResetIcon } from '@/art/icons'
+import { CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -44,6 +44,11 @@ const HAND_W = 54
 /** Tall enough for a lifted card plus the fan's own arc, at the widest hands
  *  this game deals — scaled down along with HAND_W. */
 const HAND_HEIGHT = 90
+
+/** How long a finger has to stay down on the hand before it starts browsing
+ *  (widening the fan, popping up whichever card it's over) rather than
+ *  simply being the start of an ordinary tap or drag. */
+const HOLD_TO_FAN_MS = 130
 
 // The hand tray sits outside the flex flow (see the board container below),
 // so nothing else reserves its footprint automatically any more — anything
@@ -529,8 +534,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
           <div className="flex items-center gap-2">
-            <PileCount kind="deck" count={foe.deck.length} />
-            <PileCount kind="discard" count={foe.discard.length} cardIds={foe.discard} />
+            <PileCount count={foe.deck.length} />
+            <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
           </div>
         </div>
 
@@ -542,13 +547,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <div className="flex items-center gap-2">
-            <PileCount kind="deck" count={you.deck.length} />
-            <PileCount kind="discard" count={you.discard.length} cardIds={you.discard} />
+            <PileCount count={you.deck.length} />
+            <DiscardButton count={you.discard.length} cardIds={you.discard} />
           </div>
           <StatsChip points={you.points} seconds={clocks.you} />
         </div>
 
-        <div ref={activeSlotRef} className="shrink-0">
+        {/* Pulled up past the flex gap that already separates every row here:
+            your own Active and Bench read as sitting further from the
+            clash ring than the opponent's mirror of them, since your stats
+            row above them is the same height as theirs but there's nothing
+            below your Bench pulling the eye back down the way the turn
+            banner does above. This closes that gap without touching the
+            opponent's side, or the spacing the turn banner itself keeps. */}
+        <div ref={activeSlotRef} className="shrink-0" style={{ marginTop: -10 }}>
           <BoardFigure
             figure={you.active}
             width={ACTIVE_W}
@@ -558,7 +570,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             noPeek={Boolean(you.active && myTurn)}
           />
         </div>
-        <div className="flex gap-1.5 mt-1">
+        <div className="flex gap-1.5" style={{ marginTop: -6 }}>
           {you.bench.map((figure, i) => (
             <div
               key={i}
@@ -685,8 +697,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 />
               )}
 
-              <motion.button
-                disabled={!myTurn || you.altar === null}
+              {/* The Altar itself — the socket, not the thing being dragged.
+                  It never moves: only the orb sitting on top of it (below)
+                  drags onto a Figure, so the frame stays put as the visual
+                  anchor for "this is where energy comes from" whether or
+                  not one is resting there right now. */}
+              <div
                 className="relative rounded-pill grid place-items-center"
                 style={{
                   width: 46,
@@ -694,22 +710,29 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
                   boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
                 }}
-                // No tap-to-sheet any more — dragging the orb onto a Figure is
-                // the only way to attach energy now.
-                drag={myTurn && you.altar !== null}
-                dragSnapToOrigin
-                dragElastic={0.35}
-                whileDrag={{ zIndex: 2000, scale: 1.15 }}
-                onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
-                onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
-                aria-label={you.altar ? `Altar: ${you.altar} energy ready — drag onto a Figure` : 'Altar empty'}
+                aria-hidden={you.altar !== null}
               >
-                {you.altar ? (
+                {!you.altar && <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>}
+              </div>
+
+              {/* The energy orb, layered on top of the (stationary) Altar.
+                  No tap-to-sheet any more — dragging it onto a Figure is the
+                  only way to attach energy now. */}
+              {you.altar && (
+                <motion.button
+                  disabled={!myTurn}
+                  className="absolute inset-0 grid place-items-center rounded-pill"
+                  drag={myTurn}
+                  dragSnapToOrigin
+                  dragElastic={0.35}
+                  whileDrag={{ zIndex: 2000, scale: 1.15 }}
+                  onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
+                  onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
+                  aria-label={`Altar: ${you.altar} energy ready — drag onto a Figure`}
+                >
                   <EnergyOrb type={you.altar} size={30} />
-                ) : (
-                  <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
-                )}
-              </motion.button>
+                </motion.button>
+              )}
             </div>
           </div>
         </div>
@@ -869,6 +892,11 @@ function PlayerHand({
   // guarantees a draggable card stays tappable regardless of overlap, this
   // just keeps the overlap itself from getting absurd at extreme hand sizes.
   const spanStep = count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0
+  // The same two steps, wider — what the fan opens up to while a hold is
+  // browsing it, so a card has somewhere to go besides just enlarging in
+  // place under its neighbours.
+  const wideSpanStep = Math.min(50, spanStep * 1.55)
+  const wideRotateStep = Math.min(14, rotateStep * 1.35)
 
   // The lift a card gets as a thumb brushes across the fan without yet
   // committing to a drag — the same tell a hand of real cards gives when
@@ -877,33 +905,116 @@ function PlayerHand({
   // browsers, and this game is touch-first.
   const [brushed, setBrushed] = useState<number | null>(null)
 
+  // A held finger widens the whole fan and lifts whichever card sits under
+  // it to full size — a browse, distinct from the drag-to-play gesture below.
+  // It lives at the tray level rather than on each card, because the card the
+  // finger ends up over after a hold has *moved* is not necessarily the one
+  // it started on; a per-card gesture would lose the finger the instant it
+  // crossed into a neighbour's box.
+  const [fanOpen, setFanOpen] = useState(false)
+  const [focusIndex, setFocusIndex] = useState<number | null>(null)
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const activePointer = useRef<number | null>(null)
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>()
+  const lastPoint = useRef({ x: 0, y: 0 })
+
+  const isDraggableIndex = (index: number) => {
+    const isBasic = basicsInHand.some((b) => b.index === index)
+    const actions = playable.get(index) ?? []
+    return (
+      !simulating &&
+      (setupPhase ? isBasic : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'))
+    )
+  }
+
+  /** The topmost card whose box contains this point, ranked by the same
+   *  draggable-wins-ties order the fan renders with. */
+  const hitTest = (x: number, y: number): number | null => {
+    const order = Array.from({ length: hand.length }, (_, i) => i).sort(
+      (a, b) => (isDraggableIndex(b) ? 1000 : 0) + b - ((isDraggableIndex(a) ? 1000 : 0) + a),
+    )
+    for (const i of order) {
+      const el = cardRefs.current[i]
+      if (!el) continue
+      const r = el.getBoundingClientRect()
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i
+    }
+    return null
+  }
+
+  // No `setPointerCapture` anywhere here, deliberately: capturing the
+  // pointer on this container would retarget every subsequent event for it
+  // away from whichever card the finger came down on — including the
+  // native listeners Framer's own `drag` attaches directly to that card —
+  // which broke the drag-to-play gesture outright rather than merely
+  // competing with it cosmetically. Plain event bubbling already reaches
+  // this container from any card beneath it, which is all hit-testing here
+  // needs.
+  const onHandPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointer.current !== null) return
+    activePointer.current = e.pointerId
+    lastPoint.current = { x: e.clientX, y: e.clientY }
+    clearTimeout(holdTimer.current)
+    holdTimer.current = setTimeout(() => {
+      if (activePointer.current === null) return
+      setFanOpen(true)
+      setFocusIndex(hitTest(lastPoint.current.x, lastPoint.current.y))
+    }, HOLD_TO_FAN_MS)
+  }
+
+  const onHandPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointer.current !== e.pointerId) return
+    lastPoint.current = { x: e.clientX, y: e.clientY }
+    if (!fanOpen) return
+    setFocusIndex(hitTest(e.clientX, e.clientY))
+  }
+
+  const endHold = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointer.current !== e.pointerId) return
+    clearTimeout(holdTimer.current)
+    activePointer.current = null
+    setFanOpen(false)
+    setFocusIndex(null)
+  }
+
   return (
-    <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
+    <div
+      className="flex-1 min-w-0 relative"
+      style={{ height: HAND_HEIGHT, touchAction: 'none' }}
+      onPointerDown={onHandPointerDown}
+      onPointerMove={onHandPointerMove}
+      onPointerUp={endHold}
+      onPointerCancel={endHold}
+    >
       {hand.map((cardId, index) => {
         const pickedActive = setupActive === index
         const pickedBench = setupBench.includes(index)
         const isBasic = basicsInHand.some((b) => b.index === index)
-        const actions = playable.get(index) ?? []
-        const draggable =
-          !simulating &&
-          (setupPhase
-            ? isBasic
-            : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'))
+        const draggable = isDraggableIndex(index)
         const offset = index - mid
         // Only an unspent Basic during setup — the moment it's picked it has
         // already been found, and a card already resting in the Active or
         // Bench outline doesn't need to keep asking for a drag that would
         // just undo the pick.
         const glows = setupPhase && isBasic && !pickedActive && !pickedBench
+        const isFocused = focusIndex === index
+        // Wider spacing and rotation while a hold is browsing the hand, so
+        // there's room for the focused card to lift clear of its neighbours
+        // instead of just peeking out from under them.
+        const span = fanOpen ? wideSpanStep : spanStep
+        const rot = fanOpen ? wideRotateStep : rotateStep
 
         return (
           <motion.button
             key={`${cardId}-${index}`}
+            ref={(el) => {
+              cardRefs.current[index] = el
+            }}
             className="absolute bottom-0"
             style={{
               width: HAND_W,
               left: '50%',
-              marginLeft: offset * spanStep - HAND_W / 2,
+              marginLeft: -HAND_W / 2,
               // A tight fan means neighbours overlap enough that a card's own
               // centre can sit *under* the card next to it. Ordering by hand
               // position alone put a non-draggable neighbour on top of a
@@ -912,19 +1023,30 @@ function PlayerHand({
               // happened, and it looked like the drag itself had failed.
               // Draggable cards now always win the stacking order over
               // non-draggable ones, so the card you can actually act on is
-              // never the one buried underneath.
-              zIndex: (draggable ? 1000 : 0) + index,
+              // never the one buried underneath. A focused card (browsed via
+              // hold) always wins over both.
+              zIndex: isFocused ? 3000 : (draggable ? 1000 : 0) + index,
               transformOrigin: 'bottom center',
             }}
             animate={{
+              // The horizontal fan offset lives here, as an animated motion
+              // value, rather than in the static style above — the same
+              // treatment `y` already gets below — so widening the fan on a
+              // hold (and settling back once it ends) tweens through the
+              // spring transition instead of jumping.
+              x: offset * span,
               // A card further from the centre dips a little further down, so
               // the row reads as a fan held from below rather than a straight
-              // line of tilted cards.
-              rotate: offset * rotateStep,
+              // line of tilted cards. The focused card straightens and lifts
+              // well clear of that curve so it reads at full size rather than
+              // as one more card leaning in the row.
+              rotate: isFocused ? 0 : offset * rot,
               y:
                 (pickedActive || pickedBench ? -14 : 0) +
                 offset * offset * 1.4 -
-                (brushed === index ? 10 : 0),
+                (brushed === index ? 10 : 0) -
+                (isFocused ? 78 : 0),
+              scale: isFocused ? 1.55 : 1,
             }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             onPointerEnter={() => setBrushed(index)}
@@ -1023,24 +1145,12 @@ function OpponentHand({ count }: { count: number }) {
 }
 
 /**
- * A pile of face-down cards — the deck, or the discard.
- *
- * No text label any more; the pile reads by its art alone, and a tap answers
- * the question a label used to. On the deck that's a count, shown as a
- * digit over the card back and left to fade on its own rather than needing a
- * second tap to dismiss. On the discard it's the pile itself, fanned open
- * into a scrollable strip — public information in a card game, worth more
- * than a number.
+ * The deck: a pile of face-down cards, read by its art alone. A tap answers
+ * the only question a label used to — how many are left — as a digit over
+ * the card back, left to fade on its own rather than needing a second tap
+ * to dismiss.
  */
-function PileCount({
-  kind,
-  count,
-  cardIds,
-}: {
-  kind: 'deck' | 'discard'
-  count: number
-  cardIds?: string[]
-}) {
+function PileCount({ count }: { count: number }) {
   // Twice the card's former 26px width — the size the layout otherwise
   // reserved for a label underneath now goes to the pile itself.
   const size = 52
@@ -1051,52 +1161,90 @@ function PileCount({
 
   const tap = () => {
     if (count === 0) return
-    if (kind === 'discard') {
-      setRevealed((v) => !v)
-      return
-    }
     setRevealed(true)
     clearTimeout(fadeTimer.current)
     fadeTimer.current = setTimeout(() => setRevealed(false), 2200)
   }
 
   return (
+    <button
+      onClick={tap}
+      disabled={count === 0}
+      className="relative rounded-sm overflow-hidden"
+      style={{ width: size, aspectRatio: '63/88' }}
+      aria-label={`Deck: ${count} card${count === 1 ? '' : 's'} left`}
+    >
+      {count > 0 ? (
+        <CardBack />
+      ) : (
+        <div className="absolute inset-0 rounded-sm" style={{ background: 'rgba(10,7,3,.4)' }} />
+      )}
+
+      <AnimatePresence>
+        {revealed && (
+          <motion.span
+            className="absolute inset-0 grid place-items-center font-numeric tabular-nums"
+            style={{ fontSize: 18, color: '#fdfaf3', textShadow: '0 1px 6px rgba(0,0,0,.85)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
+          >
+            {count}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  )
+}
+
+/**
+ * The discard pile, as a touch button rather than a pile of its own — there
+ * was never a stack worth looking at here (a discard pile is public
+ * information regardless of how many cards are in it, unlike a face-down
+ * deck), so the slot it used to occupy now carries the game's own
+ * letterform for it instead. Tapping opens the same fanned strip the old
+ * pile slot did.
+ */
+function DiscardButton({ count, cardIds }: { count: number; cardIds: string[] }) {
+  const [open, setOpen] = useState(false)
+
+  return (
     <>
       <button
-        onClick={tap}
+        onClick={() => count > 0 && setOpen((v) => !v)}
         disabled={count === 0}
-        className="relative rounded-sm overflow-hidden"
-        style={{ width: size, aspectRatio: '63/88' }}
-        aria-label={
-          kind === 'deck' ? `Deck: ${count} card${count === 1 ? '' : 's'} left` : `Discard: ${count} card${count === 1 ? '' : 's'}`
-        }
+        className="relative shrink-0 rounded-pill grid place-items-center"
+        style={{
+          width: 34,
+          height: 34,
+          background: 'var(--bg-sunk)',
+          border: '1px solid rgba(229,192,140,.25)',
+          opacity: count === 0 ? 0.4 : 1,
+        }}
+        aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
       >
-        {count > 0 ? (
-          <CardBack />
-        ) : (
-          <div className="absolute inset-0 rounded-sm" style={{ background: 'rgba(10,7,3,.4)' }} />
+        <DiscardIcon size={15} className="text-ink-faint" />
+        {count > 0 && (
+          <span
+            className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
+            style={{
+              minWidth: 15,
+              height: 15,
+              padding: '0 3px',
+              fontSize: 9,
+              background: 'var(--surface-raised)',
+              border: '1px solid rgba(229,192,140,.3)',
+              color: 'rgba(229,192,140,.85)',
+            }}
+          >
+            {count}
+          </span>
         )}
-
-        <AnimatePresence>
-          {kind === 'deck' && revealed && (
-            <motion.span
-              className="absolute inset-0 grid place-items-center font-numeric tabular-nums"
-              style={{ fontSize: 18, color: '#fdfaf3', textShadow: '0 1px 6px rgba(0,0,0,.85)' }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.6 } }}
-            >
-              {count}
-            </motion.span>
-          )}
-        </AnimatePresence>
       </button>
 
-      {kind === 'discard' && (
-        <AnimatePresence>
-          {revealed && <DiscardStrip cardIds={cardIds ?? []} onClose={() => setRevealed(false)} />}
-        </AnimatePresence>
-      )}
+      <AnimatePresence>
+        {open && <DiscardStrip cardIds={cardIds} onClose={() => setOpen(false)} />}
+      </AnimatePresence>
     </>
   )
 }
@@ -1191,9 +1339,13 @@ function TurnBanner({
   )
 }
 
+/** How long the coin spins before settling — a beat longer than the reveal
+ *  text and the overlay's own dismissal below, so both keep pace with it. */
+const COIN_FLIP_S = 3.1
+
 function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onDone, 3200)
+    const timer = setTimeout(onDone, (COIN_FLIP_S + 0.7) * 1000)
     return () => clearTimeout(timer)
   }, [onDone])
 
@@ -1214,7 +1366,7 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             style={{ transformStyle: 'preserve-3d' }}
             initial={{ rotateY: 0 }}
             animate={{ rotateY: heads ? 1800 : 1980 }}
-            transition={{ duration: 2.5, ease: [0.18, 0.9, 0.3, 1] }}
+            transition={{ duration: COIN_FLIP_S, ease: [0.18, 0.9, 0.3, 1] }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div
@@ -1241,7 +1393,7 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
           className="text-center"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 2.6 }}
+          transition={{ delay: COIN_FLIP_S + 0.1 }}
         >
           <p className="font-display text-lg" style={{ color: 'var(--gold-bright)' }}>
             {heads ? 'Heads' : 'Tails'}

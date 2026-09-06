@@ -16,6 +16,7 @@ export const RULES = {
   /* Board */
   BENCH_SIZE: 3,
   OPENING_HAND: 5,
+  MAX_HAND: 10,
 
   /* Turn economy */
   ENERGY_PER_TURN: 1,
