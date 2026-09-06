@@ -231,6 +231,12 @@ const SWIPE_THRESHOLD = 90
  *  of even a wide phone, so it's fully gone rather than clipped mid-flight. */
 const EXIT_X = 560
 
+/** How long the card's own snap-back to centre takes after a reveal swipe
+ *  (paired with the tight, overdamped `dragTransition` below) — and how
+ *  long the flip waits before starting, so it turns over once stationary
+ *  rather than mid-slide. */
+const REVEAL_SNAP_MS = 140
+
 function Revealing({
   cards,
   flipped,
@@ -256,12 +262,15 @@ function Revealing({
   const onDragEnd = (_event: unknown, info: PanInfo) => {
     if (Math.abs(info.offset.x) < SWIPE_THRESHOLD) return
 
-    // First swipe on a face-down card reveals it in place — the card stays
-    // put and springs back to centre (framer's own constraint spring, since
-    // nothing here overrides it) while `FlipCard` turns it face-up. Only a
-    // swipe on an *already revealed* card sends it away.
+    // First swipe on a face-down card reveals it — but only once the card
+    // has actually snapped back to centre. Starting the flip immediately on
+    // release turned it over while it was still sliding in from wherever the
+    // thumb let go, so the card read as skidding and spinning at once rather
+    // than turning over in place. The snap-back itself is tuned fast and
+    // overdamped below (REVEAL_SNAP_MS) so this delay is barely noticeable
+    // as a pause — it's just enough for the slide to finish first.
     if (!revealed) {
-      onFlip(focus)
+      window.setTimeout(() => onFlip(focus), REVEAL_SNAP_MS)
       return
     }
 
@@ -304,6 +313,11 @@ function Revealing({
               // springs straight back there on its own, for free.
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.7}
+              // Overdamped: the release snaps straight back to centre with
+              // no bounce or overshoot, so it settles fast and predictably
+              // rather than the default spring's slower, springier return —
+              // which is what let the flip below catch it still mid-slide.
+              dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
               onDragEnd={onDragEnd}
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
