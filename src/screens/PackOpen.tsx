@@ -291,8 +291,6 @@ function Revealing({
       )}
 
       <div className="relative flex-1 flex items-center justify-center px-8 min-h-0">
-        <HeavenlyGlow />
-
         <div className="relative w-full max-w-[290px]" style={{ perspective: '1400px' }}>
           {/* `popLayout` lets the dismissed card fly out of flow immediately
               rather than leaving a gap the next one has to animate into —
@@ -358,26 +356,25 @@ function Revealing({
   )
 }
 
-/** A soft light beneath every card, win or not — separate from `FlipCard`'s
- *  own flare, which is a brief, bright burst reserved for a rare-or-better
- *  pull. This one is constant and quiet: an ambient presence behind the
- *  reveal rather than a reaction to what it turns out to be. */
+/** A soft light traced along the card's own edge, win or not — separate
+ *  from the flare below, which is a brief, bright burst reserved for a
+ *  rare-or-better pull. This one is constant and quiet, and it lives inside
+ *  the same box the card sits in rather than the screen behind it, so it
+ *  rides along with every drag, flip and exit instead of staying put while
+ *  the card moves out from under it. Matches the card's own corner radius
+ *  (the 4.5%/3.22% figure `Card`'s own frame uses) so the glow reads as
+ *  coming from the card's edge, not from a rectangle loosely behind it. */
 function HeavenlyGlow() {
   return (
     <motion.div
       aria-hidden="true"
-      className="absolute pointer-events-none"
+      className="absolute inset-0 pointer-events-none"
       style={{
-        left: '50%',
-        top: '62%',
-        width: '85%',
-        height: '55%',
-        transform: 'translate(-50%, -50%)',
-        background:
-          'radial-gradient(ellipse 55% 100% at 50% 50%, rgba(255,246,222,.4) 0%, rgba(255,224,160,.16) 45%, transparent 72%)',
-        filter: 'blur(6px)',
+        borderRadius: '4.5% / 3.22%',
+        boxShadow:
+          '0 0 22px 2px rgba(255,246,222,.34), 0 16px 40px 6px rgba(255,224,160,.3)',
       }}
-      animate={{ opacity: [0.75, 1, 0.75] }}
+      animate={{ opacity: [0.7, 1, 0.7] }}
       transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
     />
   )
@@ -388,6 +385,8 @@ function FlipCard({ card, revealed }: { card: CardData; revealed: boolean }) {
 
   return (
     <div style={{ position: 'relative', transformStyle: 'preserve-3d' }}>
+      <HeavenlyGlow />
+
       <motion.div
         animate={{ rotateY: revealed ? 0 : 180 }}
         transition={{ duration: 0.62, ease: [0.22, 1, 0.36, 1] }}
