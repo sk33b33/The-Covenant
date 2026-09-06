@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { SlotOutline } from '@/art/BattleMat'
 import { PressableCard } from '@/components/card/PressableCard'
@@ -49,6 +49,17 @@ interface Props {
    */
   noPeek?: boolean
   className?: string
+  /**
+   * A card shown seated in an otherwise-empty slot — a hand card either
+   * already picked for it (setup) or presently being magnetically dragged
+   * toward it (see `previewTentative`). Ignored once the slot holds a real
+   * Figure: that always wins.
+   */
+  previewCardId?: string
+  /** A preview that's only being *offered*, not yet dropped — dimmer, and
+   *  without the picked ring, so it doesn't read as more committed than it
+   *  is. Unset (or false) once the slot has actually been chosen. */
+  previewTentative?: boolean
 }
 
 export function BoardFigure({
@@ -61,6 +72,8 @@ export function BoardFigure({
   compactStats,
   noPeek,
   className,
+  previewCardId,
+  previewTentative,
 }: Props) {
   if (!figure) {
     return (
@@ -69,6 +82,23 @@ export function BoardFigure({
         style={{ width, aspectRatio: '63 / 88' }}
       >
         <SlotOutline label={emptyLabel} />
+        <AnimatePresence>
+          {previewCardId && (
+            <motion.div
+              key={previewCardId}
+              className="absolute inset-0 rounded-[8%]"
+              style={{
+                boxShadow: previewTentative ? undefined : '0 0 0 2.5px var(--gold-bright)',
+              }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: previewTentative ? 0.65 : 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              transition={{ type: 'spring', stiffness: 480, damping: 30 }}
+            >
+              <PressableCard card={requireCard(previewCardId)} compact noHolo noPeek standalone />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     )
   }

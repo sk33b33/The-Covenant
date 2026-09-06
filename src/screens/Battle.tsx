@@ -356,21 +356,48 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // target — still counts, rather than silently snapping back to hand with no
   // explanation.
   const DROP_PAD = 14
-  const within = (el: HTMLDivElement | null, point: { x: number; y: number }) => {
+  // A much larger, separate radius that only ever gates the *magnetic ghost
+  // preview* below — never the actual drop. Wanting the card to visibly
+  // start pulling toward a slot before the finger is almost on top of it
+  // means this has to be generous; it never has to be exact, since the real
+  // drop is still judged by DROP_PAD alone.
+  const MAGNET_PAD = 46
+  const withinPad = (el: HTMLDivElement | null, point: { x: number; y: number }, pad: number) => {
     if (!el) return false
     const r = el.getBoundingClientRect()
     return (
-      point.x >= r.left - DROP_PAD &&
-      point.x <= r.right + DROP_PAD &&
-      point.y >= r.top - DROP_PAD &&
-      point.y <= r.bottom + DROP_PAD
+      point.x >= r.left - pad && point.x <= r.right + pad && point.y >= r.top - pad && point.y <= r.bottom + pad
     )
   }
+  const within = (el: HTMLDivElement | null, point: { x: number; y: number }) => withinPad(el, point, DROP_PAD)
 
   const slotAt = (point: { x: number; y: number }): HTMLDivElement | null => {
     if (within(activeSlotRef.current, point)) return activeSlotRef.current
     return benchSlotRefs.current.find((el) => within(el, point)) ?? null
   }
+
+  const magnetSlotAt = (point: { x: number; y: number }): HTMLDivElement | null => {
+    if (withinPad(activeSlotRef.current, point, MAGNET_PAD)) return activeSlotRef.current
+    return benchSlotRefs.current.find((el) => withinPad(el, point, MAGNET_PAD)) ?? null
+  }
+
+  type MagnetTarget = { kind: 'active' } | { kind: 'bench'; index: number }
+
+  /** Which named slot a drop-target element is, if any — resolved once at
+   *  drag time rather than compared by element identity at render time, so
+   *  the slots below never have to read a ref during their own render. */
+  const magnetTargetOf = (el: HTMLDivElement | null): MagnetTarget | null => {
+    if (!el) return null
+    if (el === activeSlotRef.current) return { kind: 'active' }
+    const index = benchSlotRefs.current.indexOf(el)
+    return index !== -1 ? { kind: 'bench', index } : null
+  }
+
+  // The slot a dragged hand card is currently being magnetically pulled
+  // toward, if any, and which card is on offer there — read by the Active
+  // and Bench slots below to show a live preview of the card seated in
+  // place before the finger has actually released it.
+  const [magnet, setMagnet] = useState<{ target: MagnetTarget; cardId: string } | null>(null)
 
   // The live "will this land here?" highlight is applied straight to the DOM
   // rather than through React state. A card in hand fires this on every frame
@@ -413,8 +440,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
    * `legal` rather than re-deriving eligibility here is what keeps a drag from
    * ever being able to offer a move the engine wouldn't.
    */
-  const legalHandDrop = (index: number, point: { x: number; y: number }) => {
-    const el = slotAt(point)
+  const legalDropAt = (index: number, el: HTMLDivElement | null) => {
     if (!el) return null
     const actions = actionsFor.byHand.get(index) ?? []
     const figure = figureAt(el)
@@ -424,16 +450,32 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     return action ? { el, action } : null
   }
 
+  const legalHandDrop = (index: number, point: { x: number; y: number }) => legalDropAt(index, slotAt(point))
+
   const handleHandDrag = (index: number, point: { x: number; y: number }) => {
     if (setupPhase) {
       setHighlight(slotAt(point))
+      // Any slot within magnet range is a legal target during setup — a
+      // pick always overwrites whatever it was resting on (clearPick), so
+      // there's no equivalent of an "occupied, not for you" slot to exclude.
+      const target = magnetTargetOf(magnetSlotAt(point))
+      setMagnet(target ? { target, cardId: you.hand[index]! } : null)
       return
     }
+    const magnetEl = magnetSlotAt(point)
+    const magnetDrop = magnetEl ? legalDropAt(index, magnetEl) : null
+    // Only for landing a Basic in an empty slot, not for ascending onto one
+    // that's already occupied — that Figure is already visibly right there,
+    // and a ghost card layered over it would just look like a collision
+    // rather than a preview of where this one is headed.
+    const target = magnetDrop && magnetDrop.action.type === 'PLAY_FIGURE' ? magnetTargetOf(magnetDrop.el) : null
+    setMagnet(target ? { target, cardId: you.hand[index]! } : null)
     setHighlight(legalHandDrop(index, point)?.el ?? null)
   }
 
   const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
     setHighlight(null)
+    setMagnet(null)
     if (setupPhase) {
       const el = slotAt(point)
       if (el === activeSlotRef.current) placeActive(index)
@@ -494,6 +536,27 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   }
 
   /* ------------------------------------------------------------- render */
+
+  // What each slot shows in place of its empty outline, if anything: a
+  // *committed* pick (setup's own local state, already picked for that
+  // slot) always wins over a merely *tentative* one (a card presently being
+  // magnetically pulled toward it, not yet dropped) — the latter only ever
+  // applies while nothing has actually landed there yet.
+  const activePreview =
+    setupPhase && setupActive !== null
+      ? { cardId: you.hand[setupActive]!, tentative: false }
+      : magnet?.target.kind === 'active'
+        ? { cardId: magnet.cardId, tentative: true }
+        : null
+
+  const benchPreview = (i: number) => {
+    const picked = setupPhase ? setupBench[i] : null
+    if (picked !== null && picked !== undefined) return { cardId: you.hand[picked]!, tentative: false }
+    if (magnet?.target.kind === 'bench' && magnet.target.index === i) {
+      return { cardId: magnet.cardId, tentative: true }
+    }
+    return null
+  }
 
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
@@ -585,36 +648,43 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             onClick={you.active && myTurn ? openActive : undefined}
             selected={Boolean(you.active && myTurn)}
             noPeek={Boolean(you.active && myTurn)}
+            previewCardId={activePreview?.cardId}
+            previewTentative={activePreview?.tentative}
           />
         </div>
         <div
           className="flex gap-1.5 mt-1"
           style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
         >
-          {you.bench.map((figure, i) => (
-            <div
-              key={i}
-              className="shrink-0"
-              ref={(el) => {
-                benchSlotRefs.current[i] = el
-              }}
-            >
-              <BoardFigure
-                figure={figure}
-                width={BENCH_W}
-                emptyLabel=""
-                targetable={mustPromote && figure !== null}
-                onClick={
-                  mustPromote && figure
-                    ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
-                    : figure && myTurn
-                      ? () => openBench(i)
-                      : undefined
-                }
-                noPeek={Boolean(figure && myTurn && !mustPromote)}
-              />
-            </div>
-          ))}
+          {you.bench.map((figure, i) => {
+            const preview = benchPreview(i)
+            return (
+              <div
+                key={i}
+                className="shrink-0"
+                ref={(el) => {
+                  benchSlotRefs.current[i] = el
+                }}
+              >
+                <BoardFigure
+                  figure={figure}
+                  width={BENCH_W}
+                  emptyLabel=""
+                  targetable={mustPromote && figure !== null}
+                  onClick={
+                    mustPromote && figure
+                      ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
+                      : figure && myTurn
+                        ? () => openBench(i)
+                        : undefined
+                  }
+                  noPeek={Boolean(figure && myTurn && !mustPromote)}
+                  previewCardId={preview?.cardId}
+                  previewTentative={preview?.tentative}
+                />
+              </div>
+            )
+          })}
         </div>
       </div>
 
@@ -1429,8 +1499,16 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d' }}
             initial={{ rotateY: 0 }}
-            animate={{ rotateY: heads ? 1800 : 1980 }}
-            transition={{ duration: COIN_FLIP_S, ease: [0.18, 0.9, 0.3, 1] }}
+            // The old single bezier ([0.18, 0.9, 0.3, 1]) reached ~90% of
+            // the spin within the first 30% of the duration, then crawled
+            // through the remaining rotation for the rest of it — that long,
+            // barely-moving tail is what read as "laggy", not an actual
+            // frame-rate problem. A steady, constant-speed spin for most of
+            // the duration (linear — no plateau to get stuck on) that only
+            // eases into its final quarter-turn at the very end reads as a
+            // coin actually spinning down, rather than stalling.
+            animate={{ rotateY: [0, (heads ? 1800 : 1980) - 90, heads ? 1800 : 1980] }}
+            transition={{ duration: COIN_FLIP_S, ease: ['linear', 'easeOut'], times: [0, 0.82, 1] }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div
