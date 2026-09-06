@@ -50,6 +50,11 @@ const HAND_HEIGHT = 90
  *  simply being the start of an ordinary tap or drag. */
 const HOLD_TO_FAN_MS = 130
 
+/** How far your own Active/Bench row is pulled up past its normal flex flow,
+ *  so it crosses into the mat's clash ring instead of merely approaching its
+ *  edge — see the render site for the measurement this is based on. */
+const YOU_ROW_LIFT = 80
+
 // The hand tray sits outside the flex flow (see the board container below),
 // so nothing else reserves its footprint automatically any more — anything
 // that needs to know its height, or clear it, reads this one calc.
@@ -553,14 +558,26 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           <StatsChip points={you.points} seconds={clocks.you} />
         </div>
 
-        {/* Pulled up past the flex gap that already separates every row here:
-            your own Active and Bench read as sitting further from the
-            clash ring than the opponent's mirror of them, since your stats
-            row above them is the same height as theirs but there's nothing
-            below your Bench pulling the eye back down the way the turn
-            banner does above. This closes that gap without touching the
-            opponent's side, or the spacing the turn banner itself keeps. */}
-        <div ref={activeSlotRef} className="shrink-0" style={{ marginTop: -10 }}>
+        {/* Lifted via `transform`, not margin: this whole board block is
+            centred with `justify-center` above, so a negative margin here
+            only half-worked — shrinking this row's own space in the flow
+            shortened the block, and re-centring a shorter block shifted the
+            *opponent's* rows down by the other half of the change, which is
+            exactly what this must not touch. A transform moves the paint
+            position without changing what the flex column measures, so the
+            opponent's side and the turn banner's own spacing stay exactly
+            where they were.
+
+            Measured on a 390×844 phone viewport, your Active's top edge
+            used to sit almost exactly on the clash ring's outer boundary —
+            a ~117px gap from the true halfway line versus the opponent's
+            ~73px above it — rather than crossing into the ring at all.
+            YOU_ROW_LIFT pulls it in far enough to sit inside the ring. */}
+        <div
+          ref={activeSlotRef}
+          className="shrink-0"
+          style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
+        >
           <BoardFigure
             figure={you.active}
             width={ACTIVE_W}
@@ -570,7 +587,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             noPeek={Boolean(you.active && myTurn)}
           />
         </div>
-        <div className="flex gap-1.5" style={{ marginTop: -6 }}>
+        <div
+          className="flex gap-1.5 mt-1"
+          style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
+        >
           {you.bench.map((figure, i) => (
             <div
               key={i}
@@ -917,6 +937,26 @@ function PlayerHand({
   const activePointer = useRef<number | null>(null)
   const holdTimer = useRef<ReturnType<typeof setTimeout>>()
   const lastPoint = useRef({ x: 0, y: 0 })
+  // Set the instant Framer recognises an actual drag (not just a held
+  // finger). Once a card is really being dragged, the browse gesture has to
+  // get completely out of the way: hit-testing on every move re-renders the
+  // whole hand, and that fight against Framer's own drag tracking is what
+  // made moving a card feel glitchy. Both stop the moment this flips true.
+  const draggingCard = useRef(false)
+  // Which card that is, and what its own span/rotation/focus looked like the
+  // instant its drag began. Framer adds the live drag offset on top of
+  // whatever `animate` currently targets for x/y — so resetting fanOpen and
+  // focusIndex the moment a drag starts (needed so the *other* cards spring
+  // back out of the way) was itself the bug: it changed the dragged card's
+  // own target mid-gesture, and the render jumped by the difference before
+  // the rest of the drag continued smoothly from the new baseline. Freezing
+  // this card's own numbers here and reusing them for the rest of its drag
+  // keeps its target constant throughout, so only the drag offset moves it —
+  // which is what made it read as glitchy in the first place. It settles
+  // back to its real resting fan position with a normal spring once the drag
+  // actually ends, since only then do these stop being read.
+  const draggingIndex = useRef<number | null>(null)
+  const frozenPose = useRef<{ span: number; rot: number; isFocused: boolean } | null>(null)
 
   const isDraggableIndex = (index: number) => {
     const isBasic = basicsInHand.some((b) => b.index === index)
@@ -963,6 +1003,7 @@ function PlayerHand({
   }
 
   const onHandPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (draggingCard.current) return
     if (activePointer.current !== e.pointerId) return
     lastPoint.current = { x: e.clientX, y: e.clientY }
     if (!fanOpen) return
@@ -997,12 +1038,18 @@ function PlayerHand({
         // Bench outline doesn't need to keep asking for a drag that would
         // just undo the pick.
         const glows = setupPhase && isBasic && !pickedActive && !pickedBench
-        const isFocused = focusIndex === index
         // Wider spacing and rotation while a hold is browsing the hand, so
         // there's room for the focused card to lift clear of its neighbours
         // instead of just peeking out from under them.
-        const span = fanOpen ? wideSpanStep : spanStep
-        const rot = fanOpen ? wideRotateStep : rotateStep
+        let isFocused = focusIndex === index
+        let span = fanOpen ? wideSpanStep : spanStep
+        let rot = fanOpen ? wideRotateStep : rotateStep
+        // This card is mid-drag: use the pose frozen the instant that drag
+        // began instead of the live (already-reset) browse state — see
+        // frozenPose's own comment for why.
+        if (draggingIndex.current === index && frozenPose.current) {
+          ;({ span, rot, isFocused } = frozenPose.current)
+        }
 
         return (
           <motion.button
@@ -1063,8 +1110,25 @@ function PlayerHand({
             // back at exactly the spot its offset computes, holding nothing
             // from what was just done to it.
             whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
+            onDragStart={() => {
+              // Freeze this card's own current pose first, then drop the
+              // shared browse state — so every *other* card snaps back to
+              // normal spacing immediately (nothing is fighting their
+              // drag), while this one keeps rendering the exact numbers it
+              // had the instant it grabbed, all the way to drop.
+              frozenPose.current = { span, rot, isFocused }
+              draggingIndex.current = index
+              draggingCard.current = true
+              clearTimeout(holdTimer.current)
+              activePointer.current = null
+              setFanOpen(false)
+              setFocusIndex(null)
+            }}
             onDrag={(_event, info: PanInfo) => onDragMove(index, info.point)}
             onDragEnd={(_event, info: PanInfo) => {
+              draggingCard.current = false
+              draggingIndex.current = null
+              frozenPose.current = null
               setBrushed(null)
               onDropEnd(index, info.point)
             }}
