@@ -387,6 +387,11 @@ function FlipCard({ card, revealed }: { card: CardData; revealed: boolean }) {
       <HeavenlyGlow />
 
       <motion.div
+        // No `initial`-to-`animate` flip on mount: a freshly arrived card is
+        // already face down, it hasn't been turned. Only a later change to
+        // `revealed` — an actual swipe — should animate the turn; arriving
+        // should just be the scale/fade entrance on the wrapper above.
+        initial={false}
         animate={{ rotateY: revealed ? 0 : 180 }}
         transition={{ duration: 0.62, ease: [0.22, 1, 0.36, 1] }}
         style={{ transformStyle: 'preserve-3d', position: 'relative' }}
