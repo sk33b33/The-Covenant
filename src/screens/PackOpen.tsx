@@ -292,11 +292,10 @@ function Revealing({
 
       <div className="relative flex-1 flex items-center justify-center px-8 min-h-0">
         <div className="relative w-full max-w-[290px]" style={{ perspective: '1400px' }}>
-          {/* `popLayout` lets the dismissed card fly out of flow immediately
-              rather than leaving a gap the next one has to animate into —
-              the incoming card is just already there, centred, the instant
-              the outgoing one starts leaving. */}
-          <AnimatePresence initial={false} mode="popLayout">
+          {/* `wait` holds the next card back until the dismissed one has
+              fully finished its exit — so a card never starts arriving
+              while the last one is still on its way off screen. */}
+          <AnimatePresence initial={false} mode="wait">
             <motion.div
               key={focus}
               drag="x"
