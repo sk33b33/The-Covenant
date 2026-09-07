@@ -1041,11 +1041,10 @@ function PlayerHand({
   }
 
   /** The topmost card whose box contains this point, ranked by the same
-   *  draggable-wins-ties order the fan renders with. */
+   *  plain hand-order stacking the fan renders with — see the `zIndex`
+   *  comment at the render site for why viability plays no part in it. */
   const hitTest = (x: number, y: number): number | null => {
-    const order = Array.from({ length: hand.length }, (_, i) => i).sort(
-      (a, b) => (isDraggableIndex(b) ? 1000 : 0) + b - ((isDraggableIndex(a) ? 1000 : 0) + a),
-    )
+    const order = Array.from({ length: hand.length }, (_, i) => i).sort((a, b) => b - a)
     for (const i of order) {
       const el = cardRefs.current[i]
       if (!el) continue
@@ -1139,17 +1138,14 @@ function PlayerHand({
               width: HAND_W,
               left: '50%',
               marginLeft: -HAND_W / 2,
-              // A tight fan means neighbours overlap enough that a card's own
-              // centre can sit *under* the card next to it. Ordering by hand
-              // position alone put a non-draggable neighbour on top of a
-              // basic Figure often enough that a tap meant for the Figure
-              // landed on the inert card covering it instead — nothing
-              // happened, and it looked like the drag itself had failed.
-              // Draggable cards now always win the stacking order over
-              // non-draggable ones, so the card you can actually act on is
-              // never the one buried underneath. A focused card (browsed via
-              // hold) always wins over both.
-              zIndex: isFocused ? 3000 : (draggable ? 1000 : 0) + index,
+              // A plain ribbon spread: stacking order always follows hand
+              // order, full stop. Whether a card is viable never changes it —
+              // a viable card earlier in the hand stays exactly as overlapped
+              // by its later neighbours as a non-viable one would be, rather
+              // than jumping ahead of them. Only the browsed (held-and-lifted)
+              // card is ever an exception, since it's meant to visibly clear
+              // the row while it's focused.
+              zIndex: isFocused ? 3000 : index,
               transformOrigin: 'bottom center',
             }}
             initial={{ opacity: 0, scale: 0.82 }}
