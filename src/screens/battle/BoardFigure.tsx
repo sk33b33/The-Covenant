@@ -93,7 +93,12 @@ export function BoardFigure({
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: previewTentative ? 0.65 : 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.7 }}
-              transition={{ type: 'spring', stiffness: 480, damping: 30 }}
+              // A spring while the drag is still pulling this card toward
+              // the slot (the magnetic feel), but the instant it actually
+              // commits (tentative -> false, on drop) there is nothing left
+              // to animate: it should already be sitting there, full and
+              // ringed, with no lingering pop or fade behind it.
+              transition={previewTentative ? { type: 'spring', stiffness: 480, damping: 30 } : { duration: 0 }}
             >
               <PressableCard card={requireCard(previewCardId)} compact noHolo noPeek standalone />
             </motion.div>

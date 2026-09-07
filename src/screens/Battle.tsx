@@ -55,6 +55,12 @@ const HOLD_TO_FAN_MS = 130
  *  edge — see the render site for the measurement this is based on. */
 const YOU_ROW_LIFT = 80
 
+/** A small nudge of the opponent's Active/Bench row toward the halfway
+ *  line, the mirror of YOU_ROW_LIFT but far more modest — their side
+ *  already sat close to the ring, so this only needs to close the last bit
+ *  of the gap rather than cross into it. */
+const FOE_ROW_LIFT = 20
+
 // The hand tray sits outside the flex flow (see the board container below),
 // so nothing else reserves its footprint automatically any more — anything
 // that needs to know its height, or clear it, reads this one calc.
@@ -592,12 +598,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       >
         <OpponentHand count={foe.hand.length} />
 
-        <div className="flex gap-1.5">
+        {/* Nudged down via `transform`, same reasoning as YOU_ROW_LIFT below:
+            a margin here would shrink this row's own share of the centred
+            flex column and silently re-centre the whole block, pulling
+            *your* side up to compensate. A transform moves the paint
+            position only. */}
+        <div className="flex gap-1.5" style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
           {foe.bench.map((figure, i) => (
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
           ))}
         </div>
-        <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+        <div style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
+          <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+        </div>
 
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
@@ -1099,7 +1112,6 @@ function PlayerHand({
       onPointerUp={endHold}
       onPointerCancel={endHold}
     >
-      <AnimatePresence initial={false}>
       {hand.map((cardId, index) => {
         const pickedActive = setupActive === index
         const pickedBench = setupBench.includes(index)
@@ -1148,15 +1160,7 @@ function PlayerHand({
               zIndex: isFocused ? 3000 : index,
               transformOrigin: 'bottom center',
             }}
-            initial={{ opacity: 0, scale: 0.82 }}
-            // A picked card leaving `hand` (see the early `return null`
-            // above) fades and shrinks away in place rather than sliding
-            // anywhere — the ghost preview already seated in its slot (see
-            // BoardFigure's own `previewCardId`) is what carries the sense
-            // of where it went.
-            exit={{ opacity: 0, scale: 0.82, transition: { duration: 0.18 } }}
             animate={{
-              opacity: 1,
               // The fan itself never moves — only `y` and `scale` change for
               // whichever card is focused, so there's nothing else to
               // resettle when the finger moves on to a neighbour, and the
@@ -1216,16 +1220,15 @@ function PlayerHand({
             whileTap={setupPhase || simulating ? undefined : { scale: 0.95 }}
             disabled={(setupPhase && !isBasic) || simulating}
           >
-            <div
-              className={cx('rounded-[8%]', glows && 'cov-hand-glow')}
-              style={{ opacity: setupPhase && !isBasic ? 0.4 : 1 }}
-            >
+            {/* Every card in hand stays fully visible — the glow above is
+                the only thing that marks a card viable, not how much of the
+                rest of the hand fades out around it. */}
+            <div className={cx('rounded-[8%]', glows && 'cov-hand-glow')}>
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
           </motion.button>
         )
       })}
-      </AnimatePresence>
     </div>
   )
 }
@@ -1493,16 +1496,14 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d' }}
             initial={{ rotateY: 0 }}
-            // The old single bezier ([0.18, 0.9, 0.3, 1]) reached ~90% of
-            // the spin within the first 30% of the duration, then crawled
-            // through the remaining rotation for the rest of it — that long,
-            // barely-moving tail is what read as "laggy", not an actual
-            // frame-rate problem. A steady, constant-speed spin for most of
-            // the duration (linear — no plateau to get stuck on) that only
-            // eases into its final quarter-turn at the very end reads as a
-            // coin actually spinning down, rather than stalling.
-            animate={{ rotateY: [0, (heads ? 1800 : 1980) - 90, heads ? 1800 : 1980] }}
-            transition={{ duration: COIN_FLIP_S, ease: ['linear', 'easeOut'], times: [0, 0.82, 1] }}
+            // A single continuous deceleration across the whole spin — fast
+            // at the tap, steadily slowing, coming to rest right at the end
+            // — rather than two segments stitched together (a constant pace
+            // that only eases off in its last fraction reads as a coin that
+            // suddenly decides to stop, not one that was spinning down the
+            // whole time).
+            animate={{ rotateY: heads ? 1800 : 1980 }}
+            transition={{ duration: COIN_FLIP_S, ease: 'easeOut' }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div
