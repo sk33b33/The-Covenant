@@ -4,7 +4,6 @@ import { createRng, type Rng } from '@/game/rng'
 import { WEAKNESS, isFigure, pointsFor } from '@/game/types'
 import { runEffect, type EffectContext } from './effects'
 import {
-  addToHand,
   applyStatus,
   benchCount,
   canPayCost,
@@ -195,17 +194,20 @@ export function damageFigure(
 }
 
 /** Draws one card, or loses the match if the deck is empty. A hand already
- *  at RULES.MAX_HAND sends the drawn card straight to discard instead. */
+ *  at RULES.MAX_HAND simply doesn't draw — the card stays in the deck rather
+ *  than being drawn only to be discarded straight back out. */
 function draw(state: MatchState, playerId: PlayerId, count = 1) {
   const player = state.players[playerId]
 
   for (let i = 0; i < count; i++) {
+    if (player.hand.length >= RULES.MAX_HAND) return
+
     const card = player.deck.shift()
     if (card === undefined) {
       endMatch(state, OPPONENT[playerId], 'deckout')
       return
     }
-    addToHand(player, card)
+    player.hand.push(card)
   }
 }
 

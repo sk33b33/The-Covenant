@@ -194,7 +194,7 @@ describe('energy', () => {
 /* ------------------------------------------------------------- hand limit */
 
 describe('the hand limit', () => {
-  it('sends a drawn card to discard once the hand is already at the cap', () => {
+  it('skips the turn draw once the hand is already at the cap, leaving the card in the deck', () => {
     let state = started({ forceFirst: 'foe' })
     // What matters here is the count, not which cards fill it.
     state = {
@@ -205,11 +205,13 @@ describe('the hand limit', () => {
       },
     }
     const discardBefore = state.players.you.discard.length
+    const deckBefore = state.players.you.deck.length
 
-    state = reduce(state, { type: 'END_TURN' }) // foe ends; you begin and draw
+    state = reduce(state, { type: 'END_TURN' }) // foe ends; you begin, but can't draw
 
     expect(state.players.you.hand).toHaveLength(RULES.MAX_HAND)
-    expect(state.players.you.discard).toHaveLength(discardBefore + 1)
+    expect(state.players.you.discard).toHaveLength(discardBefore)
+    expect(state.players.you.deck).toHaveLength(deckBefore)
   })
 })
 
