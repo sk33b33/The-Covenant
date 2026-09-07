@@ -729,29 +729,43 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
       {/* ------------------------------------------------------------ hand */}
       <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-safe pb-2">
-        <div className="flex items-end gap-1">
-          <PlayerHand
-            hand={you.hand}
-            setupActive={setupActive}
-            setupBench={setupBench}
-            basicsInHand={basicsInHand}
-            setupPhase={setupPhase}
-            myTurn={myTurn}
-            simulating={simulating}
-            playable={actionsFor.byHand}
-            onTap={(index) => {
-              // Setup places cards by drag only now — a tap during setup used
-              // to auto-assign the next open slot, but that made the drag
-              // gesture redundant instead of authoritative. Outside setup, a
-              // tap still opens the card's own sheet of plays.
-              if (!setupPhase) openHandCard(index)
-            }}
-            onDropEnd={handleHandDragEnd}
-            onDragMove={handleHandDrag}
-          />
+        <div className="relative">
+          {/* The hand gets the tray's *full* width to itself now, rather than
+              sharing a flex row with the Altar column: `PlayerHand` centres
+              its fan with `left: 50%` on whatever box it's given, and a
+              flex-1 box squeezed narrower by the Altar's own width centred
+              the fan on that smaller box instead of the true screen — a
+              constant, structural left-of-centre offset, worse the wider the
+              Altar's column got. Positioning it as its own absolute layer
+              spanning the tray means that 50% is always 50% of the screen. */}
+          <div className="absolute inset-x-0 bottom-0">
+            <PlayerHand
+              hand={you.hand}
+              setupActive={setupActive}
+              setupBench={setupBench}
+              basicsInHand={basicsInHand}
+              setupPhase={setupPhase}
+              myTurn={myTurn}
+              simulating={simulating}
+              playable={actionsFor.byHand}
+              onTap={(index) => {
+                // Setup places cards by drag only now — a tap during setup used
+                // to auto-assign the next open slot, but that made the drag
+                // gesture redundant instead of authoritative. Outside setup, a
+                // tap still opens the card's own sheet of plays.
+                if (!setupPhase) openHandCard(index)
+              }}
+              onDropEnd={handleHandDragEnd}
+              onDragMove={handleHandDrag}
+            />
+          </div>
 
-          {/* Altar, with the small popup action trigger stacked above it. */}
-          <div className="relative flex flex-col items-center gap-1.5 shrink-0">
+          {/* Altar, with the small popup action trigger stacked above it —
+              its own layer now, pinned to the tray's right edge instead of
+              sharing the hand's row (see above). Sits above the hand fan in
+              paint order, which only matters for a hand large enough to
+              spread near the tray's edges. */}
+          <div className="absolute right-0 bottom-0 flex flex-col items-center gap-1.5 shrink-0">
             <AnimatePresence>
               {actionOpen && (actionLabel || canSimulate) && (
                 <motion.div
@@ -1009,7 +1023,20 @@ function PlayerHand({
   onDropEnd: (index: number, point: { x: number; y: number }) => void
   onDragMove: (index: number, point: { x: number; y: number }) => void
 }) {
-  const count = hand.length
+  // Which hand indices are actually rendered right now — a card picked for
+  // a slot during setup is hidden (the early `return null` below), and the
+  // fan has to be built from *this* list rather than from raw hand indices.
+  // Spacing every card by its own index minus the raw array's own midpoint
+  // left a hole exactly where a picked card used to sit: picking anything
+  // but the dead-centre card split the remaining cards unevenly between the
+  // two sides of that hole, and the whole fan read as tipped lopsided
+  // rather than centred and one card shorter. Ranking within the visible
+  // list instead means the fan always closes back up around its own true
+  // centre, for any hand size and whichever card was just picked.
+  const visibleIndices = hand
+    .map((_, i) => i)
+    .filter((i) => !(setupPhase && (setupActive === i || setupBench.includes(i))))
+  const count = visibleIndices.length
   const mid = (count - 1) / 2
   // Divided by count rather than count-1, and with no flat ceiling for the
   // hand sizes this game actually deals: the old cap saturated at max spread
@@ -1166,7 +1193,10 @@ function PlayerHand({
         if (setupPhase && (pickedActive || pickedBench)) return null
         const isBasic = basicsInHand.some((b) => b.index === index)
         const draggable = isDraggableIndex(index)
-        const offset = index - mid
+        // Rank among the visible cards, not the raw hand index — see the
+        // comment on `visibleIndices` above.
+        const rank = visibleIndices.indexOf(index)
+        const offset = rank - mid
         // The glow (coloured by which of the three this is) is the *only*
         // thing that marks a card viable; there is deliberately no height
         // or position change to go with it — see the fan's `y`/`x` below,
