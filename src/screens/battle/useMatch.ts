@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RULES } from '@/game/config'
 import { createRng, randomSeed } from '@/game/rng'
-import { DIFFICULTY, aiSetup, playAiTurn, type AiConfig } from '@/engine/ai'
+import { DIFFICULTY, aiSetup, chooseAction, type AiConfig } from '@/engine/ai'
 import { legalActions, setupOptions } from '@/engine/legal'
 import { IllegalAction, reduce } from '@/engine/reducer'
 import { createMatch } from '@/engine/state'
@@ -124,6 +124,17 @@ export function useMatch(config: MatchConfig) {
   // second copy of it for 'you': the pacing (the same thinking pause, the
   // same re-check of who's still owed the move before acting on stale
   // state) has no reason to differ between them.
+  //
+  // One action per pause, not the whole turn at once: attaching energy,
+  // playing a card and attacking used to all land in a single state update
+  // after one "thinking" pause, so a turn with more than one action in it
+  // jumped straight to its end result with nothing to actually watch happen
+  // in between — the same information a battle log would have narrated, just
+  // never shown anywhere. Committing one action here lets this same effect's
+  // own re-run (triggered by the state it just produced) discover the turn
+  // isn't over yet and pace out the next action the same way, so every
+  // intermediate step the AI takes plays out on the board exactly like the
+  // player's own turn does, action by action.
   useEffect(() => {
     if (!coinSettled || state.phase === 'ended' || state.phase === 'setup') return
 
@@ -143,7 +154,16 @@ export function useMatch(config: MatchConfig) {
         // pause elapsed, and acting on stale state would desync the board.
         const stillToMove = s.phase === 'promote' ? s.promoting : s.phase === 'main' ? s.current : null
         const stillAi = stillToMove === 'foe' || (simulating && stillToMove === 'you')
-        return stillAi && stillToMove ? playAiTurn(s, stillToMove, difficulty) : s
+        if (!stillAi || !stillToMove) return s
+
+        // A fresh Rng every step rather than one carried across the whole
+        // turn — seeded off `log.length` as well as `rngState` so consecutive
+        // steps within the same turn still draw independent "mistake" rolls,
+        // since `rngState` itself only moves when a game action consumes
+        // real randomness (a coin flip, a Blinded miss), not on every action.
+        const rng = createRng(s.rngState ^ 0x9e3779b9 ^ (s.log.length * 0x1000193))
+        const action = chooseAction(s, stillToMove, difficulty, rng)
+        return action ? reduce(s, action) : s
       })
       setAiThinking(false)
     }, AI_THINKING_MS)

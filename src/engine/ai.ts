@@ -158,7 +158,13 @@ function score(state: MatchState, me: PlayerId, action: Action): number {
 
 /* -------------------------------------------------------------------- play */
 
-function chooseAction(state: MatchState, me: PlayerId, config: AiConfig, rng: Rng): Action | null {
+/**
+ * Picks one action for `me` to take right now. Exported (rather than kept
+ * private to `playAiTurn` below) so a UI can drive the AI one action at a
+ * time — pausing, committing, re-checking whether the turn continues —
+ * instead of only ever seeing a whole turn's actions land at once.
+ */
+export function chooseAction(state: MatchState, me: PlayerId, config: AiConfig, rng: Rng): Action | null {
   const options = legalActions(state)
   if (options.length === 0) return null
 
@@ -196,7 +202,11 @@ export function aiSetup(state: MatchState, me: PlayerId, rng: Rng): Action {
 }
 
 /**
- * Plays the AI's entire turn.
+ * Plays the AI's entire turn in one call — for tests and anything else that
+ * wants a finished turn without watching it happen. The battle screen uses
+ * `chooseAction` directly instead, one call per paced step, so a human has
+ * something to actually see between the opponent's opening move and the
+ * turn's end.
  *
  * Bounded: an effect that hands the AI another action every time it acts would
  * otherwise loop forever. Hitting the cap ends the turn, which is always legal.
