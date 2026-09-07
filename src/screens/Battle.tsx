@@ -1113,11 +1113,13 @@ function PlayerHand({
         const isBasic = basicsInHand.some((b) => b.index === index)
         const draggable = isDraggableIndex(index)
         const offset = index - mid
-        // Only an unspent Basic during setup — the moment it's picked it has
-        // already been found, and a card already resting in the Active or
-        // Bench outline doesn't need to keep asking for a drag that would
-        // just undo the pick.
-        const glows = setupPhase && isBasic
+        // `draggable` already means exactly this: a Basic to place during
+        // setup, or — mid-match — a card that can go into a Bench slot or
+        // ascend the Figure standing there. The glow is the *only* thing
+        // that marks a card viable; there is deliberately no height or
+        // position change to go with it; see the fan's `y`/`x` below, which
+        // never reads `draggable` at all.
+        const glows = draggable
         let isFocused = focusIndex === index
         // This card is mid-drag: use the focus state frozen the instant
         // that drag began instead of the live (already-cleared) browse
@@ -1220,14 +1222,7 @@ function PlayerHand({
           >
             <div
               className={cx('rounded-[8%]', glows && 'cov-hand-glow')}
-              style={{
-                opacity: setupPhase && !isBasic ? 0.4 : 1,
-                // A picked card never reaches this render (see the early
-                // return above), so there is no "picked" ring to draw here
-                // any more — the only ring a hand card still shows is the
-                // ordinary "this is playable" one.
-                boxShadow: playable.has(index) && myTurn ? '0 0 0 1.5px rgba(229,192,140,.4)' : undefined,
-              }}
+              style={{ opacity: setupPhase && !isBasic ? 0.4 : 1 }}
             >
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
