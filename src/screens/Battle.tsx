@@ -50,6 +50,32 @@ const HAND_HEIGHT = 90
  *  simply being the start of an ordinary tap or drag. */
 const HOLD_TO_FAN_MS = 130
 
+/** The four custom properties `.cov-hand-glow`'s pulse (global.css) reads,
+ *  one set per way a card can be viable — set inline per card rather than
+ *  through a modifier class, since sibling class rules placed after
+ *  `.cov-hand-glow` in that file were, for reasons never pinned down,
+ *  silently dropped from the stylesheet the browser actually loaded. */
+const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> = {
+  use: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(229,192,140,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(229,192,140,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: 'var(--gold-bright)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(229,192,140,.75)',
+  } as React.CSSProperties,
+  ascend: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(240,240,245,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(240,240,245,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: '#ffffff',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(255,255,255,.75)',
+  } as React.CSSProperties,
+  ability: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(214,68,58,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(214,68,58,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: 'rgb(232,84,72)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(214,68,58,.75)',
+  } as React.CSSProperties,
+}
+
 /** How far your own Active/Bench row is pulled up past its normal flex flow,
  *  so it crosses into the mat's clash ring instead of merely approaching its
  *  edge — see the render site for the measurement this is based on. */
@@ -1053,6 +1079,23 @@ function PlayerHand({
     )
   }
 
+  /** Which of the three things make a card glow, if any — each reads as a
+   *  different colour (see VIABILITY_GLOW below): gold for something
+   *  placeable, white for an ascension, red for a Covenant or Relic's own
+   *  ability. Unlike `isDraggableIndex`, this also covers those last two —
+   *  they're played through the tap sheet, not a drag, but are every bit as
+   *  "viable right now" as the cards that are. */
+  const viabilityOf = (index: number): 'use' | 'ascend' | 'ability' | null => {
+    if (simulating) return null
+    if (setupPhase) return basicsInHand.some((b) => b.index === index) ? 'use' : null
+    if (!myTurn) return null
+    const actions = playable.get(index) ?? []
+    if (actions.some((a) => a.type === 'PLAY_FIGURE')) return 'use'
+    if (actions.some((a) => a.type === 'ASCEND')) return 'ascend'
+    if (actions.some((a) => a.type === 'PLAY_COVENANT' || a.type === 'PLAY_RELIC')) return 'ability'
+    return null
+  }
+
   /** The topmost card whose box contains this point, ranked by the same
    *  plain hand-order stacking the fan renders with — see the `zIndex`
    *  comment at the render site for why viability plays no part in it. */
@@ -1124,13 +1167,11 @@ function PlayerHand({
         const isBasic = basicsInHand.some((b) => b.index === index)
         const draggable = isDraggableIndex(index)
         const offset = index - mid
-        // `draggable` already means exactly this: a Basic to place during
-        // setup, or — mid-match — a card that can go into a Bench slot or
-        // ascend the Figure standing there. The glow is the *only* thing
-        // that marks a card viable; there is deliberately no height or
-        // position change to go with it; see the fan's `y`/`x` below, which
-        // never reads `draggable` at all.
-        const glows = draggable
+        // The glow (coloured by which of the three this is) is the *only*
+        // thing that marks a card viable; there is deliberately no height
+        // or position change to go with it — see the fan's `y`/`x` below,
+        // which never reads viability at all.
+        const viability = viabilityOf(index)
         let isFocused = focusIndex === index
         // This card is mid-drag: use the focus state frozen the instant
         // that drag began instead of the live (already-cleared) browse
@@ -1223,7 +1264,10 @@ function PlayerHand({
             {/* Every card in hand stays fully visible — the glow above is
                 the only thing that marks a card viable, not how much of the
                 rest of the hand fades out around it. */}
-            <div className={cx('rounded-[8%]', glows && 'cov-hand-glow')}>
+            <div
+              className={cx('rounded-[8%]', viability && 'cov-hand-glow')}
+              style={viability ? VIABILITY_GLOW[viability] : undefined}
+            >
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
           </motion.button>
@@ -1491,10 +1535,20 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
       exit={{ opacity: 0 }}
     >
       <div className="flex flex-col items-center gap-6">
-        <div style={{ width: 108, height: 108, perspective: 600 }}>
+        {/* The circular clip lives here, on the static wrapper, rather than
+            on the two rotating faces below. A border-radius clip on an
+            element that's also being 3D-transformed forces a lot of mobile
+            browsers to give up on pure GPU compositing and re-rasterise the
+            clip every frame — exactly what read as "laggy" on a handheld,
+            even with the spin's timing already right. Clipping the
+            non-rotating viewport onto it instead costs nothing per frame:
+            the coin behind it can stay a plain, uninterrupted transform. */}
+        <div
+          style={{ width: 108, height: 108, perspective: 600, borderRadius: '50%', overflow: 'hidden' }}
+        >
           <motion.div
             className="relative w-full h-full"
-            style={{ transformStyle: 'preserve-3d' }}
+            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
             initial={{ rotateY: 0 }}
             // A single continuous deceleration across the whole spin — fast
             // at the tap, steadily slowing, coming to rest right at the end
@@ -1506,16 +1560,13 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             transition={{ duration: COIN_FLIP_S, ease: 'easeOut' }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
-            <div
-              className="absolute inset-0 rounded-pill overflow-hidden"
-              style={{ backfaceVisibility: 'hidden' }}
-            >
+            <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
               <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
             </div>
             {/* Tails: the book, pre-rotated so it faces the viewer once the
                 parent has turned the rest of the way around. */}
             <div
-              className="absolute inset-0 rounded-pill overflow-hidden"
+              className="absolute inset-0"
               style={{
                 backfaceVisibility: 'hidden',
                 transform: 'rotateY(180deg)',

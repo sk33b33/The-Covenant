@@ -421,20 +421,28 @@
     animation: cov-pulse-glow 2.4s ease-in-out infinite;
   }
 
-  /* Marks a Basic in hand as viable to place the moment setup begins — a
-   * pulsing ring rather than the pile's radial pulse, since it has to trace
-   * a card's rounded-rectangle edge instead of sitting inside a circle. */
+  /* Marks a hand card as viable the moment it can be acted on — a pulsing
+   * ring rather than the pile's radial pulse, since it has to trace a
+   * card's rounded-rectangle edge instead of sitting inside a circle. The
+   * colour itself comes from four custom properties set inline per card
+   * (see Battle.tsx's VIABILITY_GLOW) rather than from a modifier class
+   * here — new sibling rules placed after this one in this file were, for
+   * reasons never pinned down, silently absent from the stylesheet the
+   * browser actually loaded (reproducible even for a trivial, unrelated
+   * rule, across full dev-server restarts with the cache cleared). Setting
+   * the same four properties inline sidesteps whatever that was, and costs
+   * nothing extra: the properties are already designed to be per-element. */
   @keyframes cov-hand-pulse {
     0%,
     100% {
       box-shadow:
-        0 0 0 1.5px rgba(229, 192, 140, 0.55),
-        0 0 6px rgba(229, 192, 140, 0.3);
+        0 0 0 1.5px var(--cov-hand-glow-dim-ring),
+        0 0 6px var(--cov-hand-glow-dim-blur);
     }
     50% {
       box-shadow:
-        0 0 0 2px var(--gold-bright),
-        0 0 16px rgba(229, 192, 140, 0.75);
+        0 0 0 2px var(--cov-hand-glow-bright-ring),
+        0 0 16px var(--cov-hand-glow-bright-blur);
     }
   }
 
