@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
+import { AnimatePresence, motion, useAnimation, type PanInfo } from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
@@ -15,6 +15,7 @@ import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
+import { AttackFx, IMPACT_SHAKE, travelSeconds, type AttackFxTrigger } from './battle/AttackFx'
 import { BoardFigure } from './battle/BoardFigure'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
@@ -146,6 +147,58 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const timer = setTimeout(clearError, 2600)
     return () => clearTimeout(timer)
   }, [error, clearError])
+
+  /* --------------------------------------------------------- attack effect */
+
+  // The lunge (attacker) and hit-shake (defender) live on the real board
+  // pieces, imperative controls rather than a declarative `animate` prop —
+  // two attacks in a row can otherwise land on an *identical* target (same
+  // Figure, same shake), which framer treats as nothing having changed and
+  // never replays. Each side only ever plays one of the two roles at a time,
+  // so one controls object per side covers both.
+  const youFigureFx = useAnimation()
+  const foeFigureFx = useAnimation()
+  const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
+
+  useEffect(() => {
+    const ev = state.lastAttack
+    if (!ev) return
+
+    const fromEl = ev.by === 'you' ? activeSlotRef.current : foeActiveSlotRef.current
+    const toEl = ev.by === 'you' ? foeActiveSlotRef.current : activeSlotRef.current
+    // Missing either slot means there's nothing on screen yet to animate
+    // between — a rare timing edge (e.g. the very first paint) rather than
+    // something worth a fallback for.
+    if (!fromEl || !toEl) return
+
+    const attacker = ev.by === 'you' ? youFigureFx : foeFigureFx
+    const defender = ev.by === 'you' ? foeFigureFx : youFigureFx
+    // You sit below the clash ring and lunge up toward it; the opponent
+    // lunges down toward you — both lunge *toward the middle*, not toward a
+    // fixed compass direction.
+    const lungeDir = ev.by === 'you' ? -1 : 1
+
+    attacker.start({
+      y: [0, lungeDir * 14, 0],
+      transition: { duration: 0.4, times: [0, 0.4, 1], ease: 'easeOut' },
+    })
+
+    if (!ev.missed) {
+      setTimeout(() => {
+        const shake = IMPACT_SHAKE[ev.type]
+        defender.start({
+          x: [0, -shake.amount, shake.amount, -shake.amount * 0.6, 0],
+          transition: { duration: shake.seconds, ease: 'easeOut' },
+        })
+      }, travelSeconds(ev.type) * 1000)
+    }
+
+    setAttackFx({ event: ev, fromRect: fromEl.getBoundingClientRect(), toRect: toEl.getBoundingClientRect() })
+    // Re-fires only when a genuinely new attack lands — `id` only ever
+    // increases, so this can't retrigger off an unrelated state update that
+    // happens to carry the same `lastAttack` forward.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lastAttack?.id])
 
   // The SETUP action removes the placed cards from hand, which shifts every
   // later card's index down — so a picked-card's hand index left sitting in
@@ -382,6 +435,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // cached, since the mat reflows with the viewport and with orientation.
   const activeSlotRef = useRef<HTMLDivElement>(null)
   const benchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Read only for its screen position when an attack fires — see the effect
+  // below. Nothing else on this side needs to find its own Active slot the
+  // way setup's drag-and-drop needs yours (hence no foe equivalent of the
+  // padded/hit-test helpers just below).
+  const foeActiveSlotRef = useRef<HTMLDivElement>(null)
 
   // A drop target padded a few px beyond its own box, so a drop that lands
   // just outside a slot's visible edge — an easy miss on a small touchscreen
@@ -634,8 +692,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
           ))}
         </div>
-        <div style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
-          <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+        <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
+          <motion.div animate={foeFigureFx}>
+            <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+          </motion.div>
         </div>
 
         <div className="w-full flex items-center justify-between gap-2 px-0.5">
@@ -680,16 +740,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           className="shrink-0"
           style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
         >
-          <BoardFigure
-            figure={you.active}
-            width={ACTIVE_W}
-            emptyLabel="Active"
-            onClick={you.active && myTurn ? openActive : undefined}
-            selected={Boolean(you.active && myTurn)}
-            noPeek={Boolean(you.active && myTurn)}
-            previewCardId={activePreview?.cardId}
-            previewTentative={activePreview?.tentative}
-          />
+          <motion.div animate={youFigureFx}>
+            <BoardFigure
+              figure={you.active}
+              width={ACTIVE_W}
+              emptyLabel="Active"
+              onClick={you.active && myTurn ? openActive : undefined}
+              selected={Boolean(you.active && myTurn)}
+              noPeek={Boolean(you.active && myTurn)}
+              previewCardId={activePreview?.cardId}
+              previewTentative={activePreview?.tentative}
+            />
+          </motion.div>
         </div>
         <div
           className="flex gap-1.5 mt-1"
@@ -885,6 +947,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       <AnimatePresence>
         {!coinSettled && <CoinFlip first={state.first} onDone={settleCoin} />}
       </AnimatePresence>
+
+      <AttackFx trigger={attackFx} onDone={() => setAttackFx(null)} />
 
       <AnimatePresence>
         {error && (

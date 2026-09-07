@@ -135,6 +135,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     players,
     winner: null,
     endReason: null,
+    lastAttack: null,
     log: [
       {
         turn: 0,

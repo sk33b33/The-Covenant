@@ -552,6 +552,15 @@ export function reduce(input: MatchState, action: Action): MatchState {
         const hit = withRng(state, (rng) => rng.chance(0.5))
         if (!hit) {
           log(state, me, 'Blinded — the attack misses.')
+          state.lastAttack = {
+            id: state.log.length,
+            by: me,
+            attackerCardId: attacker.cardId,
+            type: card.type,
+            damage: 0,
+            weakness: false,
+            missed: true,
+          }
           endTurn(state)
           return state
         }
@@ -559,6 +568,7 @@ export function reduce(input: MatchState, action: Action): MatchState {
 
       const defender = foe.active
       let dealt = 0
+      let weakness = false
 
       if (defender && attack.damage > 0) {
         dealt = attack.damage + attacker.attackBonus
@@ -567,6 +577,7 @@ export function reduce(input: MatchState, action: Action): MatchState {
         const defenderCard = figureCard(defender)
         if (WEAKNESS[defenderCard.type] === card.type && !hasStatus(defender, 'unweak')) {
           dealt += RULES.WEAKNESS_BONUS
+          weakness = true
           log(state, me, 'It strikes a weakness.')
         }
       }
@@ -581,11 +592,26 @@ export function reduce(input: MatchState, action: Action): MatchState {
       if (isEnded(state)) return state
 
       const finalDamage = context?.damageOverride ?? dealt
+      // Captured before the hit lands so the event can report what actually
+      // got through — a shield, Guarded or armor can all shrink this well
+      // below `finalDamage`, and a shield stops it outright.
+      const damageBefore = defender?.damage ?? 0
 
       if (defender && finalDamage > 0 && foe.active) {
         damageFigure(state, OPPONENT[me], foe.active, finalDamage, {
           pierce: attack.effect === 'pierce',
         })
+      }
+
+      state.lastAttack = {
+        id: state.log.length,
+        by: me,
+        attackerCardId: attacker.cardId,
+        targetCardId: defender?.cardId,
+        type: card.type,
+        damage: defender ? defender.damage - damageBefore : 0,
+        weakness,
+        missed: false,
       }
 
       if (isEnded(state)) return state
