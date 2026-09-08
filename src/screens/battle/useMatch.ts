@@ -27,8 +27,16 @@ export interface MatchConfig {
   forceFirst?: 'you' | 'foe'
 }
 
-/** How long the opponent appears to think, in ms. */
-const AI_THINKING_MS = 850
+/**
+ * How long the opponent appears to think before each single action, in ms.
+ *
+ * This is per *action*, not per turn (see the stepping effect below), so a
+ * three-action turn takes three of these. Deliberately unhurried: the whole
+ * point of pacing the AI out action by action is that a human can follow
+ * what it did, and at under a second per beat the energy attaching, the card
+ * landing and the attack all blur into one another again.
+ */
+const AI_THINKING_MS = 1400
 
 export function useMatch(config: MatchConfig) {
   const [state, setState] = useState<MatchState>(() =>

@@ -17,6 +17,7 @@ import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
 import { AttackFx, impactDelaySeconds, shakeFor, type AttackFxTrigger } from './battle/AttackFx'
 import { BoardFigure } from './battle/BoardFigure'
+import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
 import type { FigureInPlay, MatchState } from '@/engine/types'
@@ -147,6 +148,21 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const timer = setTimeout(clearError, 2600)
     return () => clearTimeout(timer)
   }, [error, clearError])
+
+  /* ------------------------------------------------------- turn hand-off */
+
+  // Announced once per hand-off, keyed by turn *and* side so a promotion
+  // dropping back into 'main' on the same turn can't re-announce it. Skipped
+  // while simulating: with both sides on the AI, "Your turn" would be a lie.
+  const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
+  const announced = useRef<string | null>(null)
+  useEffect(() => {
+    if (!coinSettled || simulating || state.phase !== 'main') return
+    const key = `${state.turn}:${state.current}`
+    if (announced.current === key) return
+    announced.current = key
+    setTurnCue({ key, mine: state.current === 'you' })
+  }, [coinSettled, simulating, state.phase, state.turn, state.current])
 
   /* --------------------------------------------------------- attack effect */
 
@@ -960,6 +976,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       </AnimatePresence>
 
       <AttackFx trigger={attackFx} onDone={() => setAttackFx(null)} />
+
+      <AnimatePresence>
+        {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}
+      </AnimatePresence>
 
       <AnimatePresence>
         {error && (
