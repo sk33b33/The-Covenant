@@ -559,6 +559,7 @@ export function reduce(input: MatchState, action: Action): MatchState {
             type: card.type,
             damage: 0,
             weakness: false,
+            knockedOut: false,
             missed: true,
           }
           endTurn(state)
@@ -611,6 +612,10 @@ export function reduce(input: MatchState, action: Action): MatchState {
         type: card.type,
         damage: defender ? defender.damage - damageBefore : 0,
         weakness,
+        // `defender` is the reference captured before the hit, so its own
+        // `.damage` still reads correctly even once knocked out and moved to
+        // discard — `isKnockedOut` already accounts for Enduring saving it.
+        knockedOut: defender ? isKnockedOut(defender) : false,
         missed: false,
       }
 

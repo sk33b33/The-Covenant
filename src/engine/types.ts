@@ -132,6 +132,8 @@ export interface AttackEvent {
   /** Damage actually applied, after shields, guard and armor. */
   damage: number
   weakness: boolean
+  /** Whether this hit is what took the target down. */
+  knockedOut: boolean
   /** A Blinded Figure's coin-flip miss — nothing else in `AttackEvent` is
    *  meaningful when this is set. */
   missed: boolean

@@ -15,7 +15,7 @@ import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
-import { AttackFx, IMPACT_SHAKE, travelSeconds, type AttackFxTrigger } from './battle/AttackFx'
+import { AttackFx, impactDelaySeconds, shakeFor, type AttackFxTrigger } from './battle/AttackFx'
 import { BoardFigure } from './battle/BoardFigure'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
@@ -178,19 +178,30 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // fixed compass direction.
     const lungeDir = ev.by === 'you' ? -1 : 1
 
+    // A bigger recoil than a routine card game needs, deliberately — this
+    // effect is meant to read as amplified, not restrained.
     attacker.start({
-      y: [0, lungeDir * 14, 0],
-      transition: { duration: 0.4, times: [0, 0.4, 1], ease: 'easeOut' },
+      y: [0, lungeDir * 20, 0],
+      transition: { duration: 0.42, times: [0, 0.4, 1], ease: 'easeOut' },
     })
 
     if (!ev.missed) {
       setTimeout(() => {
-        const shake = IMPACT_SHAKE[ev.type]
+        const shake = shakeFor(ev)
         defender.start({
           x: [0, -shake.amount, shake.amount, -shake.amount * 0.6, 0],
           transition: { duration: shake.seconds, ease: 'easeOut' },
         })
-      }, travelSeconds(ev.type) * 1000)
+        // A knockout gets a little extra than just a harder shake: a beat of
+        // recoil-scale on the card itself, so the "finishing blow" reads as
+        // heavier than the shake alone would carry.
+        if (ev.knockedOut) {
+          defender.start({
+            scale: [1, 0.92, 1],
+            transition: { duration: 0.3, ease: 'easeOut' },
+          })
+        }
+      }, impactDelaySeconds(ev) * 1000)
     }
 
     setAttackFx({ event: ev, fromRect: fromEl.getBoundingClientRect(), toRect: toEl.getBoundingClientRect() })
