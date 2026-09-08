@@ -118,6 +118,20 @@ export interface BattleProps extends MatchConfig {
 }
 
 export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinish, onExit, ...config }: BattleProps) {
+  // Declared up here, ahead of `useMatch`, only so the hold below can be
+  // handed to it: everything that drives them lives further down with the
+  // rest of the presentation.
+  const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
+  const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
+
+  // Nothing the engine does is allowed to land while a strike is still in
+  // the air or a hand-off card is still on screen. The engine resolves an
+  // action the instant it is taken, but showing one takes over a second, and
+  // without this the two run over each other in both directions: the AI's
+  // first move arriving under its own turn card, or its next move arriving
+  // on top of the attack you just watched it make.
+  const presenting = attackFx !== null || turnCue !== null
+
   const {
     state,
     dispatch,
@@ -130,7 +144,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     settleCoin,
     simulating,
     simulate,
-  } = useMatch(config)
+  } = useMatch(config, presenting)
 
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
@@ -164,21 +178,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     return () => clearTimeout(timer)
   }, [error, clearError])
 
-  /* ------------------------------------------------------- turn hand-off */
-
-  // Announced once per hand-off, keyed by turn *and* side so a promotion
-  // dropping back into 'main' on the same turn can't re-announce it. Skipped
-  // while simulating: with both sides on the AI, "Your turn" would be a lie.
-  const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
-  const announced = useRef<string | null>(null)
-  useEffect(() => {
-    if (!coinSettled || simulating || state.phase !== 'main') return
-    const key = `${state.turn}:${state.current}`
-    if (announced.current === key) return
-    announced.current = key
-    setTurnCue({ key, mine: state.current === 'you' })
-  }, [coinSettled, simulating, state.phase, state.turn, state.current])
-
   /* --------------------------------------------------------- attack effect */
 
   // The lunge (attacker) and hit-shake (defender) live on the real board
@@ -189,7 +188,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // so one controls object per side covers both.
   const youFigureFx = useAnimation()
   const foeFigureFx = useAnimation()
-  const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
+  // Set the instant a strike starts and cleared when it has played out.
+  // A ref rather than the `attackFx` state above because the turn hand-off
+  // below has to read it *in the same commit* this effect sets it: an ATTACK
+  // ends the attacker's turn in the same reducer call, so both land together,
+  // and a state value set here would still read null over there.
+  const fxInFlight = useRef(false)
 
   useEffect(() => {
     const ev = state.lastAttack
@@ -235,12 +239,49 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       }, impactDelaySeconds(ev) * 1000)
     }
 
+    fxInFlight.current = true
     setAttackFx({ event: ev, fromRect: fromEl.getBoundingClientRect(), toRect: toEl.getBoundingClientRect() })
     // Re-fires only when a genuinely new attack lands — `id` only ever
     // increases, so this can't retrigger off an unrelated state update that
     // happens to carry the same `lastAttack` forward.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastAttack?.id])
+
+  /* ------------------------------------------------------- turn hand-off */
+
+  // Announced once per hand-off, keyed by turn *and* side so a promotion
+  // dropping back into 'main' on the same turn can't re-announce it. Skipped
+  // while simulating: with both sides on the AI, "Your turn" would be a lie.
+  //
+  // Declared *after* the attack effect above, and deliberately so: effects
+  // run top to bottom within a commit, and an ATTACK ends the attacker's
+  // turn in the same reducer call it resolves in, so the strike and the
+  // hand-off arrive together. Running second is what lets this see the flag
+  // the strike just raised and hold the card back until the blow has landed
+  // — otherwise the opponent's attack plays out underneath a banner already
+  // announcing your turn.
+  const announced = useRef<string | null>(null)
+  const pendingCue = useRef<TurnCue | null>(null)
+  useEffect(() => {
+    if (!coinSettled || simulating || state.phase !== 'main') return
+    const key = `${state.turn}:${state.current}`
+    if (announced.current === key) return
+    announced.current = key
+
+    const cue: TurnCue = { key, mine: state.current === 'you' }
+    if (fxInFlight.current) pendingCue.current = cue
+    else setTurnCue(cue)
+  }, [coinSettled, simulating, state.phase, state.turn, state.current])
+
+  /** The strike has finished; show the hand-off it was holding up, if any. */
+  const releaseAttackFx = () => {
+    setAttackFx(null)
+    fxInFlight.current = false
+    if (pendingCue.current) {
+      setTurnCue(pendingCue.current)
+      pendingCue.current = null
+    }
+  }
 
   // The SETUP action removes the placed cards from hand, which shifts every
   // later card's index down — so a picked-card's hand index left sitting in
@@ -993,7 +1034,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         {!coinSettled && <CoinFlip first={state.first} onDone={settleCoin} />}
       </AnimatePresence>
 
-      <AttackFx trigger={attackFx} onDone={() => setAttackFx(null)} />
+      <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
       <AnimatePresence>
         {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}

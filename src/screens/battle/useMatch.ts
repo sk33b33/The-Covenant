@@ -38,7 +38,18 @@ export interface MatchConfig {
  */
 const AI_THINKING_MS = 1400
 
-export function useMatch(config: MatchConfig) {
+/**
+ * @param presenting Blocks the AI from taking its next action while the
+ *   screen is still showing the last one. The engine resolves an action the
+ *   instant it is taken, but *showing* one — a strike crossing the mat, a
+ *   turn hand-off card — takes well over a second, and an ATTACK ends the
+ *   attacker's turn in the same reducer call it resolves in. Without this
+ *   the two run over each other in both directions: the opponent's first
+ *   move arriving under its own turn card, or its next move landing on top
+ *   of the attack you are still watching. The screen owns what counts as
+ *   "still showing"; this only agrees to wait for it.
+ */
+export function useMatch(config: MatchConfig, presenting = false) {
   const [state, setState] = useState<MatchState>(() =>
     createMatch({
       seed: config.seed ?? randomSeed(),
@@ -145,6 +156,11 @@ export function useMatch(config: MatchConfig) {
   // player's own turn does, action by action.
   useEffect(() => {
     if (!coinSettled || state.phase === 'ended' || state.phase === 'setup') return
+    // Wait out whatever the screen is still showing, then take the usual
+    // thinking pause from there — `presenting` is in this effect's own
+    // dependencies, so it re-runs and starts that pause the moment the board
+    // is clear again.
+    if (presenting) return
 
     const toMove = state.phase === 'promote' ? state.promoting : state.current
     const aiControlled = toMove === 'foe' || (simulating && toMove === 'you')
@@ -177,7 +193,7 @@ export function useMatch(config: MatchConfig) {
     }, AI_THINKING_MS)
 
     return () => clearTimeout(timer)
-  }, [coinSettled, state, difficulty, simulating])
+  }, [coinSettled, state, difficulty, simulating, presenting])
 
   /* ---------------------------------------------------------------- clocks */
 
