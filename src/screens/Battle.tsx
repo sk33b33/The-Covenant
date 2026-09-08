@@ -20,7 +20,7 @@ import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
-import type { FigureInPlay, MatchState } from '@/engine/types'
+import type { FigureInPlay, MatchState, PlayerId } from '@/engine/types'
 
 /**
  * The battle screen.
@@ -193,6 +193,25 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // so one controls object per side covers both.
   const youFigureFx = useAnimation()
   const foeFigureFx = useAnimation()
+  // Whoever was standing in each Active slot as of the previous commit.
+  //
+  // A knockout empties the slot the instant the engine resolves the attack —
+  // `knockOut` sets `active` to null and moves the card to the discard — so
+  // by the time the strike is on screen there is nothing left in the slot
+  // for it to hit, and the Figure appeared to vanish before the blow that
+  // killed it ever landed. Remembering the last occupant lets the board go
+  // on drawing it until the strike is done. Kept current by an effect
+  // declared *after* the one that reads it, so a read during the attack's
+  // own commit still sees the Figure as it stood before the hit.
+  const prevActives = useRef<{ you: FigureInPlay | null; foe: FigureInPlay | null }>({
+    you: null,
+    foe: null,
+  })
+
+  /** A Figure a fatal blow has taken off the board, held on the mat until
+   *  the strike that felled it has finished playing. */
+  const [dying, setDying] = useState<{ side: PlayerId; figure: FigureInPlay } | null>(null)
+
   // Set the instant a strike starts and cleared when it has played out.
   // A ref rather than the `attackFx` state above because the turn hand-off
   // below has to read it *in the same commit* this effect sets it: an ATTACK
@@ -218,6 +237,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // fixed compass direction.
     const lungeDir = ev.by === 'you' ? -1 : 1
 
+    // The engine has already cleared a felled Figure out of its slot. Put
+    // the one that was standing there back on the mat, exactly as it stood,
+    // for as long as the strike takes.
+    if (ev.knockedOut) {
+      const victimSide: PlayerId = ev.by === 'you' ? 'foe' : 'you'
+      const victim = prevActives.current[victimSide]
+      if (victim) setDying({ side: victimSide, figure: victim })
+    }
+
     // A bigger recoil than a routine card game needs, deliberately — this
     // effect is meant to read as amplified, not restrained.
     attacker.start({
@@ -232,6 +260,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           x: [0, -shake.amount, shake.amount, -shake.amount * 0.6, 0],
           transition: { duration: shake.seconds, ease: 'easeOut' },
         })
+        // The held Figure's HP drains at the moment of contact rather than
+        // when the engine resolved the hit, so the bar empties on the blow
+        // that emptied it instead of before the blow arrives.
+        setDying((d) => (d ? { ...d, figure: { ...d.figure, damage: figureCard(d.figure).hp } } : d))
+
         // A knockout gets a little extra than just a harder shake: a beat of
         // recoil-scale on the card itself, so the "finishing blow" reads as
         // heavier than the shake alone would carry.
@@ -251,6 +284,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // happens to carry the same `lastAttack` forward.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastAttack?.id])
+
+  // Deliberately after the effect above and deliberately without deps: it
+  // has to run on every commit, and it has to run *second*, so that the
+  // attack effect still reads the board as it stood before the hit.
+  useEffect(() => {
+    prevActives.current = { you: you.active, foe: foe.active }
+  })
 
   /* ------------------------------------------------------- turn hand-off */
 
@@ -278,9 +318,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     else setTurnCue(cue)
   }, [coinSettled, simulating, state.phase, state.turn, state.current])
 
-  /** The strike has finished; show the hand-off it was holding up, if any. */
+  /** The strike has finished; let the felled Figure go, and show the
+   *  hand-off it was holding up, if any. */
   const releaseAttackFx = () => {
     setAttackFx(null)
+    setDying(null)
     fxInFlight.current = false
     if (pendingCue.current) {
       setTurnCue(pendingCue.current)
@@ -784,7 +826,14 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
         <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
           <motion.div animate={foeFigureFx}>
-            <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+            {/* `dying` only ever fills a slot the engine has already
+                emptied, and only until the strike ends — a real Figure
+                stepping up mid-effect wins over it. */}
+            <BoardFigure
+              figure={foe.active ?? (dying?.side === 'foe' ? dying.figure : null)}
+              width={ACTIVE_W}
+              emptyLabel="Active"
+            />
           </motion.div>
         </div>
 
@@ -838,7 +887,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         >
           <motion.div animate={youFigureFx}>
             <BoardFigure
-              figure={you.active}
+              figure={you.active ?? (dying?.side === 'you' ? dying.figure : null)}
               width={ACTIVE_W}
               emptyLabel="Active"
               onClick={you.active && myTurn ? openActive : undefined}
