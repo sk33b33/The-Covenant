@@ -170,6 +170,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const myTurn = state.phase === 'main' && state.current === 'you' && !simulating
   const mustPromote = state.phase === 'promote' && state.promoting === 'you' && !simulating
   const setupPhase = state.phase === 'setup'
+  // Which side is to move, for the status under each deck. Unlike `myTurn`
+  // these ignore Simulate: the label there reports which side the match is
+  // waiting on, which stays true whoever is driving it.
+  const youTurn = state.phase === 'main' && state.current === 'you'
+  const foeTurn = state.phase === 'main' && state.current === 'foe'
 
   // Errors are transient; a stale one under a later action reads as a new bug.
   useEffect(() => {
@@ -393,24 +398,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (cardId === undefined) return
     const card = requireCard(cardId)
 
-    const options: SheetOption[] = (actionsFor.byHand.get(index) ?? []).map((action, i) => {
+    const actions = actionsFor.byHand.get(index) ?? []
+
+    // Anything that goes *onto the board* — a Basic into a Bench slot, an
+    // ascension onto a Figure already standing — is placed by dragging it
+    // there, and so has no entry here. Offering both routes meant a drag
+    // ending a few pixels outside a slot popped open a list asking which
+    // slot to use, which is precisely the question the drag had just
+    // answered by hand.
+    const placed = (a: Action) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'
+    const options: SheetOption[] = actions.filter((a) => !placed(a)).map((action, i) => {
       switch (action.type) {
-        case 'PLAY_FIGURE':
-          return {
-            id: `play-${i}`,
-            label: 'Place on the Bench',
-            detail: `Slot ${action.slot + 1}`,
-            onSelect: () => dispatch(action),
-          }
-        case 'ASCEND': {
-          const onto = figuresInPlay(you).find((f) => f.uid === action.uid)
-          return {
-            id: `ascend-${i}`,
-            label: 'Ascend',
-            detail: onto ? `onto ${requireCard(onto.cardId).name}` : undefined,
-            onSelect: () => dispatch(action),
-          }
-        }
         case 'PLAY_RELIC': {
           const onto = figuresInPlay(you).find((f) => f.uid === action.targetUid)
           return {
@@ -423,6 +421,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           return { id: `covenant-${i}`, label: 'Play', onSelect: () => dispatch(action) }
       }
     })
+
+    // A card whose only plays are placements is drag-only right now: opening
+    // an empty sheet, or one claiming it cannot be played when it plainly
+    // can, would each be worse than the tap simply doing nothing. Holding it
+    // still shows the card, which is what a tap would have been good for.
+    if (options.length === 0 && actions.some(placed)) return
 
     if (options.length === 0 && myTurn) {
       options.push({
@@ -784,10 +788,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           </motion.div>
         </div>
 
-        <div className="w-full flex items-center justify-between gap-2 px-0.5">
+        <div className="w-full flex items-start justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
-          <div className="flex items-center gap-2">
-            <PileCount count={foe.deck.length} />
+          <div className="flex items-start gap-2">
+            <div className="flex flex-col items-center">
+              <PileCount count={foe.deck.length} />
+              <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
+            </div>
             <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
           </div>
         </div>
@@ -795,12 +802,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         {/* Extra clearance: attached energy hangs below a Figure's card edge
             and would otherwise sit on top of the banner. */}
         <div className="flex items-center justify-center py-0.5 w-full">
-          <TurnBanner state={state} myTurn={myTurn} simulating={simulating} seconds={clocks.turn} />
+          <TurnBanner state={state} simulating={simulating} />
         </div>
 
-        <div className="w-full flex items-center justify-between gap-2 px-0.5">
-          <div className="flex items-center gap-2">
-            <PileCount count={you.deck.length} />
+        <div className="w-full flex items-start justify-between gap-2 px-0.5">
+          <div className="flex items-start gap-2">
+            <div className="flex flex-col items-center">
+              <PileCount count={you.deck.length} />
+              <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
+            </div>
             <DiscardButton count={you.discard.length} cardIds={you.discard} />
           </div>
           <StatsChip points={you.points} seconds={clocks.you} />
@@ -1523,6 +1533,42 @@ function OpponentHand({ count }: { count: number }) {
  * the card back, left to fade on its own rather than needing a second tap
  * to dismiss.
  */
+/**
+ * Whose turn it is and how long is left on it, sitting under that player's
+ * own deck — one under each, so the answer is attached to the side it is
+ * about instead of floating in the middle of the mat belonging to neither.
+ *
+ * Only the side to move shows anything; the other is blank rather than
+ * absent, so the row keeps its height and the board does not shift a few
+ * pixels every time the turn changes hands.
+ */
+function TurnStatus({ label, active, seconds }: { label: string; active: boolean; seconds: number }) {
+  return (
+    <div
+      className="mt-1 flex flex-col items-center justify-start whitespace-nowrap leading-tight"
+      // Stacked rather than set on one line, and no wider than the pile it
+      // sits under: both piles are at the outer edge of their row, so a
+      // single line long enough to hold the label *and* the clock ran off
+      // the side of the screen.
+      style={{ width: 52, height: 22 }}
+    >
+      {active && (
+        <>
+          <span className="font-display text-[9px] tracking-wide" style={{ color: 'var(--gold-bright)' }}>
+            {label}
+          </span>
+          <span
+            className="font-numeric tabular-nums text-[9px]"
+            style={{ color: seconds <= 10 ? '#ef8f7c' : 'rgba(229,192,140,.5)' }}
+          >
+            {seconds}s
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PileCount({ count }: { count: number }) {
   // Twice the card's former 26px width — the size the layout otherwise
   // reserved for a label underneath now goes to the pile itself.
@@ -1660,55 +1706,34 @@ function DiscardStrip({ cardIds, onClose }: { cardIds: string[]; onClose: () => 
   )
 }
 
-function TurnBanner({
-  state,
-  myTurn,
-  simulating,
-  seconds,
-}: {
-  state: MatchState
-  myTurn: boolean
-  simulating: boolean
-  seconds: number
-}) {
-  // Setup carries no label at all: the mat's own slot outlines and the fanned
-  // hand are the instruction now, not a line of copy above them. Simulating
-  // overrides that — with dragging disabled there's nothing left on screen
-  // to explain what's about to happen, so this becomes the only place that
-  // does. It stays fixed through the whole hand-off rather than swinging
-  // between "Your turn" and "Opponent's turn" as sides alternate, since
-  // neither is true any more in the sense a player would read them.
+function TurnBanner({ state, simulating }: { state: MatchState; simulating: boolean }) {
+  // Whose turn it is and how long is left on it now sit under each player's
+  // own deck (see `TurnStatus`), which is where they belong — in the middle
+  // of the mat they belonged to neither side, and they sat in the one place
+  // the clash ring wants kept clear.
+  //
+  // What is left here is only what has no other home: the hand-off to
+  // Simulate, and the prompt owed after a knockout. Setup still carries no
+  // label at all — the mat's own slot outlines and the fanned hand are the
+  // instruction, not a line of copy above them.
+  const mine = state.promoting === 'you'
   const label = simulating
     ? 'Simulating…'
-    : state.phase === 'setup'
-      ? null
-      : state.phase === 'promote'
-        ? state.promoting === 'you'
-          ? 'Choose a Figure'
-          : 'Opponent is choosing'
-        : myTurn
-          ? 'Your turn'
-          : "Opponent's turn"
+    : state.phase === 'promote'
+      ? mine
+        ? 'Choose a Figure'
+        : 'Opponent is choosing'
+      : null
+
+  if (!label) return null
 
   return (
-    <div className="flex flex-col items-center gap-0.5 flex-1">
-      {label && (
-        <span
-          className="font-display text-sm tracking-wide"
-          style={{ color: myTurn ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
-        >
-          {label}
-        </span>
-      )}
-      {state.phase === 'main' && (
-        <span
-          className="text-[10px] font-numeric tabular-nums"
-          style={{ color: seconds <= 10 ? '#ef8f7c' : 'rgba(229,192,140,.45)' }}
-        >
-          {seconds}s · turn {state.turn}
-        </span>
-      )}
-    </div>
+    <span
+      className="font-display text-sm tracking-wide"
+      style={{ color: simulating || mine ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
+    >
+      {label}
+    </span>
   )
 }
 
