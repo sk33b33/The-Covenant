@@ -339,6 +339,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (state.phase !== 'setup') setSetup({ active: null, bench: Array(RULES.BENCH_SIZE).fill(null) })
   }, [state.phase])
 
+  // Recorded the moment the match ends, not when the result is *shown*
+  // below: the win is banked even if the player backgrounds the app while
+  // the finishing blow is still playing out.
   const recordBattle = useProfile((s) => s.recordBattle)
   const [recorded, setRecorded] = useState(false)
   useEffect(() => {
@@ -348,6 +351,32 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     recordBattle(won)
     onFinish?.(won)
   }, [state.phase, state.winner, recorded, recordBattle, onFinish])
+
+  /**
+   * When the result screen is allowed up.
+   *
+   * A match-winning attack ends the match in the same reducer call it
+   * resolves in, so 'ended' arrives while the strike is still crossing the
+   * mat — the win screen was dropping over the top of the blow that won it.
+   * It now waits for the strike to finish and the felled Figure to leave the
+   * slot (both released together, see `releaseAttackFx`), plus a beat to see
+   * the empty slot it left behind before the screen covers the board.
+   *
+   * A match that ends without an attack — a deck running out, a concede —
+   * has nothing in flight and only waits out that same short beat.
+   */
+  const [resultReady, setResultReady] = useState(false)
+  useEffect(() => {
+    if (state.phase !== 'ended') return
+    // Both, for the same reason the turn hand-off needs both: the winning
+    // attack raises the ref in this very commit, while `setAttackFx` from
+    // that same effect has not been applied yet and still reads null here.
+    // The state is what re-runs this once the strike is over; the ref is
+    // what stops it firing before the strike has even been drawn.
+    if (attackFx || fxInFlight.current) return
+    const timer = setTimeout(() => setResultReady(true), 420)
+    return () => clearTimeout(timer)
+  }, [state.phase, attackFx])
 
   /* ------------------------------------------------------------- helpers */
 
@@ -1137,7 +1166,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         gets nothing from carrying an exit animation it can structurally
         never run, so there is no reason to put it back.
       */}
-      {state.phase === 'ended' && <Result state={state} onExit={onExit} />}
+      {resultReady && <Result state={state} onExit={onExit} />}
     </div>
   )
 }
