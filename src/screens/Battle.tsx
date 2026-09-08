@@ -725,6 +725,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setHighlight(null)
     setMagnet(null)
     if (setupPhase) {
+      // Only a Basic Figure can open on the board. This used to be enforced
+      // by the card being an inert, undraggable button — now that every card
+      // in hand can be picked up and moved, the rule has to live where the
+      // drop is actually resolved, or a Covenant could be dropped into the
+      // Active slot and set as your opening Figure.
+      if (!basicsInHand.some((b) => b.index === index)) return
+
       const el = slotAt(point)
       if (el === activeSlotRef.current) placeActive(index)
       else {
@@ -1339,19 +1346,28 @@ function PlayerHand({
   const draggingIndex = useRef<number | null>(null)
   const frozenPose = useRef<{ isFocused: boolean } | null>(null)
 
-  const isDraggableIndex = (index: number) => {
-    const isBasic = basicsInHand.some((b) => b.index === index)
-    const actions = playable.get(index) ?? []
-    return (
-      !simulating &&
-      (setupPhase ? isBasic : myTurn && actions.some((a) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'))
-    )
-  }
+  /**
+   * Every card in hand can be picked up and carried anywhere on your side of
+   * the mat, whether or not it has a legal home to land in.
+   *
+   * Restricting the gesture to cards with a play available meant a card you
+   * could not use right now simply would not come away from the fan — you
+   * could put a finger on it and pull and it stayed glued there, which reads
+   * as the hand holding on to it rather than as the game telling you the
+   * card has nowhere to go. Picking one up and finding nothing lights up for
+   * it says the same thing and lets you look at the board while you decide.
+   *
+   * What a card is *allowed to do* when released has not moved: mid-match
+   * every drop is still checked against the engine's own legal-action list,
+   * and setup checks the Basic-only rule where it resolves the drop. Anything
+   * without a legal landing simply springs back to the fan.
+   */
+  const canLift = !simulating
 
   /** Which of the three things make a card glow, if any — each reads as a
    *  different colour (see VIABILITY_GLOW below): gold for something
    *  placeable, white for an ascension, red for a Covenant or Relic's own
-   *  ability. Unlike `isDraggableIndex`, this also covers those last two —
+   *  ability. Unlike a card's *liftability*, this also covers those last two —
    *  they're played through the tap sheet, not a drag, but are every bit as
    *  "viable right now" as the cards that are. */
   const viabilityOf = (index: number): 'use' | 'ascend' | 'ability' | null => {
@@ -1434,7 +1450,6 @@ function PlayerHand({
         // played card leaves `hand` for real, immediately, on dispatch.
         if (setupPhase && (pickedActive || pickedBench)) return null
         const isBasic = basicsInHand.some((b) => b.index === index)
-        const draggable = isDraggableIndex(index)
         // Rank among the visible cards, not the raw hand index — see the
         // comment on `visibleIndices` above.
         const rank = visibleIndices.indexOf(index)
@@ -1487,7 +1502,7 @@ function PlayerHand({
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             onPointerEnter={() => setBrushed(index)}
             onPointerLeave={() => setBrushed((b) => (b === index ? null : b))}
-            drag={draggable}
+            drag={canLift}
             dragSnapToOrigin
             dragElastic={0.35}
             // Straightens to upright the instant a card lifts off the fan,
@@ -1531,7 +1546,11 @@ function PlayerHand({
             // from under the AI turn about to land on this same card.
             onClick={setupPhase || simulating ? undefined : () => onTap(index, isBasic)}
             whileTap={setupPhase || simulating ? undefined : { scale: 0.95 }}
-            disabled={(setupPhase && !isBasic) || simulating}
+            // Only Simulate makes a card inert now. Marking non-Basics
+            // disabled during setup also blocked every pointer event on
+            // them, which is exactly what stopped them being picked up;
+            // what a *tap* does is still gated on its own, just above.
+            disabled={simulating}
           >
             {/* Every card in hand stays fully visible — the glow above is
                 the only thing that marks a card viable, not how much of the
