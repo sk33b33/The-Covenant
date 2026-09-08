@@ -89,6 +89,21 @@ const YOU_ROW_LIFT = 80
  *  of the gap rather than cross into it. */
 const FOE_ROW_LIFT = 20
 
+/**
+ * Extra air between a Bench row and its own Active, on top of the flex gap.
+ *
+ * Attached energy hangs 12px below a Figure's card edge (see BoardFigure's
+ * `-bottom-3` energy row), and the rows were only a 4px gap apart — so the
+ * orbs kept landing on the card in the next row rather than in clear space:
+ * your Active's energy under your Bench, their Bench's energy on their
+ * Active, and both rows reading as one stack.
+ *
+ * It moves each Bench *away from its own Active*, which is downward on your
+ * side and upward on theirs, because the two sit on opposite sides of their
+ * Active — the opponent's Bench is above their Active, not below it.
+ */
+const BENCH_CLEARANCE = 12
+
 // The hand tray sits outside the flex flow (see the board container below),
 // so nothing else reserves its footprint automatically any more — anything
 // that needs to know its height, or clear it, reads this one calc.
@@ -714,7 +729,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             flex column and silently re-centre the whole block, pulling
             *your* side up to compensate. A transform moves the paint
             position only. */}
-        <div className="flex gap-1.5" style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
+        <div
+          className="flex gap-1.5"
+          style={{ transform: `translateY(${FOE_ROW_LIFT - BENCH_CLEARANCE}px)` }}
+        >
           {foe.bench.map((figure, i) => (
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
           ))}
@@ -782,7 +800,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
         <div
           className="flex gap-1.5 mt-1"
-          style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
+          style={{ transform: `translateY(-${YOU_ROW_LIFT - BENCH_CLEARANCE}px)` }}
         >
           {you.bench.map((figure, i) => {
             const preview = benchPreview(i)
@@ -1404,9 +1422,19 @@ function PlayerHand({
 
 /**
  * The opponent's hand, face-down and unreachable — a count of cards fanned
- * out the same way yours is, so the board reads as two hands at the table
- * rather than one player's cards and the other's invisible ones. Smaller and
- * inert: nothing here is a target for anything, it only tells you how many
+ * across the table from you, so the board reads as two hands at the table
+ * rather than one player's cards and the other's invisible ones.
+ *
+ * Fanned as *they* hold it, not as you hold yours: a point reflection of
+ * your own fan rather than a copy of it. Yours converges below the cards, at
+ * your own hand; theirs converges above, off the top of the screen where
+ * they are sitting — so their outer cards ride up where yours dip down, they
+ * lean the opposite way, and the ribbon stacks right-to-left, which is
+ * left-to-right from their side of the table. Fanning it the same way as
+ * yours read as a second hand belonging to you.
+ *
+ * Smaller and inert: nothing here is a target for anything, it only tells
+ * you how many
  * cards are left to worry about.
  */
 function OpponentHand({ count }: { count: number }) {
@@ -1430,9 +1458,13 @@ function OpponentHand({ count }: { count: number }) {
               aspectRatio: '63/88',
               left: '50%',
               marginLeft: offset * spanStep - width / 2,
-              transform: `translateY(${offset * offset * 1.1}px) rotate(${offset * rotateStep}deg)`,
+              // Both the lean and the arc are negated against your own hand's
+              // (`rotate: offset * step`, `y: offset² * k`, pivoting at the
+              // bottom): pivoting at the top with the signs flipped is the
+              // same fan turned to face the other way down the table.
+              transform: `translateY(${-offset * offset * 1.1}px) rotate(${-offset * rotateStep}deg)`,
               transformOrigin: 'top center',
-              zIndex: count - Math.abs(offset),
+              zIndex: count - index,
               boxShadow: '0 2px 8px rgba(0,0,0,.5)',
             }}
           >
