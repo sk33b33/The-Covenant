@@ -114,6 +114,31 @@ export interface LogEntry {
   text: string
 }
 
+/**
+ * A structured record of the most recent attack, for the UI to animate —
+ * `log` only ever carries prose, which is fine for the battle log but not
+ * enough to drive an effect keyed to the attacker's element or the exact
+ * damage that landed. `id` only ever increases, so a screen can tell a fresh
+ * attack from the one it already animated without the engine needing to
+ * "clear" this field on its behalf.
+ */
+export interface AttackEvent {
+  id: number
+  by: PlayerId
+  attackerCardId: string
+  /** Absent if there was nothing in the Active spot to strike. */
+  targetCardId?: string
+  type: EnergyType
+  /** Damage actually applied, after shields, guard and armor. */
+  damage: number
+  weakness: boolean
+  /** Whether this hit is what took the target down. */
+  knockedOut: boolean
+  /** A Blinded Figure's coin-flip miss — nothing else in `AttackEvent` is
+   *  meaningful when this is set. */
+  missed: boolean
+}
+
 export interface MatchState {
   seed: number
   /** RNG cursor, advanced in place so the match stays replayable. */
@@ -134,4 +159,6 @@ export interface MatchState {
   endReason: EndReason | null
 
   log: LogEntry[]
+  /** The most recent attack, for the UI to animate. Null until the first one. */
+  lastAttack: AttackEvent | null
 }

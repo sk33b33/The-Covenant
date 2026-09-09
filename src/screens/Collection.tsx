@@ -20,9 +20,10 @@ import { cx } from '@/lib/cx'
 /**
  * The binder.
  *
- * Shows the whole set, not just what you own, because a collection screen that
- * hides its gaps gives you nothing to chase. Unowned cards render as silhouettes
- * so the shape of what is missing is visible at a glance.
+ * Opens owned-only, so the first thing you see is your own collection rather
+ * than a wall of silhouettes for a set you have barely touched. The "Owned
+ * only" toggle switches to the whole set, where unowned cards render as
+ * silhouettes so the shape of what is missing is visible at a glance.
  */
 export function Collection() {
   const owned = useCollection((s) => s.owned)
@@ -32,7 +33,10 @@ export function Collection() {
 
   const [query, setQuery] = useState('')
   const [types, setTypes] = useState<EnergyType[]>([])
-  const [ownedOnly, setOwnedOnly] = useState(false)
+  // Defaults to owned-only: opening the binder to a wall of silhouettes reads
+  // as "you own nothing" before it reads as "here is what to chase". Showing
+  // your own cards first, with a toggle to reveal the gaps, does both.
+  const [ownedOnly, setOwnedOnly] = useState(true)
 
   const ownedCount = Object.keys(owned).filter((id) => owned[id]! > 0).length
   const totalHeld = Object.values(owned).reduce((a, b) => a + b, 0)

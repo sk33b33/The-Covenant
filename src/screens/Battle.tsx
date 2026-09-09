@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
+import {
+  AnimatePresence,
+  DragControls,
+  animate,
+  motion,
+  useAnimation,
+  useMotionValue,
+  type PanInfo,
+} from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { CheckIcon } from '@/art/icons'
+import { CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -12,12 +20,15 @@ import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
+import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
+import { AttackFx, impactDelaySeconds, shakeFor, type AttackFxTrigger } from './battle/AttackFx'
 import { BoardFigure } from './battle/BoardFigure'
+import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
-import type { FigureInPlay, MatchState } from '@/engine/types'
+import type { FigureInPlay, MatchState, PlayerId } from '@/engine/types'
 
 /**
  * The battle screen.
@@ -28,9 +39,83 @@ import type { FigureInPlay, MatchState } from '@/engine/types'
  * a legal one.
  */
 
-const ACTIVE_W = 96
-const BENCH_W = 60
-const HAND_W = 68
+// Smaller than the original size on purpose: shrinking the Active card and
+// Bench slots on both sides frees up real vertical room on the board, so nothing
+// packed this tightly risks the rows themselves running into each other or into
+// the hand tray below — the same class of overlap that was hiding cards in the
+// hand, just one level up.
+const ACTIVE_W = 80
+const BENCH_W = 48
+// Smaller than before on purpose: a smaller card overlaps its neighbour by
+// less at the same fan spacing, which is real breathing room around each
+// card's own tappable centre, not just a smaller footprint.
+const HAND_W = 54
+
+/** Tall enough for a lifted card plus the fan's own arc, at the widest hands
+ *  this game deals — scaled down along with HAND_W. */
+const HAND_HEIGHT = 90
+
+/** How long a finger has to stay down on the hand before it starts browsing
+ *  (widening the fan, popping up whichever card it's over) rather than
+ *  simply being the start of an ordinary tap or drag. */
+const HOLD_TO_FAN_MS = 130
+
+/** The four custom properties `.cov-hand-glow`'s pulse (global.css) reads,
+ *  one set per way a card can be viable — set inline per card rather than
+ *  through a modifier class, since sibling class rules placed after
+ *  `.cov-hand-glow` in that file were, for reasons never pinned down,
+ *  silently dropped from the stylesheet the browser actually loaded. */
+const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> = {
+  use: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(229,192,140,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(229,192,140,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: 'var(--gold-bright)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(229,192,140,.75)',
+  } as React.CSSProperties,
+  ascend: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(240,240,245,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(240,240,245,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: '#ffffff',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(255,255,255,.75)',
+  } as React.CSSProperties,
+  ability: {
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(214,68,58,.55)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(214,68,58,.3)',
+    ['--cov-hand-glow-bright-ring' as string]: 'rgb(232,84,72)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(214,68,58,.75)',
+  } as React.CSSProperties,
+}
+
+/** How far your own Active/Bench row is pulled up past its normal flex flow,
+ *  so it crosses into the mat's clash ring instead of merely approaching its
+ *  edge — see the render site for the measurement this is based on. */
+const YOU_ROW_LIFT = 80
+
+/** A small nudge of the opponent's Active/Bench row toward the halfway
+ *  line, the mirror of YOU_ROW_LIFT but far more modest — their side
+ *  already sat close to the ring, so this only needs to close the last bit
+ *  of the gap rather than cross into it. */
+const FOE_ROW_LIFT = 20
+
+/**
+ * Extra air between a Bench row and its own Active, on top of the flex gap.
+ *
+ * Attached energy hangs 12px below a Figure's card edge (see BoardFigure's
+ * `-bottom-3` energy row), and the rows were only a 4px gap apart — so the
+ * orbs kept landing on the card in the next row rather than in clear space:
+ * your Active's energy under your Bench, their Bench's energy on their
+ * Active, and both rows reading as one stack.
+ *
+ * It moves each Bench *away from its own Active*, which is downward on your
+ * side and upward on theirs, because the two sit on opposite sides of their
+ * Active — the opponent's Bench is above their Active, not below it.
+ */
+const BENCH_CLEARANCE = 12
+
+// The hand tray sits outside the flex flow (see the board container below),
+// so nothing else reserves its footprint automatically any more — anything
+// that needs to know its height, or clear it, reads this one calc.
+const HAND_TRAY_CALC = `calc(${HAND_HEIGHT}px + 8px + env(safe-area-inset-bottom, 0px))`
 
 export interface BattleProps extends MatchConfig {
   /** Shown in the opponent's nameplate. */
@@ -41,8 +126,33 @@ export interface BattleProps extends MatchConfig {
 }
 
 export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinish, onExit, ...config }: BattleProps) {
-  const { state, dispatch, legal, error, clearError, aiThinking, clocks, coinSettled, settleCoin } =
-    useMatch(config)
+  // Declared up here, ahead of `useMatch`, only so the hold below can be
+  // handed to it: everything that drives them lives further down with the
+  // rest of the presentation.
+  const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
+  const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
+
+  // Nothing the engine does is allowed to land while a strike is still in
+  // the air or a hand-off card is still on screen. The engine resolves an
+  // action the instant it is taken, but showing one takes over a second, and
+  // without this the two run over each other in both directions: the AI's
+  // first move arriving under its own turn card, or its next move arriving
+  // on top of the attack you just watched it make.
+  const presenting = attackFx !== null || turnCue !== null
+
+  const {
+    state,
+    dispatch,
+    legal,
+    error,
+    clearError,
+    aiThinking,
+    clocks,
+    coinSettled,
+    settleCoin,
+    simulating,
+    simulate,
+  } = useMatch(config, presenting)
 
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
@@ -62,8 +172,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   const you = state.players.you
   const foe = state.players.foe
-  const myTurn = state.phase === 'main' && state.current === 'you'
-  const mustPromote = state.phase === 'promote' && state.promoting === 'you'
+  // Simulate hands your side to the AI, so none of the manual controls that
+  // gate off `myTurn`/`mustPromote` should still answer to a tap once it's
+  // running — the two would otherwise race to act on the same turn.
+  const myTurn = state.phase === 'main' && state.current === 'you' && !simulating
+  const mustPromote = state.phase === 'promote' && state.promoting === 'you' && !simulating
+  const setupPhase = state.phase === 'setup'
+  // Which side is to move, for the status under each deck. Unlike `myTurn`
+  // these ignore Simulate: the label there reports which side the match is
+  // waiting on, which stays true whoever is driving it.
+  const youTurn = state.phase === 'main' && state.current === 'you'
+  const foeTurn = state.phase === 'main' && state.current === 'foe'
 
   // Errors are transient; a stale one under a later action reads as a new bug.
   useEffect(() => {
@@ -71,6 +190,153 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const timer = setTimeout(clearError, 2600)
     return () => clearTimeout(timer)
   }, [error, clearError])
+
+  /* --------------------------------------------------------- attack effect */
+
+  // The lunge (attacker) and hit-shake (defender) live on the real board
+  // pieces, imperative controls rather than a declarative `animate` prop —
+  // two attacks in a row can otherwise land on an *identical* target (same
+  // Figure, same shake), which framer treats as nothing having changed and
+  // never replays. Each side only ever plays one of the two roles at a time,
+  // so one controls object per side covers both.
+  const youFigureFx = useAnimation()
+  const foeFigureFx = useAnimation()
+  // Whoever was standing in each Active slot as of the previous commit.
+  //
+  // A knockout empties the slot the instant the engine resolves the attack —
+  // `knockOut` sets `active` to null and moves the card to the discard — so
+  // by the time the strike is on screen there is nothing left in the slot
+  // for it to hit, and the Figure appeared to vanish before the blow that
+  // killed it ever landed. Remembering the last occupant lets the board go
+  // on drawing it until the strike is done. Kept current by an effect
+  // declared *after* the one that reads it, so a read during the attack's
+  // own commit still sees the Figure as it stood before the hit.
+  const prevActives = useRef<{ you: FigureInPlay | null; foe: FigureInPlay | null }>({
+    you: null,
+    foe: null,
+  })
+
+  /** A Figure a fatal blow has taken off the board, held on the mat until
+   *  the strike that felled it has finished playing. */
+  const [dying, setDying] = useState<{ side: PlayerId; figure: FigureInPlay } | null>(null)
+
+  // Set the instant a strike starts and cleared when it has played out.
+  // A ref rather than the `attackFx` state above because the turn hand-off
+  // below has to read it *in the same commit* this effect sets it: an ATTACK
+  // ends the attacker's turn in the same reducer call, so both land together,
+  // and a state value set here would still read null over there.
+  const fxInFlight = useRef(false)
+
+  useEffect(() => {
+    const ev = state.lastAttack
+    if (!ev) return
+
+    const fromEl = ev.by === 'you' ? activeSlotRef.current : foeActiveSlotRef.current
+    const toEl = ev.by === 'you' ? foeActiveSlotRef.current : activeSlotRef.current
+    // Missing either slot means there's nothing on screen yet to animate
+    // between — a rare timing edge (e.g. the very first paint) rather than
+    // something worth a fallback for.
+    if (!fromEl || !toEl) return
+
+    const attacker = ev.by === 'you' ? youFigureFx : foeFigureFx
+    const defender = ev.by === 'you' ? foeFigureFx : youFigureFx
+    // You sit below the clash ring and lunge up toward it; the opponent
+    // lunges down toward you — both lunge *toward the middle*, not toward a
+    // fixed compass direction.
+    const lungeDir = ev.by === 'you' ? -1 : 1
+
+    // The engine has already cleared a felled Figure out of its slot. Put
+    // the one that was standing there back on the mat, exactly as it stood,
+    // for as long as the strike takes.
+    if (ev.knockedOut) {
+      const victimSide: PlayerId = ev.by === 'you' ? 'foe' : 'you'
+      const victim = prevActives.current[victimSide]
+      if (victim) setDying({ side: victimSide, figure: victim })
+    }
+
+    // A bigger recoil than a routine card game needs, deliberately — this
+    // effect is meant to read as amplified, not restrained.
+    attacker.start({
+      y: [0, lungeDir * 20, 0],
+      transition: { duration: 0.42, times: [0, 0.4, 1], ease: 'easeOut' },
+    })
+
+    if (!ev.missed) {
+      setTimeout(() => {
+        const shake = shakeFor(ev)
+        defender.start({
+          x: [0, -shake.amount, shake.amount, -shake.amount * 0.6, 0],
+          transition: { duration: shake.seconds, ease: 'easeOut' },
+        })
+        // The held Figure's HP drains at the moment of contact rather than
+        // when the engine resolved the hit, so the bar empties on the blow
+        // that emptied it instead of before the blow arrives.
+        setDying((d) => (d ? { ...d, figure: { ...d.figure, damage: figureCard(d.figure).hp } } : d))
+
+        // A knockout gets a little extra than just a harder shake: a beat of
+        // recoil-scale on the card itself, so the "finishing blow" reads as
+        // heavier than the shake alone would carry.
+        if (ev.knockedOut) {
+          defender.start({
+            scale: [1, 0.92, 1],
+            transition: { duration: 0.3, ease: 'easeOut' },
+          })
+        }
+      }, impactDelaySeconds(ev) * 1000)
+    }
+
+    fxInFlight.current = true
+    setAttackFx({ event: ev, fromRect: fromEl.getBoundingClientRect(), toRect: toEl.getBoundingClientRect() })
+    // Re-fires only when a genuinely new attack lands — `id` only ever
+    // increases, so this can't retrigger off an unrelated state update that
+    // happens to carry the same `lastAttack` forward.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lastAttack?.id])
+
+  // Deliberately after the effect above and deliberately without deps: it
+  // has to run on every commit, and it has to run *second*, so that the
+  // attack effect still reads the board as it stood before the hit.
+  useEffect(() => {
+    prevActives.current = { you: you.active, foe: foe.active }
+  })
+
+  /* ------------------------------------------------------- turn hand-off */
+
+  // Announced once per hand-off, keyed by turn *and* side so a promotion
+  // dropping back into 'main' on the same turn can't re-announce it. Skipped
+  // while simulating: with both sides on the AI, "Your turn" would be a lie.
+  //
+  // Declared *after* the attack effect above, and deliberately so: effects
+  // run top to bottom within a commit, and an ATTACK ends the attacker's
+  // turn in the same reducer call it resolves in, so the strike and the
+  // hand-off arrive together. Running second is what lets this see the flag
+  // the strike just raised and hold the card back until the blow has landed
+  // — otherwise the opponent's attack plays out underneath a banner already
+  // announcing your turn.
+  const announced = useRef<string | null>(null)
+  const pendingCue = useRef<TurnCue | null>(null)
+  useEffect(() => {
+    if (!coinSettled || simulating || state.phase !== 'main') return
+    const key = `${state.turn}:${state.current}`
+    if (announced.current === key) return
+    announced.current = key
+
+    const cue: TurnCue = { key, mine: state.current === 'you' }
+    if (fxInFlight.current) pendingCue.current = cue
+    else setTurnCue(cue)
+  }, [coinSettled, simulating, state.phase, state.turn, state.current])
+
+  /** The strike has finished; let the felled Figure go, and show the
+   *  hand-off it was holding up, if any. */
+  const releaseAttackFx = () => {
+    setAttackFx(null)
+    setDying(null)
+    fxInFlight.current = false
+    if (pendingCue.current) {
+      setTurnCue(pendingCue.current)
+      pendingCue.current = null
+    }
+  }
 
   // The SETUP action removes the placed cards from hand, which shifts every
   // later card's index down — so a picked-card's hand index left sitting in
@@ -81,6 +347,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (state.phase !== 'setup') setSetup({ active: null, bench: Array(RULES.BENCH_SIZE).fill(null) })
   }, [state.phase])
 
+  // Recorded the moment the match ends, not when the result is *shown*
+  // below: the win is banked even if the player backgrounds the app while
+  // the finishing blow is still playing out.
   const recordBattle = useProfile((s) => s.recordBattle)
   const [recorded, setRecorded] = useState(false)
   useEffect(() => {
@@ -90,6 +359,32 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     recordBattle(won)
     onFinish?.(won)
   }, [state.phase, state.winner, recorded, recordBattle, onFinish])
+
+  /**
+   * When the result screen is allowed up.
+   *
+   * A match-winning attack ends the match in the same reducer call it
+   * resolves in, so 'ended' arrives while the strike is still crossing the
+   * mat — the win screen was dropping over the top of the blow that won it.
+   * It now waits for the strike to finish and the felled Figure to leave the
+   * slot (both released together, see `releaseAttackFx`), plus a beat to see
+   * the empty slot it left behind before the screen covers the board.
+   *
+   * A match that ends without an attack — a deck running out, a concede —
+   * has nothing in flight and only waits out that same short beat.
+   */
+  const [resultReady, setResultReady] = useState(false)
+  useEffect(() => {
+    if (state.phase !== 'ended') return
+    // Both, for the same reason the turn hand-off needs both: the winning
+    // attack raises the ref in this very commit, while `setAttackFx` from
+    // that same effect has not been applied yet and still reads null here.
+    // The state is what re-runs this once the strike is over; the ref is
+    // what stops it firing before the strike has even been drawn.
+    if (attackFx || fxInFlight.current) return
+    const timer = setTimeout(() => setResultReady(true), 420)
+    return () => clearTimeout(timer)
+  }, [state.phase, attackFx])
 
   /* ------------------------------------------------------------- helpers */
 
@@ -160,19 +455,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       return { active: cleared.active, bench }
     })
 
-  /** The tap fallback: first tap becomes Active, later taps fill the next
-   *  open Bench slot in order, and tapping a placed card again clears it. */
-  const toggleSetupPick = (index: number) =>
-    setSetup((prev) => {
-      if (prev.active === index || prev.bench.includes(index)) return clearPick(prev, index)
-      if (prev.active === null) return { active: index, bench: prev.bench }
-
-      const open = prev.bench.indexOf(null)
-      if (open === -1) return prev
-      const bench = [...prev.bench]
-      bench[open] = index
-      return { active: prev.active, bench }
-    })
+  /** The small reset button: clears every setup pick so a misdropped card can
+   *  be dragged again from a clean hand instead of dragged a second time onto
+   *  the slot it is already sitting in. */
+  const resetSetup = () => setSetup({ active: null, bench: Array(RULES.BENCH_SIZE).fill(null) })
 
   const startBattle = () => {
     if (setupActive === null) return
@@ -191,24 +477,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (cardId === undefined) return
     const card = requireCard(cardId)
 
-    const options: SheetOption[] = (actionsFor.byHand.get(index) ?? []).map((action, i) => {
+    const actions = actionsFor.byHand.get(index) ?? []
+
+    // Anything that goes *onto the board* — a Basic into a Bench slot, an
+    // ascension onto a Figure already standing — is placed by dragging it
+    // there, and so has no entry here. Offering both routes meant a drag
+    // ending a few pixels outside a slot popped open a list asking which
+    // slot to use, which is precisely the question the drag had just
+    // answered by hand.
+    const placed = (a: Action) => a.type === 'PLAY_FIGURE' || a.type === 'ASCEND'
+    const options: SheetOption[] = actions.filter((a) => !placed(a)).map((action, i) => {
       switch (action.type) {
-        case 'PLAY_FIGURE':
-          return {
-            id: `play-${i}`,
-            label: 'Place on the Bench',
-            detail: `Slot ${action.slot + 1}`,
-            onSelect: () => dispatch(action),
-          }
-        case 'ASCEND': {
-          const onto = figuresInPlay(you).find((f) => f.uid === action.uid)
-          return {
-            id: `ascend-${i}`,
-            label: 'Ascend',
-            detail: onto ? `onto ${requireCard(onto.cardId).name}` : undefined,
-            onSelect: () => dispatch(action),
-          }
-        }
         case 'PLAY_RELIC': {
           const onto = figuresInPlay(you).find((f) => f.uid === action.targetUid)
           return {
@@ -221,6 +500,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           return { id: `covenant-${i}`, label: 'Play', onSelect: () => dispatch(action) }
       }
     })
+
+    // A card whose only plays are placements is drag-only right now: opening
+    // an empty sheet, or one claiming it cannot be played when it plainly
+    // can, would each be worse than the tap simply doing nothing. Holding it
+    // still shows the card, which is what a tap would have been good for.
+    if (options.length === 0 && actions.some(placed)) return
 
     if (options.length === 0 && myTurn) {
       options.push({
@@ -293,19 +578,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     })
   }
 
-  const openAltar = () => {
-    if (!myTurn || you.altar === null) return
+  const openBench = (i: number) => {
+    const figure = you.bench[i]
+    if (!figure || !myTurn) return
 
-    const options: SheetOption[] = figuresInPlay(you).map((figure) => ({
-      id: `attach-${figure.uid}`,
-      label: `Attach to ${requireCard(figure.cardId).name}`,
-      detail: you.active?.uid === figure.uid ? 'Active' : 'Bench',
-      disabled: !actionsFor.byUid.has(figure.uid),
-      reason: 'Energy has already been attached this turn',
-      onSelect: () => dispatch({ type: 'ATTACH', uid: figure.uid }),
-    }))
+    const card = figureCard(figure)
 
-    setSheet({ title: 'The Altar', subtitle: 'One energy may be attached each turn', options })
+    // No sheet, and (for now) no actions: nothing in the card pool has an
+    // ability usable from the bench yet, so there is nothing to list beneath
+    // it. The tap still lifts the card into the viewer for its tilt and its
+    // live HP/energy — the same reason a bench Figure exists to look at, even
+    // before it has something to press a second gesture to do.
+    peek(card, {
+      actionsNote: `${Math.max(0, card.hp - figure.damage)} of ${card.hp} HP · ${figure.energy.length} energy`,
+    })
   }
 
   /* --------------------------------------------------------------- drag */
@@ -315,34 +601,182 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // cached, since the mat reflows with the viewport and with orientation.
   const activeSlotRef = useRef<HTMLDivElement>(null)
   const benchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Read only for its screen position when an attack fires — see the effect
+  // below. Nothing else on this side needs to find its own Active slot the
+  // way setup's drag-and-drop needs yours (hence no foe equivalent of the
+  // padded/hit-test helpers just below).
+  const foeActiveSlotRef = useRef<HTMLDivElement>(null)
 
-  const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
-    const within = (el: HTMLDivElement | null) => {
-      if (!el) return false
-      const r = el.getBoundingClientRect()
-      return point.x >= r.left && point.x <= r.right && point.y >= r.top && point.y <= r.bottom
-    }
-    if (within(activeSlotRef.current)) {
-      placeActive(index)
+  // A drop target padded a few px beyond its own box, so a drop that lands
+  // just outside a slot's visible edge — an easy miss on a small touchscreen
+  // target — still counts, rather than silently snapping back to hand with no
+  // explanation.
+  const DROP_PAD = 14
+  // A much larger, separate radius that only ever gates the *magnetic ghost
+  // preview* below — never the actual drop. Wanting the card to visibly
+  // start pulling toward a slot before the finger is almost on top of it
+  // means this has to be generous; it never has to be exact, since the real
+  // drop is still judged by DROP_PAD alone.
+  const MAGNET_PAD = 46
+  const withinPad = (el: HTMLDivElement | null, point: { x: number; y: number }, pad: number) => {
+    if (!el) return false
+    const r = el.getBoundingClientRect()
+    return (
+      point.x >= r.left - pad && point.x <= r.right + pad && point.y >= r.top - pad && point.y <= r.bottom + pad
+    )
+  }
+  const within = (el: HTMLDivElement | null, point: { x: number; y: number }) => withinPad(el, point, DROP_PAD)
+
+  const slotAt = (point: { x: number; y: number }): HTMLDivElement | null => {
+    if (within(activeSlotRef.current, point)) return activeSlotRef.current
+    return benchSlotRefs.current.find((el) => within(el, point)) ?? null
+  }
+
+  const magnetSlotAt = (point: { x: number; y: number }): HTMLDivElement | null => {
+    if (withinPad(activeSlotRef.current, point, MAGNET_PAD)) return activeSlotRef.current
+    return benchSlotRefs.current.find((el) => withinPad(el, point, MAGNET_PAD)) ?? null
+  }
+
+  type MagnetTarget = { kind: 'active' } | { kind: 'bench'; index: number }
+
+  /** Which named slot a drop-target element is, if any — resolved once at
+   *  drag time rather than compared by element identity at render time, so
+   *  the slots below never have to read a ref during their own render. */
+  const magnetTargetOf = (el: HTMLDivElement | null): MagnetTarget | null => {
+    if (!el) return null
+    if (el === activeSlotRef.current) return { kind: 'active' }
+    const index = benchSlotRefs.current.indexOf(el)
+    return index !== -1 ? { kind: 'bench', index } : null
+  }
+
+  // The slot a dragged hand card is currently being magnetically pulled
+  // toward, if any, and which card is on offer there — read by the Active
+  // and Bench slots below to show a live preview of the card seated in
+  // place before the finger has actually released it.
+  const [magnet, setMagnet] = useState<{ target: MagnetTarget; cardId: string } | null>(null)
+
+  // The live "will this land here?" highlight is applied straight to the DOM
+  // rather than through React state. A card in hand fires this on every frame
+  // of the drag, and re-rendering the whole board that often turned out to be
+  // enough to make framer's own drag recognition occasionally drop the
+  // gesture entirely — the highlight is worth showing, but not at the cost of
+  // the drag itself sometimes silently failing to register. The same slot
+  // refs serve two different drags — a hand card looking for an empty Active
+  // or Bench slot during setup, and (below) the Altar looking for an occupied
+  // one to attach to — so this checks for either child rather than assuming
+  // which one is present.
+  const lastHighlighted = useRef<HTMLDivElement | null>(null)
+  const setHighlight = (el: HTMLDivElement | null) => {
+    if (lastHighlighted.current === el) return
+    lastHighlighted.current
+      ?.querySelector('.cov-slot-outline, .cov-figure-card')
+      ?.classList.remove('cov-slot-drag-target')
+    el?.querySelector('.cov-slot-outline, .cov-figure-card')?.classList.add('cov-slot-drag-target')
+    lastHighlighted.current = el
+  }
+
+  /** The Figure a drop target's own ref currently belongs to, if any — the
+   *  Active slot's ref and each Bench slot's ref outlive whichever Figure
+   *  (or nothing) currently occupies them. */
+  const figureAt = (el: HTMLDivElement | null): FigureInPlay | null => {
+    if (el === activeSlotRef.current) return you.active
+    const slot = benchSlotRefs.current.indexOf(el)
+    return slot !== -1 ? (you.bench[slot] ?? null) : null
+  }
+
+  /**
+   * What a hand card dropped at this point would actually do, mid-battle.
+   *
+   * Setup places cards through its own local state — there is no Figure in
+   * play yet to evolve, and the legal-action list doesn't exist until SETUP
+   * is dispatched. Once the match is running, both drops a hand card can make
+   * are real dispatches: an empty Bench slot takes a Basic via PLAY_FIGURE, an
+   * occupied one (Active included) takes its next stage via ASCEND if the
+   * card in hand ascends from what's standing there. Reading the answer off
+   * `legal` rather than re-deriving eligibility here is what keeps a drag from
+   * ever being able to offer a move the engine wouldn't.
+   */
+  const legalDropAt = (index: number, el: HTMLDivElement | null) => {
+    if (!el) return null
+    const actions = actionsFor.byHand.get(index) ?? []
+    const figure = figureAt(el)
+    const action = figure
+      ? actions.find((a) => a.type === 'ASCEND' && a.uid === figure.uid)
+      : actions.find((a) => a.type === 'PLAY_FIGURE' && el === benchSlotRefs.current[a.slot])
+    return action ? { el, action } : null
+  }
+
+  const legalHandDrop = (index: number, point: { x: number; y: number }) => legalDropAt(index, slotAt(point))
+
+  const handleHandDrag = (index: number, point: { x: number; y: number }) => {
+    if (setupPhase) {
+      setHighlight(slotAt(point))
+      // Any slot within magnet range is a legal target during setup — a
+      // pick always overwrites whatever it was resting on (clearPick), so
+      // there's no equivalent of an "occupied, not for you" slot to exclude.
+      const target = magnetTargetOf(magnetSlotAt(point))
+      setMagnet(target ? { target, cardId: you.hand[index]! } : null)
       return
     }
-    const slot = benchSlotRefs.current.findIndex(within)
-    if (slot !== -1) placeBench(index, slot)
+    const magnetEl = magnetSlotAt(point)
+    const magnetDrop = magnetEl ? legalDropAt(index, magnetEl) : null
+    // Only for landing a Basic in an empty slot, not for ascending onto one
+    // that's already occupied — that Figure is already visibly right there,
+    // and a ghost card layered over it would just look like a collision
+    // rather than a preview of where this one is headed.
+    const target = magnetDrop && magnetDrop.action.type === 'PLAY_FIGURE' ? magnetTargetOf(magnetDrop.el) : null
+    setMagnet(target ? { target, cardId: you.hand[index]! } : null)
+    setHighlight(legalHandDrop(index, point)?.el ?? null)
+  }
+
+  const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
+    setHighlight(null)
+    setMagnet(null)
+    if (setupPhase) {
+      // Only a Basic Figure can open on the board. This used to be enforced
+      // by the card being an inert, undraggable button — now that every card
+      // in hand can be picked up and moved, the rule has to live where the
+      // drop is actually resolved, or a Covenant could be dropped into the
+      // Active slot and set as your opening Figure.
+      if (!basicsInHand.some((b) => b.index === index)) return
+
+      const el = slotAt(point)
+      if (el === activeSlotRef.current) placeActive(index)
+      else {
+        const slot = benchSlotRefs.current.indexOf(el)
+        if (el && slot !== -1) placeBench(index, slot)
+      }
+      return
+    }
+    const drop = legalHandDrop(index, point)
+    if (drop) dispatch(drop.action)
+  }
+
+  const handleAltarDrag = (point: { x: number; y: number }) => {
+    const figure = figureAt(slotAt(point))
+    setHighlight(figure && actionsFor.byUid.has(figure.uid) ? slotAt(point) : null)
+  }
+
+  const handleAltarDragEnd = (point: { x: number; y: number }) => {
+    const figure = figureAt(slotAt(point))
+    setHighlight(null)
+    if (figure && actionsFor.byUid.has(figure.uid)) dispatch({ type: 'ATTACH', uid: figure.uid })
   }
 
   /* --------------------------------------------------------------- action */
 
   // What the small popup above the Altar offers, if anything. Promote has
   // its own instruction on the turn banner and its own targetable Bench
-  // glow — nothing for this button to add there.
+  // glow — nothing for this button to add there. The label itself stays
+  // fixed — "Start Match" or "End Turn" — rather than folding in a Bench
+  // count: a label that changes shape as picks are made read as a second
+  // status readout competing with the picks' own badges in the hand.
   const benchCount = setupBench.filter((i) => i !== null).length
   const actionLabel =
     state.phase === 'setup'
       ? setupActive === null
         ? null
-        : benchCount === 0
-          ? 'Start Battle — no Bench'
-          : `Start Battle — ${benchCount} on the Bench`
+        : 'Start Match'
       : !mustPromote && myTurn
         ? 'End Turn'
         : null
@@ -353,7 +787,39 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setActionOpen(false)
   }
 
+  // Simulate hands your side to the AI for the rest of the match — at the
+  // same pace it already plays the opponent at, not a fast-forward, so a
+  // hand-off partway through still reads as the same match continuing
+  // rather than cutting straight to a result. Offered any time there's
+  // still a match to play and nobody's already simulating it.
+  const canSimulate = !simulating && state.phase !== 'ended'
+  const runSimulate = () => {
+    simulate()
+    setActionOpen(false)
+  }
+
   /* ------------------------------------------------------------- render */
+
+  // What each slot shows in place of its empty outline, if anything: a
+  // *committed* pick (setup's own local state, already picked for that
+  // slot) always wins over a merely *tentative* one (a card presently being
+  // magnetically pulled toward it, not yet dropped) — the latter only ever
+  // applies while nothing has actually landed there yet.
+  const activePreview =
+    setupPhase && setupActive !== null
+      ? { cardId: you.hand[setupActive]!, tentative: false }
+      : magnet?.target.kind === 'active'
+        ? { cardId: magnet.cardId, tentative: true }
+        : null
+
+  const benchPreview = (i: number) => {
+    const picked = setupPhase ? setupBench[i] : null
+    if (picked !== null && picked !== undefined) return { cardId: you.hand[picked]!, tentative: false }
+    if (magnet?.target.kind === 'bench' && magnet.target.index === i) {
+      return { cardId: magnet.cardId, tentative: true }
+    }
+    return null
+  }
 
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
@@ -365,141 +831,303 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           so the two halves meet at the mat's clash ring instead of being
           pushed to the screen edges.
 
-          Each side is a mirror of the other: piles sit just off the mat's own
-          centreline on the left, and the points/time badge sits in that
-          side's own outer corner — top-right for the opponent, bottom-right
-          for you, on the same shared container so "mirrored" is one rule
-          applied twice rather than two hand-tuned layouts. */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0 px-3 pt-safe overflow-hidden">
-        <CornerStats corner="top" points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
+          Each side's row spans the full width with its two pieces at
+          opposite ends rather than clustered on one side: the opponent's
+          points/time chip sits at the far left with their piles at the far
+          right, and yours is the mirror of that — piles far left, chip far
+          right — so the two rows read as one rule applied twice, not two
+          hand-tuned layouts. */}
+      {/* The hand tray below is positioned outside the flex flow (an absolute
+          overlay pinned to the bottom) rather than as a flex sibling, so this
+          board area spans the *entire* screen instead of (screen − hand tray
+          height). Padding top and bottom by half the tray's height keeps the
+          centred content the same size it always was — nothing shrinks — but
+          re-centres it on the screen's true midpoint, which is where the
+          mat's own halfway line is drawn. A flex sibling ate that clearance
+          asymmetrically only at the bottom, which is what pushed every piece
+          of this board, deck and discard piles included, above the line. */}
+      <div
+        className="relative z-10 flex-1 flex flex-col items-center justify-center gap-1 min-h-0 px-3 overflow-hidden"
+        style={{
+          paddingTop: `calc(${HAND_TRAY_CALC} / 2 + env(safe-area-inset-top, 0px))`,
+          paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
+        }}
+      >
+        <OpponentHand count={foe.hand.length} />
 
-        <div className="flex gap-1.5">
+        {/* Nudged down via `transform`, same reasoning as YOU_ROW_LIFT below:
+            a margin here would shrink this row's own share of the centred
+            flex column and silently re-centre the whole block, pulling
+            *your* side up to compensate. A transform moves the paint
+            position only. */}
+        <div
+          className="flex gap-1.5"
+          style={{ transform: `translateY(${FOE_ROW_LIFT - BENCH_CLEARANCE}px)` }}
+        >
           {foe.bench.map((figure, i) => (
             <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
           ))}
         </div>
-        <BoardFigure figure={foe.active} width={ACTIVE_W} emptyLabel="Active" />
+        <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
+          <motion.div animate={foeFigureFx}>
+            {/* `dying` only ever fills a slot the engine has already
+                emptied, and only until the strike ends — a real Figure
+                stepping up mid-effect wins over it. */}
+            <BoardFigure
+              figure={foe.active ?? (dying?.side === 'foe' ? dying.figure : null)}
+              width={ACTIVE_W}
+              emptyLabel="Active"
+            />
+          </motion.div>
+        </div>
 
-        <div className="w-full flex justify-start pl-0.5">
-          <PileCount label="Deck" count={foe.deck.length} small />
-          <PileCount label="Disc" count={foe.discard.length} small />
+        <div className="w-full flex items-start justify-between gap-2 px-0.5">
+          <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
+          <div className="flex items-start gap-2">
+            <div className="flex flex-col items-center">
+              <PileCount count={foe.deck.length} />
+              <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
+            </div>
+            <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
+          </div>
         </div>
 
         {/* Extra clearance: attached energy hangs below a Figure's card edge
             and would otherwise sit on top of the banner. */}
-        <div className="flex items-center justify-center py-1.5 w-full">
-          <TurnBanner state={state} myTurn={myTurn} seconds={clocks.turn} />
+        <div className="flex items-center justify-center py-0.5 w-full">
+          <TurnBanner state={state} simulating={simulating} />
         </div>
 
-        <div className="w-full flex justify-start pl-0.5">
-          <PileCount label="Deck" count={you.deck.length} small />
-          <PileCount label="Disc" count={you.discard.length} small />
-        </div>
-
-        <div ref={activeSlotRef} className="shrink-0">
-          <BoardFigure
-            figure={you.active}
-            width={ACTIVE_W}
-            emptyLabel="Active"
-            onClick={you.active && myTurn ? openActive : undefined}
-            selected={Boolean(you.active && myTurn)}
-            noPeek={Boolean(you.active && myTurn)}
-          />
-        </div>
-        <div className="flex gap-1.5 mt-1">
-          {you.bench.map((figure, i) => (
-            <div
-              key={i}
-              className="shrink-0"
-              ref={(el) => {
-                benchSlotRefs.current[i] = el
-              }}
-            >
-              <BoardFigure
-                figure={figure}
-                width={BENCH_W}
-                emptyLabel=""
-                targetable={mustPromote && figure !== null}
-                onClick={
-                  mustPromote && figure
-                    ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
-                    : undefined
-                }
-              />
+        <div className="w-full flex items-start justify-between gap-2 px-0.5">
+          <div className="flex items-start gap-2">
+            <div className="flex flex-col items-center">
+              <PileCount count={you.deck.length} />
+              <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
             </div>
-          ))}
+            <DiscardButton count={you.discard.length} cardIds={you.discard} />
+          </div>
+          <StatsChip points={you.points} seconds={clocks.you} />
         </div>
 
-        <CornerStats corner="bottom" points={you.points} seconds={clocks.you} />
+        {/* Lifted via `transform`, not margin: this whole board block is
+            centred with `justify-center` above, so a negative margin here
+            only half-worked — shrinking this row's own space in the flow
+            shortened the block, and re-centring a shorter block shifted the
+            *opponent's* rows down by the other half of the change, which is
+            exactly what this must not touch. A transform moves the paint
+            position without changing what the flex column measures, so the
+            opponent's side and the turn banner's own spacing stay exactly
+            where they were.
+
+            Measured on a 390×844 phone viewport, your Active's top edge
+            used to sit almost exactly on the clash ring's outer boundary —
+            a ~117px gap from the true halfway line versus the opponent's
+            ~73px above it — rather than crossing into the ring at all.
+            YOU_ROW_LIFT pulls it in far enough to sit inside the ring. */}
+        <div
+          ref={activeSlotRef}
+          className="shrink-0"
+          style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
+        >
+          <motion.div animate={youFigureFx}>
+            <BoardFigure
+              figure={you.active ?? (dying?.side === 'you' ? dying.figure : null)}
+              width={ACTIVE_W}
+              emptyLabel="Active"
+              onClick={you.active && myTurn ? openActive : undefined}
+              selected={Boolean(you.active && myTurn)}
+              noPeek={Boolean(you.active && myTurn)}
+              previewCardId={activePreview?.cardId}
+              previewTentative={activePreview?.tentative}
+            />
+          </motion.div>
+        </div>
+        <div
+          className="flex gap-1.5 mt-1"
+          style={{ transform: `translateY(-${YOU_ROW_LIFT - BENCH_CLEARANCE}px)` }}
+        >
+          {you.bench.map((figure, i) => {
+            const preview = benchPreview(i)
+            return (
+              <div
+                key={i}
+                className="shrink-0"
+                ref={(el) => {
+                  benchSlotRefs.current[i] = el
+                }}
+              >
+                <BoardFigure
+                  figure={figure}
+                  width={BENCH_W}
+                  emptyLabel=""
+                  targetable={mustPromote && figure !== null}
+                  onClick={
+                    mustPromote && figure
+                      ? () => dispatch({ type: 'PROMOTE', benchIndex: i })
+                      : figure && myTurn
+                        ? () => openBench(i)
+                        : undefined
+                  }
+                  noPeek={Boolean(figure && myTurn && !mustPromote)}
+                  previewCardId={preview?.cardId}
+                  previewTentative={preview?.tentative}
+                />
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ------------------------------------------------------------ hand */}
-      <div className="relative z-10 px-3 pb-safe pb-2">
-        <div className="flex items-end gap-1">
-          <PlayerHand
-            hand={you.hand}
-            setupActive={setupActive}
-            setupBench={setupBench}
-            basicsInHand={basicsInHand}
-            setupPhase={state.phase === 'setup'}
-            myTurn={myTurn}
-            playable={actionsFor.byHand}
-            onTap={(index, isBasic) =>
-              state.phase === 'setup' ? isBasic && toggleSetupPick(index) : openHandCard(index)
-            }
-            onDropEnd={handleHandDragEnd}
-          />
+      <div className="absolute inset-x-0 bottom-0 z-10 px-3 pb-safe pb-2">
+        <div className="relative">
+          {/* The hand gets the tray's *full* width to itself now, rather than
+              sharing a flex row with the Altar column: `PlayerHand` centres
+              its fan with `left: 50%` on whatever box it's given, and a
+              flex-1 box squeezed narrower by the Altar's own width centred
+              the fan on that smaller box instead of the true screen — a
+              constant, structural left-of-centre offset, worse the wider the
+              Altar's column got. Positioning it as its own absolute layer
+              spanning the tray means that 50% is always 50% of the screen. */}
+          <div className="absolute inset-x-0 bottom-0">
+            <PlayerHand
+              hand={you.hand}
+              setupActive={setupActive}
+              setupBench={setupBench}
+              basicsInHand={basicsInHand}
+              setupPhase={setupPhase}
+              myTurn={myTurn}
+              simulating={simulating}
+              playable={actionsFor.byHand}
+              onTap={(index) => {
+                // Setup places cards by drag only now — a tap during setup used
+                // to auto-assign the next open slot, but that made the drag
+                // gesture redundant instead of authoritative. Outside setup, a
+                // tap still opens the card's own sheet of plays.
+                if (!setupPhase) openHandCard(index)
+              }}
+              onDropEnd={handleHandDragEnd}
+              onDragMove={handleHandDrag}
+            />
+          </div>
 
-          {/* Altar, with the small popup action trigger stacked above it. */}
-          <div className="relative flex flex-col items-center gap-1.5 shrink-0">
+          {/* Altar, with the small popup action trigger stacked above it —
+              its own layer now, pinned to the tray's right edge instead of
+              sharing the hand's row (see above). Sits above the hand fan in
+              paint order, which only matters for a hand large enough to
+              spread near the tray's edges. */}
+          <div className="absolute right-0 bottom-0 flex flex-col items-center gap-1.5 shrink-0">
             <AnimatePresence>
-              {actionOpen && actionLabel && (
+              {actionOpen && (actionLabel || canSimulate) && (
                 <motion.div
-                  className="absolute bottom-full mb-2 right-0 whitespace-nowrap"
+                  className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-2 whitespace-nowrap"
                   initial={{ opacity: 0, y: 6, scale: 0.92 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.92 }}
                   transition={{ type: 'spring', stiffness: 460, damping: 32 }}
                 >
-                  <Button variant="gold" className="!px-4 !py-2 text-sm" onClick={runAction}>
-                    {actionLabel}
-                  </Button>
+                  {/* Above the primary action rather than below: it's the
+                      less common choice of the two, and shouldn't sit where
+                      a thumb reaching for "Start Match"/"End Turn" would
+                      land on it by accident. */}
+                  {canSimulate && (
+                    <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={runSimulate}>
+                      Simulate Match
+                    </Button>
+                  )}
+                  {actionLabel && (
+                    <Button variant="gold" className="!px-4 !py-2 text-sm" onClick={runAction}>
+                      {actionLabel}
+                    </Button>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            <button
-              onClick={() => setActionOpen((v) => !v)}
-              disabled={!actionLabel}
-              className="rounded-pill w-9 h-9 grid place-items-center"
-              style={{
-                background: actionLabel ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                opacity: actionLabel ? 1 : 0.5,
-              }}
-              aria-label={actionLabel ?? 'No action available'}
-              aria-expanded={actionOpen}
-            >
-              <CheckIcon size={16} className={actionLabel ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
-            </button>
+            {state.phase === 'setup' && (
+              <button
+                onClick={resetSetup}
+                disabled={setupActive === null && benchCount === 0}
+                className="rounded-pill w-8 h-8 grid place-items-center"
+                style={{
+                  background: 'var(--bg-sunk)',
+                  opacity: setupActive === null && benchCount === 0 ? 0.4 : 1,
+                }}
+                aria-label="Reset setup picks"
+              >
+                <ResetIcon size={14} className="text-ink-faint" />
+              </button>
+            )}
 
             <button
-              onClick={openAltar}
-              disabled={!myTurn || you.altar === null}
-              className="rounded-pill grid place-items-center transition-transform"
+              onClick={() => setActionOpen((v) => !v)}
+              disabled={!actionLabel && !canSimulate}
+              className="rounded-pill w-9 h-9 grid place-items-center"
               style={{
-                width: 46,
-                height: 46,
-                background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
+                background: actionLabel || canSimulate ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                opacity: actionLabel || canSimulate ? 1 : 0.5,
               }}
-              aria-label={you.altar ? `Altar: ${you.altar} energy ready` : 'Altar empty'}
+              aria-label={actionLabel ?? (canSimulate ? 'Simulate Match' : 'No action available')}
+              aria-expanded={actionOpen}
             >
-              {you.altar ? (
-                <EnergyOrb type={you.altar} size={30} />
-              ) : (
-                <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>
-              )}
+              <CheckIcon
+                size={16}
+                className={actionLabel || canSimulate ? 'text-[var(--gold-bright)]' : 'text-ink-faint'}
+              />
             </button>
+
+            <div className="relative grid place-items-center">
+              {/* Charged glow: energy is attached by dragging the orb onto a
+                  Figure now, so this is the zone's only "something's here"
+                  tell besides the orb itself sitting on top of it. */}
+              {you.altar && (
+                <div
+                  className="cov-altar-glow absolute rounded-full pointer-events-none"
+                  style={{
+                    width: 46,
+                    height: 46,
+                    background: 'radial-gradient(circle, rgba(229,192,140,.55), transparent 70%)',
+                  }}
+                />
+              )}
+
+              {/* The Altar itself — the socket, not the thing being dragged.
+                  It never moves: only the orb sitting on top of it (below)
+                  drags onto a Figure, so the frame stays put as the visual
+                  anchor for "this is where energy comes from" whether or
+                  not one is resting there right now. */}
+              <div
+                className="relative rounded-pill grid place-items-center"
+                style={{
+                  width: 46,
+                  height: 46,
+                  background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                  boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
+                }}
+                aria-hidden={you.altar !== null}
+              >
+                {!you.altar && <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>}
+              </div>
+
+              {/* The energy orb, layered on top of the (stationary) Altar.
+                  No tap-to-sheet any more — dragging it onto a Figure is the
+                  only way to attach energy now. */}
+              {you.altar && (
+                <motion.button
+                  disabled={!myTurn}
+                  className="absolute inset-0 grid place-items-center rounded-pill"
+                  drag={myTurn}
+                  dragSnapToOrigin
+                  dragElastic={0.35}
+                  whileDrag={{ zIndex: 2000, scale: 1.15 }}
+                  onDrag={(_event, info: PanInfo) => handleAltarDrag(info.point)}
+                  onDragEnd={(_event, info: PanInfo) => handleAltarDragEnd(info.point)}
+                  aria-label={`Altar: ${you.altar} energy ready — drag onto a Figure`}
+                >
+                  <EnergyOrb type={you.altar} size={30} />
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -507,6 +1135,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       {/* ------------------------------------------------------- overlays */}
       <AnimatePresence>
         {!coinSettled && <CoinFlip first={state.first} onDone={settleCoin} />}
+      </AnimatePresence>
+
+      <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
+
+      <AnimatePresence>
+        {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -532,11 +1166,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         />
       )}
 
-      <AnimatePresence>
-        {state.phase === 'ended' && (
-          <Result state={state} onExit={onExit} />
-        )}
-      </AnimatePresence>
+      {/*
+        No `AnimatePresence` here. `state.phase` is one-way — a match that
+        reaches 'ended' never leaves it, so Result never needs an exit
+        transition of its own; the only way it ever disappears is the whole
+        Battle screen unmounting when the player navigates away, which is a
+        transition the *App-level* route AnimatePresence already owns.
+        This was the first thing tried against the "Continue does nothing"
+        bug — a nested AnimatePresence whose child never gets its own exit
+        signal looked exactly like the kind of thing that could confuse an
+        ancestor AnimatePresence waiting on the whole subtree. Removing it
+        alone did not fix the bug (see App.tsx for what actually did — its
+        `mode="wait"`), but it still is not doing anything useful: Result
+        gets nothing from carrying an exit animation it can structurally
+        never run, so there is no reason to put it back.
+      */}
+      {resultReady && <Result state={state} onExit={onExit} />}
     </div>
   )
 }
@@ -550,13 +1195,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
  * side's own outer corner, top for the opponent and bottom for you, on the
  * same mat so the two read as one mirrored rule rather than two bars.
  */
-function CornerStats({
-  corner,
+function StatsChip({
   points,
   seconds,
   thinking,
 }: {
-  corner: 'top' | 'bottom'
   points: number
   seconds: number
   thinking?: boolean
@@ -566,11 +1209,11 @@ function CornerStats({
 
   return (
     <div
-      className={cx(
-        'absolute right-2 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1',
-        corner === 'top' ? 'top-2' : 'bottom-2',
-      )}
-      style={{ background: 'rgba(10,7,3,.55)', border: '1px solid rgba(229,192,140,.25)' }}
+      className="shrink-0 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1"
+      style={{
+        background: 'rgba(10,7,3,.55)',
+        border: '1px solid rgba(229,192,140,.25)',
+      }}
     >
       <span className="flex gap-1" aria-label={`${points} of ${RULES.POINTS_TO_WIN} points`}>
         {Array.from({ length: RULES.POINTS_TO_WIN }, (_, i) => (
@@ -596,18 +1239,24 @@ function CornerStats({
   )
 }
 
-/** Tall enough for a lifted card plus the fan's own arc and a picked card's
- *  badge, at the widest hands this game deals. */
-const HAND_HEIGHT = 112
-
 /**
  * The hand, fanned rather than scrolled.
  *
- * Each card is rotated and lifted by its distance from the centre — framer's
- * own `rotate`/`y` style keys, not a plain CSS `transform` string, so a drag's
- * own x/y compose with the fan's static pose instead of one overwriting the
- * other. Spread narrows as the hand grows, so a big hand fans within the same
- * width a small one does rather than spilling past the Altar column.
+ * Each card is rotated and lifted by its distance from the centre. The
+ * rotation and scale are framer's own `animate` keys and the offset is a pair
+ * of `x`/`y` motion values, never a plain CSS `transform` string — a drag
+ * moves those same two values, so the fan's pose and the drag compose instead
+ * of one overwriting the other. Spread narrows as the hand grows, so a big
+ * hand fans within the same width a small one does rather than spilling past
+ * the Altar column.
+ *
+ * Two gestures start the same way here, and telling them apart is what most
+ * of the code below is for. Dragging a finger *across* the fan riffles
+ * through it, lifting each card as it passes — the same thing you'd do with a
+ * real hand of cards to see what you're holding. Pulling a card *up* takes it
+ * out of the hand to play it. So a card is never dragged by framer's own
+ * pointerdown listener (`dragListener={false}`); the tray watches the gesture
+ * first and only hands it over once the finger has clearly gone upward.
  *
  * Long-press-to-peek is switched off for the whole phase (`noPeek`) rather
  * than only on the cards that can be dragged: a hold that starts sizing up a
@@ -622,9 +1271,11 @@ function PlayerHand({
   basicsInHand,
   setupPhase,
   myTurn,
+  simulating,
   playable,
   onTap,
   onDropEnd,
+  onDragMove,
 }: {
   hand: string[]
   setupActive: number | null
@@ -632,154 +1283,782 @@ function PlayerHand({
   basicsInHand: { cardId: string; index: number }[]
   setupPhase: boolean
   myTurn: boolean
+  /** The AI is playing this side now — every gesture here is inert. */
+  simulating: boolean
   playable: Map<number, Action[]>
   onTap: (index: number, isBasic: boolean) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
+  onDragMove: (index: number, point: { x: number; y: number }) => void
 }) {
-  const count = hand.length
+  // Which hand indices are actually rendered right now — a card picked for
+  // a slot during setup is hidden (the early `return null` below), and the
+  // fan has to be built from *this* list rather than from raw hand indices.
+  // Spacing every card by its own index minus the raw array's own midpoint
+  // left a hole exactly where a picked card used to sit: picking anything
+  // but the dead-centre card split the remaining cards unevenly between the
+  // two sides of that hole, and the whole fan read as tipped lopsided
+  // rather than centred and one card shorter. Ranking within the visible
+  // list instead means the fan always closes back up around its own true
+  // centre, for any hand size and whichever card was just picked.
+  const visibleIndices = hand
+    .map((_, i) => i)
+    .filter((i) => !(setupPhase && (setupActive === i || setupBench.includes(i))))
+  const count = visibleIndices.length
   const mid = (count - 1) / 2
-  const rotateStep = count > 1 ? Math.min(7, 56 / (count - 1)) : 0
-  const spanStep = count > 1 ? Math.min(34, 220 / (count - 1)) : 0
+  // Divided by count rather than count-1, and with no flat ceiling for the
+  // hand sizes this game actually deals: the old cap saturated at max spread
+  // for anything up to eight or nine cards, so drawing a card never visibly
+  // tightened the fan until a hand was already unusually large.
+  const rotateStep = count > 1 ? Math.min(10, Math.max(2, 30 / count)) : 0
+  // The floor keeps a very large hand from packing so tight that neighbours
+  // bury most of each other's card — the z-index rule below is what actually
+  // guarantees a draggable card stays tappable regardless of overlap, this
+  // just keeps the overlap itself from getting absurd at extreme hand sizes.
+  const spanStep = count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0
+
+  // The lift a card gets as a thumb brushes across the fan without yet
+  // committing to a drag — the same tell a hand of real cards gives when
+  // you're riffling through it. Pointer enter/leave rather than framer's own
+  // `whileHover` because the latter is gated to non-touch pointers in some
+  // browsers, and this game is touch-first.
+  const [brushed, setBrushed] = useState<number | null>(null)
+
+  // A little extra lift and size for whichever card a held finger is
+  // currently resting on while browsing the hand — a small, quiet tell
+  // rather than a card popping out to full size: the fan itself never moves,
+  // so there's nothing else to settle before this one card can rise and its
+  // predecessor can fall back, which is what keeps the handoff between two
+  // cards feeling like one continuous motion instead of a jump.
+  const BROWSE_LIFT = 22
+  const BROWSE_SCALE = 1.14
+
+  // A held finger browses the hand, lifting whichever card sits under it —
+  // distinct from the drag-to-play gesture below. It lives at the tray level
+  // rather than on each card, because the card the finger ends up over after
+  // a hold has *moved* is not necessarily the one it started on; a per-card
+  // gesture would lose the finger the instant it crossed into a neighbour's
+  // box.
+  const [focusIndex, setFocusIndex] = useState<number | null>(null)
+  const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const activePointer = useRef<number | null>(null)
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>()
+  const lastPoint = useRef({ x: 0, y: 0 })
+  // Set the instant Framer recognises an actual drag (not just a held
+  // finger). Once a card is really being dragged, the browse gesture has to
+  // get completely out of the way: hit-testing on every move re-renders the
+  // whole hand, and that fight against Framer's own drag tracking is what
+  // made moving a card feel glitchy. Both stop the moment this flips true.
+  const draggingCard = useRef(false)
+  // Which card that is, and whether it was the focused (lifted) one the
+  // instant its drag began. Framer adds the live drag offset on top of
+  // whatever the fan currently targets for x/y — so clearing the focus the
+  // moment a drag starts (needed so whichever *other* card was lifted settles
+  // back down) was itself a bug: it changed the dragged card's own target
+  // mid-gesture, and the render jumped by the difference before the rest of
+  // the drag continued smoothly from the new baseline. Freezing this card's
+  // own focus state here and reusing it for the rest of its drag keeps its
+  // target constant throughout, so only the drag offset moves it. It settles
+  // back to its real resting pose with a normal spring once the drag actually
+  // ends, since only then does this stop being read.
+  const draggingIndex = useRef<number | null>(null)
+  const frozenPose = useRef<{ isFocused: boolean } | null>(null)
+
+  /**
+   * Every card in hand can be picked up and carried anywhere on your side of
+   * the mat, whether or not it has a legal home to land in.
+   *
+   * Restricting the gesture to cards with a play available meant a card you
+   * could not use right now simply would not come away from the fan — you
+   * could put a finger on it and pull and it stayed glued there, which reads
+   * as the hand holding on to it rather than as the game telling you the
+   * card has nowhere to go. Picking one up and finding nothing lights up for
+   * it says the same thing and lets you look at the board while you decide.
+   *
+   * What a card is *allowed to do* when released has not moved: mid-match
+   * every drop is still checked against the engine's own legal-action list,
+   * and setup checks the Basic-only rule where it resolves the drop. Anything
+   * without a legal landing simply springs back to the fan.
+   */
+  const canLift = !simulating
+
+  // One handle per card, so the tray can start a *particular* card's drag
+  // from a gesture that began somewhere else in the fan. `useDragControls`
+  // would be the usual way to make one, but there is no hook to call per item
+  // inside a `.map()` over a hand whose length changes; the class behind that
+  // hook is exported for exactly this, and the ref keeps each handle stable
+  // for as long as a card is rendered at that index.
+  const dragHandles = useRef(new Map<number, DragControls>())
+  const handleFor = (index: number) => {
+    const existing = dragHandles.current.get(index)
+    if (existing) return existing
+    const created = new DragControls()
+    dragHandles.current.set(index, created)
+    return created
+  }
+
+  /** Which of the three things make a card glow, if any — each reads as a
+   *  different colour (see VIABILITY_GLOW below): gold for something
+   *  placeable, white for an ascension, red for a Covenant or Relic's own
+   *  ability. Unlike a card's *liftability*, this also covers those last two —
+   *  they're played through the tap sheet, not a drag, but are every bit as
+   *  "viable right now" as the cards that are. */
+  const viabilityOf = (index: number): 'use' | 'ascend' | 'ability' | null => {
+    if (simulating) return null
+    if (setupPhase) return basicsInHand.some((b) => b.index === index) ? 'use' : null
+    if (!myTurn) return null
+    const actions = playable.get(index) ?? []
+    if (actions.some((a) => a.type === 'PLAY_FIGURE')) return 'use'
+    if (actions.some((a) => a.type === 'ASCEND')) return 'ascend'
+    if (actions.some((a) => a.type === 'PLAY_COVENANT' || a.type === 'PLAY_RELIC')) return 'ability'
+    return null
+  }
+
+  /** Which card in the fan a DOM element belongs to, if any. */
+  const cardIndexOf = (el: Element | null | undefined): number | null => {
+    const button = el?.closest('button')
+    if (!button) return null
+    const index = cardRefs.current.indexOf(button as HTMLButtonElement)
+    return index === -1 ? null : index
+  }
+
+  /** The card actually under this point — the browser's own answer, which
+   *  respects both the real painted stacking and each card's rotation.
+   *  Ranking bounding boxes by hand order looks equivalent and isn't: a
+   *  rotated element's box is its *axis-aligned* bounds, noticeably wider
+   *  than the card inside it, so the outer cards of the fan claimed points
+   *  that visibly belonged to their neighbours and a finger resting on one
+   *  card would riffle — or pull out — another. */
+  const hitTest = (x: number, y: number): number | null =>
+    cardIndexOf(document.elementFromPoint(x, y))
+
+  /* ------------------------------------------------- reading the gesture */
+
+  // How far sideways before the hand decides you are riffling through it.
+  const SCRUB_SLACK = 10
+  // How far *up* before it decides you are taking a card out instead. Both
+  // are measured from where the finger went down; the upward pull also has
+  // to be the larger of the two, so a diagonal sweep across the fan riffles
+  // rather than yanking a card out of it.
+  const LIFT_PULL = 14
+  // Once riffling, the bar to pull a card out rises: the finger is already
+  // travelling, and a fan is an arc, so a scrub along it drifts upward a
+  // little on its own. Measured from the lowest point the finger has reached
+  // rather than from where it started, so it is a genuine change of
+  // direction that lifts a card, not the tail end of a long sideways sweep.
+  const LIFT_FROM_BROWSE = 26
+
+  /** How the gesture in flight is being read. Undecided until the finger has
+   *  moved far enough in one direction or the other to say. */
+  const reading = useRef<'undecided' | 'browse' | 'lift'>('undecided')
+  // Where the gesture began, and which card it began on. The card comes from
+  // the pointerdown's own target rather than from a hit test: the browser
+  // already knows exactly what was pressed, and that answer stays right even
+  // once the finger has moved off it.
+  const from = useRef<{ x: number; y: number; index: number | null }>({ x: 0, y: 0, index: null })
+  const lowest = useRef(0)
+  // The focused card as a ref as well as state: the gesture handlers below
+  // run outside React's render, and need the *current* focus to know which
+  // card an upward pull is asking for.
+  const focused = useRef<number | null>(null)
+  const focusOn = (index: number | null) => {
+    focused.current = index
+    setFocusIndex(index)
+  }
+
+  // The gesture is tracked on the window rather than on this tray. A card
+  // grabbed near the top of the fan stands proud of the tray's own box, and
+  // an upward pull leaves it within a few pixels — long before there is
+  // enough movement to tell a lift from a scrub, so a tray-level listener
+  // would simply stop hearing the gesture it is trying to read. No
+  // `setPointerCapture` either: retargeting every event to one element is a
+  // much heavier tool than this needs, and it has broken drag recognition in
+  // this hand before.
+  const untrack = useRef<() => void>()
+  const endGesture = () => {
+    untrack.current?.()
+    untrack.current = undefined
+    clearTimeout(holdTimer.current)
+    activePointer.current = null
+    reading.current = 'undecided'
+    focusOn(null)
+  }
+
+  /** Hand the gesture over to Framer: this card leaves the fan and follows
+   *  the finger from wherever it is right now. */
+  const liftOut = (event: PointerEvent, index: number | null) => {
+    if (index === null || !canLift) return
+    reading.current = 'lift'
+    clearTimeout(holdTimer.current)
+    handleFor(index).start(event)
+  }
+
+  const onGestureMove = (event: PointerEvent) => {
+    // Framer owns the gesture from here — see `draggingCard`.
+    if (draggingCard.current || reading.current === 'lift') return
+    if (activePointer.current !== event.pointerId) return
+    const x = event.clientX
+    const y = event.clientY
+    lastPoint.current = { x, y }
+
+    if (reading.current === 'undecided') {
+      const sideways = Math.abs(x - from.current.x)
+      const pull = from.current.y - y
+      if (pull >= LIFT_PULL && pull > sideways) {
+        liftOut(event, from.current.index)
+        return
+      }
+      if (sideways < SCRUB_SLACK) return
+      reading.current = 'browse'
+      clearTimeout(holdTimer.current)
+    }
+
+    // Only ever *move* the highlight, never drop it: the pull that takes a
+    // card out of the hand carries the finger off the fan almost immediately,
+    // and clearing the focus on the way out would leave nothing to lift.
+    const over = hitTest(x, y)
+    if (over !== null) focusOn(over)
+    lowest.current = Math.max(lowest.current, y)
+    if (lowest.current - y >= LIFT_FROM_BROWSE) liftOut(event, focused.current ?? from.current.index)
+  }
+
+  const onHandPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointer.current !== null) return
+    activePointer.current = e.pointerId
+    lastPoint.current = { x: e.clientX, y: e.clientY }
+    from.current = { x: e.clientX, y: e.clientY, index: cardIndexOf(e.target as Element) }
+    lowest.current = e.clientY
+    reading.current = 'undecided'
+
+    const move = (ev: PointerEvent) => onGestureMove(ev)
+    const up = () => endGesture()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    untrack.current = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+
+    // A finger that comes down and stays down is browsing too — you are
+    // looking at what you're holding, you just haven't moved yet.
+    clearTimeout(holdTimer.current)
+    holdTimer.current = setTimeout(() => {
+      if (activePointer.current === null || reading.current !== 'undecided') return
+      reading.current = 'browse'
+      focusOn(hitTest(lastPoint.current.x, lastPoint.current.y) ?? from.current.index)
+    }, HOLD_TO_FAN_MS)
+  }
+
+  useEffect(
+    () => () => {
+      untrack.current?.()
+      clearTimeout(holdTimer.current)
+    },
+    [],
+  )
 
   return (
-    <div className="flex-1 min-w-0 relative" style={{ height: HAND_HEIGHT }}>
+    <div
+      className="flex-1 min-w-0 relative"
+      style={{ height: HAND_HEIGHT, touchAction: 'none' }}
+      onPointerDown={onHandPointerDown}
+    >
       {hand.map((cardId, index) => {
         const pickedActive = setupActive === index
         const pickedBench = setupBench.includes(index)
+        // Once setup has actually picked a card for a slot, it belongs
+        // there and nowhere else — showing it in both places at once (a
+        // ring around it here, the same card seated in the slot there) read
+        // as it never having left. Mid-match has no equivalent limbo: a
+        // played card leaves `hand` for real, immediately, on dispatch.
+        if (setupPhase && (pickedActive || pickedBench)) return null
         const isBasic = basicsInHand.some((b) => b.index === index)
-        const draggable = setupPhase && isBasic
-        const offset = index - mid
+        // Rank among the visible cards, not the raw hand index — see the
+        // comment on `visibleIndices` above.
+        const rank = visibleIndices.indexOf(index)
+        const offset = rank - mid
+        // The glow (coloured by which of the three this is) is the *only*
+        // thing that marks a card viable; there is deliberately no height
+        // or position change to go with it — see the pose below, which never
+        // reads viability at all.
+        const viability = viabilityOf(index)
+        let isFocused = focusIndex === index
+        // This card is mid-drag: use the focus state frozen the instant
+        // that drag began instead of the live (already-cleared) browse
+        // state — see frozenPose's own comment for why.
+        if (draggingIndex.current === index && frozenPose.current) {
+          isFocused = frozenPose.current.isFocused
+        }
 
         return (
-          <motion.button
+          <HandCard
             key={`${cardId}-${index}`}
-            className="absolute bottom-0"
-            style={{
-              width: HAND_W,
-              left: '50%',
-              marginLeft: offset * spanStep - HAND_W / 2,
-              zIndex: index,
-              transformOrigin: 'bottom center',
+            elementRef={(el) => {
+              cardRefs.current[index] = el
             }}
-            animate={{
-              // A card further from the centre dips a little further down, so
-              // the row reads as a fan held from below rather than a straight
-              // line of tilted cards.
+            controls={handleFor(index)}
+            canLift={canLift}
+            pose={{
+              // The fan itself never moves — only `y` and `scale` change for
+              // whichever card is focused, so there's nothing else to
+              // resettle when the finger moves on to a neighbour, and the
+              // handoff between the two reads as one continuous motion
+              // instead of the fan itself lurching.
+              x: offset * spanStep,
+              y: offset * offset * 1.4 - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
               rotate: offset * rotateStep,
-              y: (pickedActive || pickedBench ? -14 : 0) + offset * offset * 1.4,
+              scale: isFocused ? BROWSE_SCALE : 1,
+              // A plain ribbon spread: stacking order always follows hand
+              // order, full stop. Whether a card is viable never changes it —
+              // a viable card earlier in the hand stays exactly as overlapped
+              // by its later neighbours as a non-viable one would be, rather
+              // than jumping ahead of them. Only the browsed (held-and-lifted)
+              // card is ever an exception, since it's meant to visibly clear
+              // the row while it's focused.
+              zIndex: isFocused ? 3000 : index,
             }}
-            drag={draggable}
-            dragSnapToOrigin
-            dragElastic={0.35}
-            whileDrag={{ zIndex: 40, scale: 1.1 }}
-            onDragEnd={(_event, info: PanInfo) => onDropEnd(index, info.point)}
-            onClick={() => onTap(index, isBasic)}
-            whileTap={{ scale: 0.95 }}
-            disabled={setupPhase && !isBasic}
+            onBrush={() => setBrushed(index)}
+            onUnbrush={() => setBrushed((b) => (b === index ? null : b))}
+            onLift={() => {
+              // Freeze this card's own focus state first, then clear the
+              // shared browse state — so whichever *other* card was lifted
+              // settles back down immediately (nothing is fighting its
+              // drag), while this one keeps rendering the exact pose it had
+              // the instant it grabbed, all the way to drop.
+              frozenPose.current = { isFocused }
+              draggingIndex.current = index
+              draggingCard.current = true
+              endGesture()
+            }}
+            onCarry={(point) => onDragMove(index, point)}
+            onRelease={(point) => {
+              draggingCard.current = false
+              draggingIndex.current = null
+              frozenPose.current = null
+              setBrushed(null)
+              onDropEnd(index, point)
+            }}
+            // Setup is drag-only, full stop — a tap here used to be a no-op
+            // already, but the button still visibly pressed down under a
+            // finger, which reads as "this does something" even when it
+            // doesn't. No click handler and no press animation is what
+            // actually looks like a card that can only be dragged. Simulate
+            // gets the same treatment for the same reason: a tap that opened
+            // the play sheet mid-simulation could dispatch a real action out
+            // from under the AI turn about to land on this same card.
+            onClick={setupPhase || simulating ? undefined : () => onTap(index, isBasic)}
+            // Only Simulate makes a card inert. Marking non-Basics disabled
+            // during setup also blocked every pointer event on them, which is
+            // exactly what stopped them being picked up; what a *tap* does is
+            // still gated on its own, just above.
+            disabled={simulating}
           >
+            {/* Every card in hand stays fully visible — the glow above is
+                the only thing that marks a card viable, not how much of the
+                rest of the hand fades out around it. */}
             <div
-              className="rounded-[8%]"
-              style={{
-                opacity: setupPhase && !isBasic ? 0.4 : 1,
-                boxShadow: pickedActive
-                  ? '0 0 0 2.5px var(--gold-bright)'
-                  : pickedBench
-                    ? '0 0 0 2px rgba(229,192,140,.6)'
-                    : playable.has(index) && myTurn
-                      ? '0 0 0 1.5px rgba(229,192,140,.4)'
-                      : undefined,
-              }}
+              className={cx('rounded-[8%]', viability && 'cov-hand-glow')}
+              style={viability ? VIABILITY_GLOW[viability] : undefined}
             >
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
-            {pickedActive && (
-              <span
-                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                style={{ background: 'var(--gold)', color: '#241a0e' }}
-              >
-                ACTIVE
-              </span>
-            )}
-            {pickedBench && (
-              <span
-                className="absolute -top-1 left-1/2 -translate-x-1/2 rounded-pill px-1.5 text-[8px] font-bold"
-                style={{ background: 'rgba(229,192,140,.75)', color: '#241a0e' }}
-              >
-                BENCH
-              </span>
-            )}
-          </motion.button>
+          </HandCard>
         )
       })}
     </div>
   )
 }
 
-function PileCount({ label, count, small }: { label: string; count: number; small?: boolean }) {
-  const size = small ? 26 : 34
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="relative rounded-sm overflow-hidden" style={{ width: size }}>
-        {count > 0 ? (
-          <CardBack />
-        ) : (
-          <div style={{ aspectRatio: '63/88', background: 'rgba(10,7,3,.4)', borderRadius: 3 }} />
-        )}
-      </div>
-      <span className="text-[8px] tabular-nums" style={{ color: 'rgba(229,192,140,.55)' }}>
-        {label} {count}
-      </span>
-    </div>
-  )
-}
+/** How the fan settles a card into place, and how it takes one back. */
+const FAN_SPRING = { type: 'spring', stiffness: 500, damping: 30 } as const
 
-function TurnBanner({
-  state,
-  myTurn,
-  seconds,
+/**
+ * One card in the fan.
+ *
+ * Its own component because each card needs two things a `.map()` body can't
+ * hold: a drag handle the tray can pull on (see `dragHandles` above), and its
+ * own `x`/`y` motion values.
+ *
+ * Those motion values are the whole reason a released card finds its way
+ * home. Framer's `dragSnapToOrigin` returns a card to x=0, y=0 — which is the
+ * *centre* of the fan, not this card's own seat in it, so every card but the
+ * middle one came back to the wrong place and stayed there, since the fan's
+ * target for it hadn't changed and so was never re-animated. Owning the two
+ * values here means the drop can simply animate them back to the pose the fan
+ * asks for, whatever that is.
+ */
+function HandCard({
+  pose,
+  canLift,
+  controls,
+  elementRef,
+  disabled,
+  onClick,
+  onBrush,
+  onUnbrush,
+  onLift,
+  onCarry,
+  onRelease,
+  children,
 }: {
-  state: MatchState
-  myTurn: boolean
-  seconds: number
+  pose: { x: number; y: number; rotate: number; scale: number; zIndex: number }
+  canLift: boolean
+  controls: DragControls
+  elementRef: (el: HTMLButtonElement | null) => void
+  disabled: boolean
+  onClick?: (() => void) | undefined
+  onBrush: () => void
+  onUnbrush: () => void
+  onLift: () => void
+  onCarry: (point: { x: number; y: number }) => void
+  onRelease: (point: { x: number; y: number }) => void
+  children: React.ReactNode
 }) {
-  // Setup carries no label at all: the mat's own slot outlines and the fanned
-  // hand are the instruction now, not a line of copy above them.
-  const label =
-    state.phase === 'setup'
-      ? null
-      : state.phase === 'promote'
-        ? state.promoting === 'you'
-          ? 'Choose a Figure'
-          : 'Opponent is choosing'
-        : myTurn
-          ? 'Your turn'
-          : "Opponent's turn"
+  const x = useMotionValue(pose.x)
+  const y = useMotionValue(pose.y)
+  const dragging = useRef(false)
+
+  // The fan's offset is a target to animate toward, not a style to render —
+  // a drag moves these same two values, so re-rendering would fight it.
+  useEffect(() => {
+    if (dragging.current) return
+    const settleX = animate(x, pose.x, FAN_SPRING)
+    const settleY = animate(y, pose.y, FAN_SPRING)
+    return () => {
+      settleX.stop()
+      settleY.stop()
+    }
+  }, [pose.x, pose.y, x, y])
 
   return (
-    <div className="flex flex-col items-center gap-0.5 flex-1">
-      {label && (
-        <span
-          className="font-display text-sm tracking-wide"
-          style={{ color: myTurn ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
-        >
-          {label}
-        </span>
-      )}
-      {state.phase === 'main' && (
-        <span
-          className="text-[10px] font-numeric tabular-nums"
-          style={{ color: seconds <= 10 ? '#ef8f7c' : 'rgba(229,192,140,.45)' }}
-        >
-          {seconds}s · turn {state.turn}
-        </span>
+    <motion.button
+      ref={elementRef}
+      className="absolute bottom-0"
+      style={{
+        x,
+        y,
+        width: HAND_W,
+        left: '50%',
+        marginLeft: -HAND_W / 2,
+        zIndex: pose.zIndex,
+        transformOrigin: 'bottom center',
+      }}
+      animate={{ rotate: pose.rotate, scale: pose.scale }}
+      transition={FAN_SPRING}
+      onPointerEnter={onBrush}
+      onPointerLeave={onUnbrush}
+      drag={canLift}
+      // Never from this card's own pointerdown: the tray reads the gesture
+      // first and starts the drag itself, so that riffling sideways through
+      // the hand doesn't pull a card out of it. See PlayerHand's own doc.
+      dragListener={false}
+      dragControls={controls}
+      // Both off so that releasing a card leaves it exactly where the finger
+      // let go, with nothing of Framer's still animating it — the drop
+      // handler below is the only thing that decides where it goes next.
+      dragMomentum={false}
+      dragSnapToOrigin={false}
+      // Straightens to upright the instant a card lifts off the fan, rather
+      // than carrying its resting tilt around under the thumb — a card you're
+      // holding reads as held, not still leaning the way it happened to sit
+      // in the hand. Nothing here persists past the gesture.
+      whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
+      onDragStart={() => {
+        dragging.current = true
+        onLift()
+      }}
+      onDrag={(_event, info: PanInfo) => onCarry(info.point)}
+      onDragEnd={(_event, info: PanInfo) => {
+        dragging.current = false
+        onRelease(info.point)
+        // Back to its seat in the fan. If the drop played the card this is
+        // moot — it has already left the hand and unmounted.
+        animate(x, pose.x, FAN_SPRING)
+        animate(y, pose.y, FAN_SPRING)
+      }}
+      whileTap={onClick ? { scale: 0.95 } : undefined}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </motion.button>
+  )
+}
+
+/**
+ * The opponent's hand, face-down and unreachable — a count of cards fanned
+ * across the table from you, so the board reads as two hands at the table
+ * rather than one player's cards and the other's invisible ones.
+ *
+ * Fanned as *they* hold it, not as you hold yours: a point reflection of
+ * your own fan rather than a copy of it. Yours converges below the cards, at
+ * your own hand; theirs converges above, off the top of the screen where
+ * they are sitting — so their outer cards ride up where yours dip down, they
+ * lean the opposite way, and the ribbon stacks right-to-left, which is
+ * left-to-right from their side of the table. Fanning it the same way as
+ * yours read as a second hand belonging to you.
+ *
+ * Smaller and inert: nothing here is a target for anything, it only tells
+ * you how many
+ * cards are left to worry about.
+ */
+function OpponentHand({ count }: { count: number }) {
+  if (count === 0) return null
+
+  const mid = (count - 1) / 2
+  const rotateStep = count > 1 ? Math.min(9, Math.max(2, 26 / count)) : 0
+  const spanStep = count > 1 ? Math.min(16, Math.max(8, 56 / count)) : 0
+  const width = 30
+
+  return (
+    <div className="relative shrink-0 pointer-events-none" style={{ height: 34, width: '100%' }}>
+      {Array.from({ length: count }, (_, index) => {
+        const offset = index - mid
+        return (
+          <div
+            key={index}
+            className="absolute top-0 rounded-[8%] overflow-hidden"
+            style={{
+              width,
+              aspectRatio: '63/88',
+              left: '50%',
+              marginLeft: offset * spanStep - width / 2,
+              // Both the lean and the arc are negated against your own hand's
+              // (`rotate: offset * step`, `y: offset² * k`, pivoting at the
+              // bottom): pivoting at the top with the signs flipped is the
+              // same fan turned to face the other way down the table.
+              transform: `translateY(${-offset * offset * 1.1}px) rotate(${-offset * rotateStep}deg)`,
+              transformOrigin: 'top center',
+              zIndex: count - index,
+              boxShadow: '0 2px 8px rgba(0,0,0,.5)',
+            }}
+          >
+            <CardBack />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * The deck: a pile of face-down cards, read by its art alone. A tap answers
+ * the only question a label used to — how many are left — as a digit over
+ * the card back, left to fade on its own rather than needing a second tap
+ * to dismiss.
+ */
+/**
+ * Whose turn it is and how long is left on it, sitting under that player's
+ * own deck — one under each, so the answer is attached to the side it is
+ * about instead of floating in the middle of the mat belonging to neither.
+ *
+ * Only the side to move shows anything; the other is blank rather than
+ * absent, so the row keeps its height and the board does not shift a few
+ * pixels every time the turn changes hands.
+ */
+function TurnStatus({ label, active, seconds }: { label: string; active: boolean; seconds: number }) {
+  return (
+    <div
+      className="mt-1 flex flex-col items-center justify-start whitespace-nowrap leading-tight"
+      // Stacked rather than set on one line, and no wider than the pile it
+      // sits under: both piles are at the outer edge of their row, so a
+      // single line long enough to hold the label *and* the clock ran off
+      // the side of the screen.
+      style={{ width: 52, height: 22 }}
+    >
+      {active && (
+        <>
+          <span className="font-display text-[9px] tracking-wide" style={{ color: 'var(--gold-bright)' }}>
+            {label}
+          </span>
+          <span
+            className="font-numeric tabular-nums text-[9px]"
+            style={{ color: seconds <= 10 ? '#ef8f7c' : 'rgba(229,192,140,.5)' }}
+          >
+            {seconds}s
+          </span>
+        </>
       )}
     </div>
   )
 }
+
+function PileCount({ count }: { count: number }) {
+  // Twice the card's former 26px width — the size the layout otherwise
+  // reserved for a label underneath now goes to the pile itself.
+  const size = 52
+
+  const [revealed, setRevealed] = useState(false)
+  const fadeTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(fadeTimer.current), [])
+
+  const tap = () => {
+    if (count === 0) return
+    setRevealed(true)
+    clearTimeout(fadeTimer.current)
+    fadeTimer.current = setTimeout(() => setRevealed(false), 2200)
+  }
+
+  return (
+    <button
+      onClick={tap}
+      disabled={count === 0}
+      className="relative rounded-sm overflow-hidden"
+      style={{ width: size, aspectRatio: '63/88' }}
+      aria-label={`Deck: ${count} card${count === 1 ? '' : 's'} left`}
+    >
+      {count > 0 ? (
+        <CardBack />
+      ) : (
+        <div className="absolute inset-0 rounded-sm" style={{ background: 'rgba(10,7,3,.4)' }} />
+      )}
+
+      <AnimatePresence>
+        {revealed && (
+          <motion.span
+            className="absolute inset-0 grid place-items-center font-numeric tabular-nums"
+            style={{ fontSize: 18, color: '#fdfaf3', textShadow: '0 1px 6px rgba(0,0,0,.85)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
+          >
+            {count}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  )
+}
+
+/**
+ * The discard pile, as a touch button rather than a pile of its own — there
+ * was never a stack worth looking at here (a discard pile is public
+ * information regardless of how many cards are in it, unlike a face-down
+ * deck), so the slot it used to occupy now carries the game's own
+ * letterform for it instead. Tapping opens the same fanned strip the old
+ * pile slot did.
+ */
+function DiscardButton({ count, cardIds }: { count: number; cardIds: string[] }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => count > 0 && setOpen((v) => !v)}
+        disabled={count === 0}
+        className="relative shrink-0 rounded-pill grid place-items-center"
+        style={{
+          width: 34,
+          height: 34,
+          background: 'var(--bg-sunk)',
+          border: '1px solid rgba(229,192,140,.25)',
+          opacity: count === 0 ? 0.4 : 1,
+        }}
+        aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
+      >
+        <DiscardIcon size={15} className="text-ink-faint" />
+        {count > 0 && (
+          <span
+            className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
+            style={{
+              minWidth: 15,
+              height: 15,
+              padding: '0 3px',
+              fontSize: 9,
+              background: 'var(--surface-raised)',
+              border: '1px solid rgba(229,192,140,.3)',
+              color: 'rgba(229,192,140,.85)',
+            }}
+          >
+            {count}
+          </span>
+        )}
+      </button>
+
+      <AnimatePresence>
+        {open && <DiscardStrip cardIds={cardIds} onClose={() => setOpen(false)} />}
+      </AnimatePresence>
+    </>
+  )
+}
+
+/** The discard pile opened into a horizontal strip. Sits below the card
+ *  viewer's own z-index, deliberately: tapping a card in the strip opens it
+ *  in the viewer on top, and closing that viewer leaves this strip open
+ *  rather than dismissing both at once. */
+function DiscardStrip({ cardIds, onClose }: { cardIds: string[]; onClose: () => void }) {
+  return (
+    <motion.div
+      className="fixed inset-0 z-40 flex items-end"
+      style={{ background: 'rgba(8,6,3,.82)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="w-full pb-safe pt-3 px-3"
+        style={{ background: 'var(--surface-raised)', borderTop: '1px solid rgba(229,192,140,.25)' }}
+        initial={{ y: 60 }}
+        animate={{ y: 0 }}
+        exit={{ y: 60 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-center text-[11px] tracking-wide mb-2" style={{ color: 'rgba(229,192,140,.6)' }}>
+          Discard · {cardIds.length} card{cardIds.length === 1 ? '' : 's'}
+        </p>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {cardIds.map((id, i) => (
+            <div key={i} className="shrink-0" style={{ width: 64 }}>
+              <PressableCard card={requireCard(id)} compact standalone />
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function TurnBanner({ state, simulating }: { state: MatchState; simulating: boolean }) {
+  // Whose turn it is and how long is left on it now sit under each player's
+  // own deck (see `TurnStatus`), which is where they belong — in the middle
+  // of the mat they belonged to neither side, and they sat in the one place
+  // the clash ring wants kept clear.
+  //
+  // What is left here is only what has no other home: the hand-off to
+  // Simulate, and the prompt owed after a knockout. Setup still carries no
+  // label at all — the mat's own slot outlines and the fanned hand are the
+  // instruction, not a line of copy above them.
+  const mine = state.promoting === 'you'
+  const label = simulating
+    ? 'Simulating…'
+    : state.phase === 'promote'
+      ? mine
+        ? 'Choose a Figure'
+        : 'Opponent is choosing'
+      : null
+
+  if (!label) return null
+
+  return (
+    <span
+      className="font-display text-sm tracking-wide"
+      style={{ color: simulating || mine ? 'var(--gold-bright)' : 'rgba(229,192,140,.5)' }}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** How long the coin spins before settling — a beat longer than the reveal
+ *  text and the overlay's own dismissal below, so both keep pace with it. */
+const COIN_FLIP_S = 3.1
 
 function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onDone, 2600)
+    const timer = setTimeout(onDone, (COIN_FLIP_S + 0.7) * 1000)
     return () => clearTimeout(timer)
   }, [onDone])
 
@@ -794,28 +2073,53 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
       exit={{ opacity: 0 }}
     >
       <div className="flex flex-col items-center gap-6">
-        <motion.div
-          className="rounded-pill grid place-items-center"
-          style={{
-            width: 108,
-            height: 108,
-            background: 'var(--gold-leaf)',
-            boxShadow: '0 12px 40px rgba(0,0,0,.6)',
-          }}
-          initial={{ rotateX: 0 }}
-          animate={{ rotateX: heads ? 1800 : 1980 }}
-          transition={{ duration: 1.9, ease: [0.18, 0.9, 0.3, 1] }}
+        {/* The circular clip lives here, on the static wrapper, rather than
+            on the two rotating faces below. A border-radius clip on an
+            element that's also being 3D-transformed forces a lot of mobile
+            browsers to give up on pure GPU compositing and re-rasterise the
+            clip every frame — exactly what read as "laggy" on a handheld,
+            even with the spin's timing already right. Clipping the
+            non-rotating viewport onto it instead costs nothing per frame:
+            the coin behind it can stay a plain, uninterrupted transform. */}
+        <div
+          style={{ width: 108, height: 108, perspective: 600, borderRadius: '50%', overflow: 'hidden' }}
         >
-          <span className="font-display text-2xl font-bold" style={{ color: '#3a2a07' }}>
-            {heads ? 'H' : 'T'}
-          </span>
-        </motion.div>
+          <motion.div
+            className="relative w-full h-full"
+            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+            initial={{ rotateY: 0 }}
+            // A single continuous deceleration across the whole spin — fast
+            // at the tap, steadily slowing, coming to rest right at the end
+            // — rather than two segments stitched together (a constant pace
+            // that only eases off in its last fraction reads as a coin that
+            // suddenly decides to stop, not one that was spinning down the
+            // whole time).
+            animate={{ rotateY: heads ? 1800 : 1980 }}
+            transition={{ duration: COIN_FLIP_S, ease: 'easeOut' }}
+          >
+            {/* Heads: the Covenant mark, facing the viewer at rest. */}
+            <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
+              <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+            {/* Tails: the book, pre-rotated so it faces the viewer once the
+                parent has turned the rest of the way around. */}
+            <div
+              className="absolute inset-0"
+              style={{
+                backfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)',
+              }}
+            >
+              <img src={asset('art/coin-tails.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+          </motion.div>
+        </div>
 
         <motion.div
           className="text-center"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 2 }}
+          transition={{ delay: COIN_FLIP_S + 0.1 }}
         >
           <p className="font-display text-lg" style={{ color: 'var(--gold-bright)' }}>
             {heads ? 'Heads' : 'Tails'}
@@ -851,7 +2155,6 @@ function Result({ state, onExit }: { state: MatchState; onExit: () => void }) {
       style={{ background: 'rgba(8,6,3,.9)' }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
     >
       <motion.div
         className="text-center w-full max-w-[320px]"

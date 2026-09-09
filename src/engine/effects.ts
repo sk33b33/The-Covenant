@@ -1,7 +1,7 @@
 import { requireCard } from '@/data/cards'
 import type { Rng } from '@/game/rng'
 import { isFigure } from '@/game/types'
-import { figureCard, figuresInPlay, hasStatus, removeStatus } from './state'
+import { addToHand, figureCard, figuresInPlay, hasStatus, removeStatus } from './state'
 import { OPPONENT, type FigureInPlay, type MatchState, type PlayerId, type StatusKind } from './types'
 
 /**
@@ -83,8 +83,8 @@ function search(ctx: EffectContext, predicate: (cardId: string) => boolean, toBe
   if (toBench) {
     const slot = player.bench.findIndex((s) => s === null)
     if (slot === -1) {
-      player.hand.push(cardId)
-      ctx.log('The Bench is full, so it goes to hand.')
+      const toHand = addToHand(player, cardId)
+      ctx.log(toHand ? 'The Bench is full, so it goes to hand.' : 'The Bench and hand are both full, so it is discarded.')
       return
     }
     player.bench[slot] = {
@@ -104,8 +104,8 @@ function search(ctx: EffectContext, predicate: (cardId: string) => boolean, toBe
     return
   }
 
-  player.hand.push(cardId)
-  ctx.log(`${requireCard(cardId).name} is found.`)
+  const toHand = addToHand(player, cardId)
+  ctx.log(toHand ? `${requireCard(cardId).name} is found.` : `${requireCard(cardId).name} is found, but the hand is full — it is discarded.`)
 }
 
 const isBasicFigure = (cardId: string) => {
@@ -327,7 +327,7 @@ const EFFECTS: Record<string, Effect> = {
     them.deck = ctx.rng((r) => r.shuffle(them.deck))
     for (let i = 0; i < Math.max(0, size - 1); i++) {
       const card = them.deck.shift()
-      if (card) them.hand.push(card)
+      if (card) addToHand(them, card)
     }
   },
   'reveal-hand': (ctx) => {
@@ -401,13 +401,13 @@ function digBest(ctx: EffectContext, depth: number) {
 
   const chosen = ranked[0]!
   player.deck.splice(player.deck.indexOf(chosen), 1)
-  player.hand.push(chosen)
+  const toHand = addToHand(player, chosen)
 
   // The rest go to the bottom, in the order they were seen.
   const rest = player.deck.splice(0, Math.max(0, depth - 1))
   player.deck.push(...rest)
 
-  ctx.log(`${requireCard(chosen).name} is taken.`)
+  ctx.log(toHand ? `${requireCard(chosen).name} is taken.` : `${requireCard(chosen).name} is taken, but the hand is full — it is discarded.`)
 }
 
 function reviveFromDiscard(ctx: EffectContext, count: number) {

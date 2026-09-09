@@ -5,7 +5,7 @@ import { BackIcon, CheckIcon, CloseIcon, MinusIcon, PlusIcon, SearchIcon } from 
 import { PressableCard } from '@/components/card/PressableCard'
 import { usePeek } from '@/store/peek'
 import { Button, Panel, Progress } from '@/components/ui'
-import { CARDS, requireCard } from '@/data/cards'
+import { CARDS, getCard, requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
 import {
   ENERGY_TYPES,
@@ -13,6 +13,7 @@ import {
   isFigure,
   type Card as CardData,
   type EnergyType,
+  type FigureCard,
 } from '@/game/types'
 import { useCollection } from '@/store/collection'
 import { useDecks, validateDeck } from '@/store/decks'
@@ -43,6 +44,9 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   const [cards, setCards] = useState<string[]>(existing?.cards ?? [])
   const [energy, setEnergy] = useState<EnergyType[]>(existing?.energy ?? [])
   const [query, setQuery] = useState('')
+  const [autoMode, setAutoMode] = useState<'single' | 'multiple'>('single')
+
+  const hasCollection = useMemo(() => Object.values(owned).some((n) => n > 0), [owned])
 
   const validation = useMemo(() => validateDeck({ cards, energy }), [cards, energy])
 
@@ -89,6 +93,99 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
       if (prev.length >= RULES.MAX_ENERGY_TYPES) return prev
       return [...prev, type]
     })
+
+  /**
+   * Replaces the deck with one drafted entirely from what's owned, built
+   * around one Altar type (`single`) or the two best-supported ones
+   * (`multiple`) instead of whatever is currently declared.
+   */
+  const autoBuild = () => {
+    // Whether a Figure has at least one attack the given types can actually
+    // pay for — the exact inverse of `validateDeck`'s "stranded" check, so a
+    // card drafted here can never trigger that warning on its own.
+    const payable = (card: FigureCard, types: EnergyType[]) => {
+      const declared = new Set(types)
+      return card.attacks.some((a) => a.cost.every((c) => c === null || declared.has(c)))
+    }
+
+    const ownedFigures = CARDS.filter(isFigure).filter((c) => (owned[c.id] ?? 0) > 0)
+
+    // Score each type by how many owned copies could attack with it alone,
+    // then take the best one (or two) as the Altar's declared types.
+    const scoreOf = (type: EnergyType) =>
+      ownedFigures
+        .filter((c) => payable(c, [type]))
+        .reduce((sum, c) => sum + Math.min(RULES.MAX_COPIES, owned[c.id] ?? 0), 0)
+
+    const ranked = [...ENERGY_TYPES].sort((a, b) => scoreOf(b) - scoreOf(a))
+    const slots = autoMode === 'single' ? 1 : RULES.MAX_ENERGY_TYPES
+    const supported = ranked.slice(0, slots).filter((t) => scoreOf(t) > 0)
+    const declaredTypes = supported.length ? supported : ranked.slice(0, 1)
+
+    // An ascended Figure is dead weight unless its whole lineage back to a
+    // Basic is owned and payable too — nothing ever gets it onto the board
+    // otherwise, since ascending replaces a Figure already in play.
+    const chainIsPlayable = (card: FigureCard): boolean => {
+      let current = card
+      const seen = new Set<string>()
+      while (current.stage !== 'basic') {
+        const fromId = current.ascendsFrom
+        if (!fromId || seen.has(fromId)) return false
+        seen.add(fromId)
+        const prev = getCard(fromId)
+        if (!prev || !isFigure(prev)) return false
+        if ((owned[prev.id] ?? 0) <= 0 || !payable(prev, declaredTypes)) return false
+        current = prev
+      }
+      return true
+    }
+
+    const stageOrder: Record<FigureCard['stage'], number> = {
+      basic: 0,
+      'ascended-1': 1,
+      'ascended-2': 2,
+    }
+    const figureCandidates = ownedFigures
+      .filter((c) => payable(c, declaredTypes) && chainIsPlayable(c))
+      .sort(
+        (a, b) =>
+          stageOrder[a.stage] - stageOrder[b.stage] ||
+          RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity] ||
+          b.hp - a.hp,
+      )
+
+    // Covenants and Relics are colourless, so every owned copy is a candidate
+    // regardless of which Altar types just got chosen.
+    const utilityCandidates = CARDS.filter((c) => !isFigure(c) && (owned[c.id] ?? 0) > 0).sort(
+      (a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity] || a.name.localeCompare(b.name),
+    )
+
+    const deck: string[] = []
+    const added = new Map<string, number>()
+    const fill = (pool: CardData[], upTo: number) => {
+      for (const card of pool) {
+        if (deck.length >= upTo) break
+        const max = Math.min(RULES.MAX_COPIES, owned[card.id] ?? 0)
+        for (let have = added.get(card.id) ?? 0; have < max && deck.length < upTo; have++) {
+          deck.push(card.id)
+          added.set(card.id, have + 1)
+        }
+      }
+    }
+
+    // Figures first, reserving a handful of slots for Covenants/Relics when
+    // there are any worth spending them on — then, if the collection came up
+    // short on utility cards (or figures), each pass tops up from where the
+    // last one left off rather than leaving the deck under size.
+    const utilityBudget =
+      utilityCandidates.length > 0 ? Math.min(4, utilityCandidates.length * RULES.MAX_COPIES) : 0
+    fill(figureCandidates, RULES.DECK_SIZE - utilityBudget)
+    fill(utilityCandidates, RULES.DECK_SIZE)
+    fill(figureCandidates, RULES.DECK_SIZE)
+
+    setCards(deck)
+    setEnergy(declaredTypes)
+  }
 
   const save = () => {
     // The cover is the deck's most striking Figure — the rarest, then the
@@ -144,6 +241,41 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
             </span>
           </div>
           <Progress value={cards.length / RULES.DECK_SIZE} className="mt-2" label="Deck size" />
+
+          {/* Auto build: pick how many Altar elements to draft around, then
+              fill the rest of the deck from what's owned. Replaces whatever
+              is currently in the deck outright — the same as re-picking
+              everything below by hand. */}
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-xs text-ink-muted shrink-0">Auto build</span>
+            <div className="flex gap-1.5">
+              {(['single', 'multiple'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setAutoMode(mode)}
+                  aria-pressed={autoMode === mode}
+                  className={cx(
+                    'rounded-pill px-2.5 py-1 text-[11px] font-medium capitalize transition-all duration-200',
+                    autoMode === mode ? 'shadow-pressed scale-95' : 'shadow-raised-sm',
+                  )}
+                  style={{
+                    background: autoMode === mode ? 'var(--gold-pale)' : 'var(--surface)',
+                    opacity: autoMode === mode ? 1 : 0.7,
+                  }}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="raised"
+              className="!px-3 !py-1.5 text-xs ml-auto shrink-0"
+              disabled={!hasCollection}
+              onClick={autoBuild}
+            >
+              Auto Build
+            </Button>
+          </div>
 
           {/* Energy declaration. */}
           <div className="flex items-center gap-2 mt-3">

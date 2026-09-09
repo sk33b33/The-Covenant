@@ -26,6 +26,24 @@ export const resetUids = () => {
   uidCounter = 0
 }
 
+/**
+ * Adds a card to a hand, respecting `RULES.MAX_HAND` — every place a card
+ * can land in a hand (the turn draw, search effects, a rider that pulls from
+ * the deck) routes through here rather than pushing directly, so the cap
+ * holds no matter which of them is responsible for a given overflow. A card
+ * that doesn't fit goes to the discard pile instead of vanishing outright.
+ * Returns whether it actually reached the hand, so a caller that logs what
+ * happened can say which one occurred.
+ */
+export function addToHand(player: PlayerState, cardId: string): boolean {
+  if (player.hand.length >= RULES.MAX_HAND) {
+    player.discard.push(cardId)
+    return false
+  }
+  player.hand.push(cardId)
+  return true
+}
+
 export function makeFigure(cardId: string, turn: number): FigureInPlay {
   return {
     uid: nextUid(),
@@ -117,6 +135,7 @@ export function createMatch(setup: MatchSetup): MatchState {
     players,
     winner: null,
     endReason: null,
+    lastAttack: null,
     log: [
       {
         turn: 0,

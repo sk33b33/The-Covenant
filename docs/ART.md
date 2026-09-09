@@ -1,6 +1,6 @@
 # Artwork
 
-74 cards, 5 illustrated, 69 on placeholders. Filling that in is a loop of three
+74 cards, none illustrated yet, all 74 on placeholders. Filling that in is a loop of three
 commands, and this file is the whole contract.
 
 ```bash
@@ -116,7 +116,7 @@ say so, but it is worth knowing when judging a render:
 - **Bottom centre**, a circle roughly 18% of the card width, is covered by the
   type orb.
 
-Faces read best in the upper third. The five shipped cards place the subject's
+Faces read best in the upper third. The frame places the subject's
 eyeline around 30% from the top, which is worth matching.
 
 ## Art direction
@@ -142,7 +142,7 @@ Style, composition and lighting live in `scripts/art-prompts.mjs` and are shared
 across every prompt. Change the look of the whole set there; change one card
 here.
 
-`ALREADY_ILLUSTRATED` at the bottom of the direction file lists the five cards
+`ALREADY_ILLUSTRATED` at the bottom of the direction file lists the cards
 that are done, kept only as a record — coverage itself is read from what is on
 disk.
 

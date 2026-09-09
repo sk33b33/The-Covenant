@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { SlotOutline } from '@/art/BattleMat'
 import { PressableCard } from '@/components/card/PressableCard'
@@ -49,6 +49,17 @@ interface Props {
    */
   noPeek?: boolean
   className?: string
+  /**
+   * A card shown seated in an otherwise-empty slot — a hand card either
+   * already picked for it (setup) or presently being magnetically dragged
+   * toward it (see `previewTentative`). Ignored once the slot holds a real
+   * Figure: that always wins.
+   */
+  previewCardId?: string
+  /** A preview that's only being *offered*, not yet dropped — dimmer, and
+   *  without the picked ring, so it doesn't read as more committed than it
+   *  is. Unset (or false) once the slot has actually been chosen. */
+  previewTentative?: boolean
 }
 
 export function BoardFigure({
@@ -61,6 +72,8 @@ export function BoardFigure({
   compactStats,
   noPeek,
   className,
+  previewCardId,
+  previewTentative,
 }: Props) {
   if (!figure) {
     return (
@@ -69,6 +82,28 @@ export function BoardFigure({
         style={{ width, aspectRatio: '63 / 88' }}
       >
         <SlotOutline label={emptyLabel} />
+        <AnimatePresence>
+          {previewCardId && (
+            <motion.div
+              key={previewCardId}
+              className="absolute inset-0 rounded-[8%]"
+              style={{
+                boxShadow: previewTentative ? undefined : '0 0 0 2.5px var(--gold-bright)',
+              }}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: previewTentative ? 0.65 : 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              // A spring while the drag is still pulling this card toward
+              // the slot (the magnetic feel), but the instant it actually
+              // commits (tentative -> false, on drop) there is nothing left
+              // to animate: it should already be sitting there, full and
+              // ringed, with no lingering pop or fade behind it.
+              transition={previewTentative ? { type: 'spring', stiffness: 480, damping: 30 } : { duration: 0 }}
+            >
+              <PressableCard card={requireCard(previewCardId)} compact noHolo noPeek standalone />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     )
   }
@@ -80,11 +115,26 @@ export function BoardFigure({
 
   return (
     <motion.button
-      layout
-      layoutId={figure.uid}
+      // No `layout`/`layoutId` here any more. A promotion moves this same
+      // Figure — same uid — from a Bench slot to the Active one in a single
+      // commit, with no `AnimatePresence` staging the old instance's exit;
+      // React just unmounts it there and mounts a new one here. That is
+      // exactly the shape framer's shared-layout projection is built to
+      // bridge, but bridging it while the outgoing instance still had an
+      // *infinite* `animate` loop in flight (the pulsing ring every
+      // `targetable` Bench Figure carries during a pending promotion) asked
+      // the projection system to compute a FLIP transform off a transform
+      // that was still being driven by a competing, never-completing
+      // animation. This game already has one documented case of framer's own
+      // gesture tracking destabilising under exactly this kind of
+      // interference (see the drag-highlight comment above `setHighlight`
+      // in Battle.tsx) — the promotion-freeze reports match that failure
+      // mode closely enough, and this combination has no correctness or
+      // requested-feature purpose, only an unrequested cosmetic cross-fade,
+      // to be worth the risk.
       onClick={onClick}
       disabled={!onClick}
-      className={cx('relative shrink-0 block', className)}
+      className={cx('cov-figure-card relative shrink-0 block', className)}
       style={{ width }}
       animate={targetable ? { scale: [1, 1.04, 1] } : { scale: 1 }}
       transition={

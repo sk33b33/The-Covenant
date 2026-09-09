@@ -18,6 +18,8 @@ import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
 import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
+import { playTap } from '@/lib/tap'
+import { pauseMusic, playMusic } from '@/lib/music'
 import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
 
 /** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
@@ -43,6 +45,39 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [back])
 
+  // The tap sound, for buttons and nothing else. One delegated listener
+  // here rather than an `onClick` threaded through every button in the
+  // app — this is the one place guaranteed to see every one of them, and
+  // the only way to add a new button anywhere and have it already make the
+  // sound without a second line of code. Capture phase, not bubble: a
+  // handful of overlays (the card viewer, action sheets) stop a click's
+  // propagation on their own content so a tap on the card doesn't also
+  // close the sheet behind it, which would otherwise take the sound with
+  // it for exactly the buttons inside those overlays. `closest` matches a
+  // real `<button>` or anything standing in for one via `role="button"`,
+  // and nothing else — not the mat, not a dragged card, not the scrim
+  // behind a sheet.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement | null)?.closest('button, [role="button"]')) playTap()
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [])
+
+  // The menu music loop plays everywhere except an actual match — a quick
+  // battle and a story encounter both render the same `Battle` screen
+  // underneath, so both count. Calling `playMusic` on every other route is
+  // safe to do on each render because it's a no-op once the loop is already
+  // running; what that repetition buys is that switching Home → Cards →
+  // Social never has to know it needs to ask for the music, because it was
+  // never stopped in the first place. It only actually resumes right here,
+  // the moment a battle route stops being current.
+  useEffect(() => {
+    if (route.name === 'battle' || route.name === 'story-encounter') pauseMusic()
+    else playMusic()
+  }, [route.name])
+
   // The splash is an overlay, so the interface beneath it is already painted —
   // chrome included. That is what the art dissolves *to*.
   //
@@ -60,10 +95,44 @@ export default function App() {
 
   return (
     <div className="h-full bg-bg text-ink">
-      <AnimatePresence mode="wait" initial={false}>
+      {/*
+        No `mode="wait"` any more. It used to hold the outgoing screen
+        mounted until its exit fade reported itself complete, then swap in
+        the next one — the two never overlapped, at the cost of briefly
+        showing neither (the reason the splash below was pulled out of this
+        swap entirely). Leaving Battle after a match traced back to exactly
+        that wait: its exit fade would reach opacity 0 and then just stop —
+        the completion callback that "wait" mode needs never fired, so the
+        next screen never mounted and the finished match sat there forever,
+        faded to invisible but still covering the screen and eating taps.
+        Reproduced and confirmed repeatedly; the exact framer-motion
+        internal reason the callback doesn't fire wasn't pinned down, only
+        that this is where it happens and only this screen. Default (sync)
+        mode mounts the next screen immediately instead of waiting on the
+        outgoing one at all, which sidesteps the hang outright — the small
+        cost is that a route change can very briefly show both screens
+        layered rather than a clean cut, standard AnimatePresence behaviour
+        everywhere that doesn't ask for `wait`.
+
+        `fixed inset-0` on the screen itself is what makes that overlap
+        harmless rather than a new bug of its own. `<main>` used to be a
+        plain `h-full` block, fine when only one was ever in the DOM at a
+        time under `mode="wait"` — but with both the outgoing and incoming
+        screen mounted together, two ordinary block siblings each 100% of
+        the viewport stack vertically like any other block content: the
+        second one lands a full screen-height below the first, technically
+        present and clickable via coordinates but completely invisible
+        below the fold — which is exactly what turned up under test, a
+        BattleHub that "worked" yet rendered as a blank page. Pinning both
+        to the same fixed position instead makes two present screens
+        genuinely overlap — the correct thing for a full-screen surface —
+        with the later one in the DOM painting on top, so the incoming
+        screen is what a player actually sees.
+      */}
+      <AnimatePresence initial={false}>
         <motion.main
           key={routeKey(route)}
-          className="h-full"
+          className="h-full fixed inset-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

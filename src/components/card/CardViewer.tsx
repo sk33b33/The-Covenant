@@ -7,8 +7,8 @@ import {
   useSpring,
   useTransform,
 } from 'framer-motion'
-import { CloseIcon } from '@/art/icons'
 import { RarityMark } from '@/art/RarityMark'
+import { cx } from '@/lib/cx'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
 import { Card } from './Card'
 import {
@@ -19,6 +19,7 @@ import {
   type Card as CardData,
 } from '@/game/types'
 import { usePeek } from '@/store/peek'
+import { useSettings } from '@/store/settings'
 
 /**
  * The card, held up to the light.
@@ -31,7 +32,8 @@ import { usePeek } from '@/store/peek'
  * table, and both the holo sheen and the metal rim track that lean: the
  * pairing is what makes a rare card feel like a physical foil rather than a
  * picture of one. Release and it springs back level. Motion is dropped
- * entirely under `prefers-reduced-motion`.
+ * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
+ * "Simplify effects" switch in Menu → Graphics.
  *
  * Touch is the only input. The gyroscope drove this too once, which meant a
  * card turned on its own while you were reading it.
@@ -148,8 +150,24 @@ function Viewer({
   // is bright before you move it, and only *changes* when you do.
   const glint = useTransform(lit, (v) => 0.38 + v * 0.62)
 
+  // Two sources feed the same flag: the OS's own prefers-reduced-motion, and
+  // the player's "Simplify effects" switch in Menu → Graphics. Read directly
+  // rather than through the `useReducedMotion` hook because this is consulted
+  // from `track`, which runs on every pointermove and cannot afford a
+  // re-render — so the media query and the store are both subscribed to once,
+  // outside React, and only the ref they write is read on the hot path.
   useEffect(() => {
-    reduced.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const sync = () => {
+      reduced.current = mq.matches || useSettings.getState().reducedMotion
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    const unsubscribe = useSettings.subscribe(sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      unsubscribe()
+    }
   }, [])
 
   // Escape closes, and the body must not scroll behind the overlay.
@@ -199,10 +217,13 @@ function Viewer({
   const metal = RARITY_METAL[card.rarity]
 
   /*
-   * Everything on screen that is not the card: the close-button row, the
-   * rarity and verse block, and the padding between them. Measured, not
+   * Everything on screen that is not the card: the rarity and verse block,
+   * the top safe-area inset, and the padding around them. Measured, not
    * guessed — 180px leaves the card as large as it can be at 568px tall while
-   * still fitting, and lets a tall phone reach the 300px cap.
+   * still fitting, and lets a tall phone reach the 300px cap. There's no
+   * close button any more, but the term is still a real (if now slightly
+   * generous) upper bound rather than a tight one, and generous is the safe
+   * direction for a cap.
    *
    * The tray term has to be the same `dvh` the tray is capped at, not a fixed
    * pixel count. A Figure with a long attack list fills that cap exactly, and
@@ -233,28 +254,20 @@ function Viewer({
       aria-modal="true"
       aria-label={card.name}
     >
-      <div className="flex justify-end pt-safe px-4">
-        <button
-          onClick={close}
-          className="w-10 h-10 rounded-pill grid place-items-center mt-2"
-          style={{ background: 'rgba(255,253,248,.14)', color: '#fdfaf3' }}
-          aria-label="Close"
-        >
-          <CloseIcon size={20} />
-        </button>
-      </div>
-
       {/*
         Locked. This was a `.scroll-y`, and while the card itself carries
         touch-action: none, a drag beginning on the padding beside it — or
         continuing past its edge — still moved the whole screen. Tilting a card
         should never shift the thing being tilted, so the column does not
         scroll at all and the contents are sized to fit instead.
+
+        No `stopPropagation` here on purpose — closing on a tap anywhere,
+        card included, is the whole point now that there's no close button.
+        It's still safe for the tilt gesture: `closeIfTap` on the scrim only
+        fires when the pointer barely moved, so a real drag that turns the
+        card in 3D never closes it, only a plain tap does.
       */}
-      <div
-        className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pb-6 gap-1 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pt-safe pb-6 gap-1 overflow-hidden">
         {/*
          * Three bounds on the width, and the last is what makes the lock work:
          * the design cap, the screen's width, and the height left after the
@@ -342,11 +355,15 @@ function Viewer({
           )}
         </div>
 
-        {actions.length > 0 && (
+        {(actions.length > 0 || actionsNote) && (
           // A solid tray, not options floating on the scrim. Over a blurred
           // battle mat the option rows alone had almost no edge, and a
           // greyed-out unavailable attack faded into the background entirely —
-          // which is exactly the row whose reason you need to read.
+          // which is exactly the row whose reason you need to read. A bench
+          // Figure has a note (its live HP and energy) but nothing in the
+          // pool yet gives it an action from there, so the tray has to open
+          // on the note alone rather than gate on an actions list that may be
+          // empty for a perfectly normal reason.
           <div
             className="on-dark w-full max-w-[300px] shrink-0 rounded-lg p-3 mt-3"
             style={{
@@ -363,9 +380,13 @@ function Viewer({
             }}
           >
             {actionsNote && (
-              <p className="text-xs text-ink-muted px-1 pb-2 tabular-nums">{actionsNote}</p>
+              <p
+                className={cx('text-xs text-ink-muted px-1 tabular-nums', actions.length > 0 && 'pb-2')}
+              >
+                {actionsNote}
+              </p>
             )}
-            <ActionList options={actions} onChosen={close} />
+            {actions.length > 0 && <ActionList options={actions} onChosen={close} />}
           </div>
         )}
       </div>

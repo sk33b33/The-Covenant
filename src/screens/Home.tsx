@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, useMotionValue, useReducedMotion, useSpring } from 'framer-motion'
+import { motion, useMotionValue, useSpring } from 'framer-motion'
+import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { PackWrapper } from '@/art/PackWrapper'
 import {
   BinderIcon,
@@ -9,7 +10,6 @@ import {
   ScrollIcon,
   ShopIcon,
   TalentIcon,
-  TreeMark,
 } from '@/art/icons'
 import { Badge, Button, Chip, Panel, Progress } from '@/components/ui'
 import { GENESIS } from '@/data/sets'
@@ -49,6 +49,17 @@ export function Home() {
   return (
     <div className="scroll-y h-full">
       <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
+        {/* The mark, not the profile button — a small fixed lockup so the
+            game's identity is on screen even before anything else has
+            loaded in, the way a masthead sits above a page rather than
+            inside it. Name only — the tree glyph doubled up with the one
+            already on the profile button just below it. */}
+        <div className="flex items-center pt-1">
+          <span className="font-display text-[22px] tracking-[0.28em] uppercase text-ink-muted">
+            Covenant
+          </span>
+        </div>
+
         <Header />
 
         {/* ---------------------------------------------------- hero panel */}
@@ -162,7 +173,7 @@ export function Home() {
       {/* Missions floats above the tab bar, as in the reference. */}
       <button
         onClick={() => go({ name: 'missions' })}
-        className="fixed right-4 z-30 neu rounded-pill w-16 h-16 grid place-items-center"
+        className="fixed right-4 z-30 neu rounded-pill w-12 h-12 grid place-items-center"
         // Matches .pb-safe's floor, not the raw inset: the bar pads itself with
         // max(--s-3, safe-area), so on a phone reporting no inset this button
         // would otherwise sit 12px into the bar.
@@ -171,8 +182,8 @@ export function Home() {
         }}
         aria-label="Missions"
       >
-        <ScrollIcon size={24} className="text-[var(--gold-deep)]" />
-        <span className="text-[9px] font-medium mt-0.5 text-ink-muted">Missions</span>
+        <ScrollIcon size={18} className="text-[var(--gold-deep)]" />
+        <span className="text-[7px] font-medium mt-0.5 text-ink-muted">Missions</span>
         <Badge />
       </button>
     </div>
@@ -197,12 +208,6 @@ function Header() {
           className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
           aria-label="Open profile"
         >
-          <span
-            className="grid place-items-center w-11 h-11 rounded-pill shrink-0 shadow-raised"
-            style={{ background: 'var(--gold-leaf)' }}
-          >
-            <TreeMark size={23} className="text-[#3a2a07]" />
-          </span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold truncate leading-tight">
               {profile.name}
