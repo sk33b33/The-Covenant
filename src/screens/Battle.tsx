@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AnimatePresence, motion, useAnimation, type PanInfo } from 'framer-motion'
+import {
+  AnimatePresence,
+  DragControls,
+  animate,
+  motion,
+  useAnimation,
+  useMotionValue,
+  type PanInfo,
+} from 'framer-motion'
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
@@ -1234,11 +1242,21 @@ function StatsChip({
 /**
  * The hand, fanned rather than scrolled.
  *
- * Each card is rotated and lifted by its distance from the centre — framer's
- * own `rotate`/`y` style keys, not a plain CSS `transform` string, so a drag's
- * own x/y compose with the fan's static pose instead of one overwriting the
- * other. Spread narrows as the hand grows, so a big hand fans within the same
- * width a small one does rather than spilling past the Altar column.
+ * Each card is rotated and lifted by its distance from the centre. The
+ * rotation and scale are framer's own `animate` keys and the offset is a pair
+ * of `x`/`y` motion values, never a plain CSS `transform` string — a drag
+ * moves those same two values, so the fan's pose and the drag compose instead
+ * of one overwriting the other. Spread narrows as the hand grows, so a big
+ * hand fans within the same width a small one does rather than spilling past
+ * the Altar column.
+ *
+ * Two gestures start the same way here, and telling them apart is what most
+ * of the code below is for. Dragging a finger *across* the fan riffles
+ * through it, lifting each card as it passes — the same thing you'd do with a
+ * real hand of cards to see what you're holding. Pulling a card *up* takes it
+ * out of the hand to play it. So a card is never dragged by framer's own
+ * pointerdown listener (`dragListener={false}`); the tray watches the gesture
+ * first and only hands it over once the finger has clearly gone upward.
  *
  * Long-press-to-peek is switched off for the whole phase (`noPeek`) rather
  * than only on the cards that can be dragged: a hold that starts sizing up a
@@ -1320,7 +1338,6 @@ function PlayerHand({
   // a hold has *moved* is not necessarily the one it started on; a per-card
   // gesture would lose the finger the instant it crossed into a neighbour's
   // box.
-  const [browsing, setBrowsing] = useState(false)
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const activePointer = useRef<number | null>(null)
@@ -1334,7 +1351,7 @@ function PlayerHand({
   const draggingCard = useRef(false)
   // Which card that is, and whether it was the focused (lifted) one the
   // instant its drag began. Framer adds the live drag offset on top of
-  // whatever `animate` currently targets for x/y — so clearing the focus the
+  // whatever the fan currently targets for x/y — so clearing the focus the
   // moment a drag starts (needed so whichever *other* card was lifted settles
   // back down) was itself a bug: it changed the dragged card's own target
   // mid-gesture, and the render jumped by the difference before the rest of
@@ -1364,6 +1381,21 @@ function PlayerHand({
    */
   const canLift = !simulating
 
+  // One handle per card, so the tray can start a *particular* card's drag
+  // from a gesture that began somewhere else in the fan. `useDragControls`
+  // would be the usual way to make one, but there is no hook to call per item
+  // inside a `.map()` over a hand whose length changes; the class behind that
+  // hook is exported for exactly this, and the ref keeps each handle stable
+  // for as long as a card is rendered at that index.
+  const dragHandles = useRef(new Map<number, DragControls>())
+  const handleFor = (index: number) => {
+    const existing = dragHandles.current.get(index)
+    if (existing) return existing
+    const created = new DragControls()
+    dragHandles.current.set(index, created)
+    return created
+  }
+
   /** Which of the three things make a card glow, if any — each reads as a
    *  different colour (see VIABILITY_GLOW below): gold for something
    *  placeable, white for an ascension, red for a Covenant or Relic's own
@@ -1381,64 +1413,156 @@ function PlayerHand({
     return null
   }
 
-  /** The topmost card whose box contains this point, ranked by the same
-   *  plain hand-order stacking the fan renders with — see the `zIndex`
-   *  comment at the render site for why viability plays no part in it. */
-  const hitTest = (x: number, y: number): number | null => {
-    const order = Array.from({ length: hand.length }, (_, i) => i).sort((a, b) => b - a)
-    for (const i of order) {
-      const el = cardRefs.current[i]
-      if (!el) continue
-      const r = el.getBoundingClientRect()
-      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i
-    }
-    return null
+  /** Which card in the fan a DOM element belongs to, if any. */
+  const cardIndexOf = (el: Element | null | undefined): number | null => {
+    const button = el?.closest('button')
+    if (!button) return null
+    const index = cardRefs.current.indexOf(button as HTMLButtonElement)
+    return index === -1 ? null : index
   }
 
-  // No `setPointerCapture` anywhere here, deliberately: capturing the
-  // pointer on this container would retarget every subsequent event for it
-  // away from whichever card the finger came down on — including the
-  // native listeners Framer's own `drag` attaches directly to that card —
-  // which broke the drag-to-play gesture outright rather than merely
-  // competing with it cosmetically. Plain event bubbling already reaches
-  // this container from any card beneath it, which is all hit-testing here
-  // needs.
+  /** The card actually under this point — the browser's own answer, which
+   *  respects both the real painted stacking and each card's rotation.
+   *  Ranking bounding boxes by hand order looks equivalent and isn't: a
+   *  rotated element's box is its *axis-aligned* bounds, noticeably wider
+   *  than the card inside it, so the outer cards of the fan claimed points
+   *  that visibly belonged to their neighbours and a finger resting on one
+   *  card would riffle — or pull out — another. */
+  const hitTest = (x: number, y: number): number | null =>
+    cardIndexOf(document.elementFromPoint(x, y))
+
+  /* ------------------------------------------------- reading the gesture */
+
+  // How far sideways before the hand decides you are riffling through it.
+  const SCRUB_SLACK = 10
+  // How far *up* before it decides you are taking a card out instead. Both
+  // are measured from where the finger went down; the upward pull also has
+  // to be the larger of the two, so a diagonal sweep across the fan riffles
+  // rather than yanking a card out of it.
+  const LIFT_PULL = 14
+  // Once riffling, the bar to pull a card out rises: the finger is already
+  // travelling, and a fan is an arc, so a scrub along it drifts upward a
+  // little on its own. Measured from the lowest point the finger has reached
+  // rather than from where it started, so it is a genuine change of
+  // direction that lifts a card, not the tail end of a long sideways sweep.
+  const LIFT_FROM_BROWSE = 26
+
+  /** How the gesture in flight is being read. Undecided until the finger has
+   *  moved far enough in one direction or the other to say. */
+  const reading = useRef<'undecided' | 'browse' | 'lift'>('undecided')
+  // Where the gesture began, and which card it began on. The card comes from
+  // the pointerdown's own target rather than from a hit test: the browser
+  // already knows exactly what was pressed, and that answer stays right even
+  // once the finger has moved off it.
+  const from = useRef<{ x: number; y: number; index: number | null }>({ x: 0, y: 0, index: null })
+  const lowest = useRef(0)
+  // The focused card as a ref as well as state: the gesture handlers below
+  // run outside React's render, and need the *current* focus to know which
+  // card an upward pull is asking for.
+  const focused = useRef<number | null>(null)
+  const focusOn = (index: number | null) => {
+    focused.current = index
+    setFocusIndex(index)
+  }
+
+  // The gesture is tracked on the window rather than on this tray. A card
+  // grabbed near the top of the fan stands proud of the tray's own box, and
+  // an upward pull leaves it within a few pixels — long before there is
+  // enough movement to tell a lift from a scrub, so a tray-level listener
+  // would simply stop hearing the gesture it is trying to read. No
+  // `setPointerCapture` either: retargeting every event to one element is a
+  // much heavier tool than this needs, and it has broken drag recognition in
+  // this hand before.
+  const untrack = useRef<() => void>()
+  const endGesture = () => {
+    untrack.current?.()
+    untrack.current = undefined
+    clearTimeout(holdTimer.current)
+    activePointer.current = null
+    reading.current = 'undecided'
+    focusOn(null)
+  }
+
+  /** Hand the gesture over to Framer: this card leaves the fan and follows
+   *  the finger from wherever it is right now. */
+  const liftOut = (event: PointerEvent, index: number | null) => {
+    if (index === null || !canLift) return
+    reading.current = 'lift'
+    clearTimeout(holdTimer.current)
+    handleFor(index).start(event)
+  }
+
+  const onGestureMove = (event: PointerEvent) => {
+    // Framer owns the gesture from here — see `draggingCard`.
+    if (draggingCard.current || reading.current === 'lift') return
+    if (activePointer.current !== event.pointerId) return
+    const x = event.clientX
+    const y = event.clientY
+    lastPoint.current = { x, y }
+
+    if (reading.current === 'undecided') {
+      const sideways = Math.abs(x - from.current.x)
+      const pull = from.current.y - y
+      if (pull >= LIFT_PULL && pull > sideways) {
+        liftOut(event, from.current.index)
+        return
+      }
+      if (sideways < SCRUB_SLACK) return
+      reading.current = 'browse'
+      clearTimeout(holdTimer.current)
+    }
+
+    // Only ever *move* the highlight, never drop it: the pull that takes a
+    // card out of the hand carries the finger off the fan almost immediately,
+    // and clearing the focus on the way out would leave nothing to lift.
+    const over = hitTest(x, y)
+    if (over !== null) focusOn(over)
+    lowest.current = Math.max(lowest.current, y)
+    if (lowest.current - y >= LIFT_FROM_BROWSE) liftOut(event, focused.current ?? from.current.index)
+  }
+
   const onHandPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activePointer.current !== null) return
     activePointer.current = e.pointerId
     lastPoint.current = { x: e.clientX, y: e.clientY }
+    from.current = { x: e.clientX, y: e.clientY, index: cardIndexOf(e.target as Element) }
+    lowest.current = e.clientY
+    reading.current = 'undecided'
+
+    const move = (ev: PointerEvent) => onGestureMove(ev)
+    const up = () => endGesture()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    untrack.current = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+
+    // A finger that comes down and stays down is browsing too — you are
+    // looking at what you're holding, you just haven't moved yet.
     clearTimeout(holdTimer.current)
     holdTimer.current = setTimeout(() => {
-      if (activePointer.current === null) return
-      setBrowsing(true)
-      setFocusIndex(hitTest(lastPoint.current.x, lastPoint.current.y))
+      if (activePointer.current === null || reading.current !== 'undecided') return
+      reading.current = 'browse'
+      focusOn(hitTest(lastPoint.current.x, lastPoint.current.y) ?? from.current.index)
     }, HOLD_TO_FAN_MS)
   }
 
-  const onHandPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (draggingCard.current) return
-    if (activePointer.current !== e.pointerId) return
-    lastPoint.current = { x: e.clientX, y: e.clientY }
-    if (!browsing) return
-    setFocusIndex(hitTest(e.clientX, e.clientY))
-  }
-
-  const endHold = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (activePointer.current !== e.pointerId) return
-    clearTimeout(holdTimer.current)
-    activePointer.current = null
-    setBrowsing(false)
-    setFocusIndex(null)
-  }
+  useEffect(
+    () => () => {
+      untrack.current?.()
+      clearTimeout(holdTimer.current)
+    },
+    [],
+  )
 
   return (
     <div
       className="flex-1 min-w-0 relative"
       style={{ height: HAND_HEIGHT, touchAction: 'none' }}
       onPointerDown={onHandPointerDown}
-      onPointerMove={onHandPointerMove}
-      onPointerUp={endHold}
-      onPointerCancel={endHold}
     >
       {hand.map((cardId, index) => {
         const pickedActive = setupActive === index
@@ -1456,8 +1580,8 @@ function PlayerHand({
         const offset = rank - mid
         // The glow (coloured by which of the three this is) is the *only*
         // thing that marks a card viable; there is deliberately no height
-        // or position change to go with it — see the fan's `y`/`x` below,
-        // which never reads viability at all.
+        // or position change to go with it — see the pose below, which never
+        // reads viability at all.
         const viability = viabilityOf(index)
         let isFocused = focusIndex === index
         // This card is mid-drag: use the focus state frozen the instant
@@ -1468,16 +1592,23 @@ function PlayerHand({
         }
 
         return (
-          <motion.button
+          <HandCard
             key={`${cardId}-${index}`}
-            ref={(el) => {
+            elementRef={(el) => {
               cardRefs.current[index] = el
             }}
-            className="absolute bottom-0"
-            style={{
-              width: HAND_W,
-              left: '50%',
-              marginLeft: -HAND_W / 2,
+            controls={handleFor(index)}
+            canLift={canLift}
+            pose={{
+              // The fan itself never moves — only `y` and `scale` change for
+              // whichever card is focused, so there's nothing else to
+              // resettle when the finger moves on to a neighbour, and the
+              // handoff between the two reads as one continuous motion
+              // instead of the fan itself lurching.
+              x: offset * spanStep,
+              y: offset * offset * 1.4 - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
+              rotate: offset * rotateStep,
+              scale: isFocused ? BROWSE_SCALE : 1,
               // A plain ribbon spread: stacking order always follows hand
               // order, full stop. Whether a card is viable never changes it —
               // a viable card earlier in the hand stays exactly as overlapped
@@ -1486,35 +1617,10 @@ function PlayerHand({
               // card is ever an exception, since it's meant to visibly clear
               // the row while it's focused.
               zIndex: isFocused ? 3000 : index,
-              transformOrigin: 'bottom center',
             }}
-            animate={{
-              // The fan itself never moves — only `y` and `scale` change for
-              // whichever card is focused, so there's nothing else to
-              // resettle when the finger moves on to a neighbour, and the
-              // handoff between the two reads as one continuous motion
-              // instead of the fan itself lurching.
-              x: offset * spanStep,
-              rotate: offset * rotateStep,
-              y: offset * offset * 1.4 - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
-              scale: isFocused ? BROWSE_SCALE : 1,
-            }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            onPointerEnter={() => setBrushed(index)}
-            onPointerLeave={() => setBrushed((b) => (b === index ? null : b))}
-            drag={canLift}
-            dragSnapToOrigin
-            dragElastic={0.35}
-            // Straightens to upright the instant a card lifts off the fan,
-            // rather than carrying its resting tilt around under the thumb —
-            // a card you're holding reads as held, not still leaning the way
-            // it happened to sit in the hand. Nothing here persists past the
-            // gesture: whileDrag and the brush lift above both fall away on
-            // their own the moment the interaction ends, so every card is
-            // back at exactly the spot its offset computes, holding nothing
-            // from what was just done to it.
-            whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
-            onDragStart={() => {
+            onBrush={() => setBrushed(index)}
+            onUnbrush={() => setBrushed((b) => (b === index ? null : b))}
+            onLift={() => {
               // Freeze this card's own focus state first, then clear the
               // shared browse state — so whichever *other* card was lifted
               // settles back down immediately (nothing is fighting its
@@ -1523,18 +1629,15 @@ function PlayerHand({
               frozenPose.current = { isFocused }
               draggingIndex.current = index
               draggingCard.current = true
-              clearTimeout(holdTimer.current)
-              activePointer.current = null
-              setBrowsing(false)
-              setFocusIndex(null)
+              endGesture()
             }}
-            onDrag={(_event, info: PanInfo) => onDragMove(index, info.point)}
-            onDragEnd={(_event, info: PanInfo) => {
+            onCarry={(point) => onDragMove(index, point)}
+            onRelease={(point) => {
               draggingCard.current = false
               draggingIndex.current = null
               frozenPose.current = null
               setBrushed(null)
-              onDropEnd(index, info.point)
+              onDropEnd(index, point)
             }}
             // Setup is drag-only, full stop — a tap here used to be a no-op
             // already, but the button still visibly pressed down under a
@@ -1545,11 +1648,10 @@ function PlayerHand({
             // the play sheet mid-simulation could dispatch a real action out
             // from under the AI turn about to land on this same card.
             onClick={setupPhase || simulating ? undefined : () => onTap(index, isBasic)}
-            whileTap={setupPhase || simulating ? undefined : { scale: 0.95 }}
-            // Only Simulate makes a card inert now. Marking non-Basics
-            // disabled during setup also blocked every pointer event on
-            // them, which is exactly what stopped them being picked up;
-            // what a *tap* does is still gated on its own, just above.
+            // Only Simulate makes a card inert. Marking non-Basics disabled
+            // during setup also blocked every pointer event on them, which is
+            // exactly what stopped them being picked up; what a *tap* does is
+            // still gated on its own, just above.
             disabled={simulating}
           >
             {/* Every card in hand stays fully visible — the glow above is
@@ -1561,10 +1663,126 @@ function PlayerHand({
             >
               <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
             </div>
-          </motion.button>
+          </HandCard>
         )
       })}
     </div>
+  )
+}
+
+/** How the fan settles a card into place, and how it takes one back. */
+const FAN_SPRING = { type: 'spring', stiffness: 500, damping: 30 } as const
+
+/**
+ * One card in the fan.
+ *
+ * Its own component because each card needs two things a `.map()` body can't
+ * hold: a drag handle the tray can pull on (see `dragHandles` above), and its
+ * own `x`/`y` motion values.
+ *
+ * Those motion values are the whole reason a released card finds its way
+ * home. Framer's `dragSnapToOrigin` returns a card to x=0, y=0 — which is the
+ * *centre* of the fan, not this card's own seat in it, so every card but the
+ * middle one came back to the wrong place and stayed there, since the fan's
+ * target for it hadn't changed and so was never re-animated. Owning the two
+ * values here means the drop can simply animate them back to the pose the fan
+ * asks for, whatever that is.
+ */
+function HandCard({
+  pose,
+  canLift,
+  controls,
+  elementRef,
+  disabled,
+  onClick,
+  onBrush,
+  onUnbrush,
+  onLift,
+  onCarry,
+  onRelease,
+  children,
+}: {
+  pose: { x: number; y: number; rotate: number; scale: number; zIndex: number }
+  canLift: boolean
+  controls: DragControls
+  elementRef: (el: HTMLButtonElement | null) => void
+  disabled: boolean
+  onClick?: (() => void) | undefined
+  onBrush: () => void
+  onUnbrush: () => void
+  onLift: () => void
+  onCarry: (point: { x: number; y: number }) => void
+  onRelease: (point: { x: number; y: number }) => void
+  children: React.ReactNode
+}) {
+  const x = useMotionValue(pose.x)
+  const y = useMotionValue(pose.y)
+  const dragging = useRef(false)
+
+  // The fan's offset is a target to animate toward, not a style to render —
+  // a drag moves these same two values, so re-rendering would fight it.
+  useEffect(() => {
+    if (dragging.current) return
+    const settleX = animate(x, pose.x, FAN_SPRING)
+    const settleY = animate(y, pose.y, FAN_SPRING)
+    return () => {
+      settleX.stop()
+      settleY.stop()
+    }
+  }, [pose.x, pose.y, x, y])
+
+  return (
+    <motion.button
+      ref={elementRef}
+      className="absolute bottom-0"
+      style={{
+        x,
+        y,
+        width: HAND_W,
+        left: '50%',
+        marginLeft: -HAND_W / 2,
+        zIndex: pose.zIndex,
+        transformOrigin: 'bottom center',
+      }}
+      animate={{ rotate: pose.rotate, scale: pose.scale }}
+      transition={FAN_SPRING}
+      onPointerEnter={onBrush}
+      onPointerLeave={onUnbrush}
+      drag={canLift}
+      // Never from this card's own pointerdown: the tray reads the gesture
+      // first and starts the drag itself, so that riffling sideways through
+      // the hand doesn't pull a card out of it. See PlayerHand's own doc.
+      dragListener={false}
+      dragControls={controls}
+      // Both off so that releasing a card leaves it exactly where the finger
+      // let go, with nothing of Framer's still animating it — the drop
+      // handler below is the only thing that decides where it goes next.
+      dragMomentum={false}
+      dragSnapToOrigin={false}
+      // Straightens to upright the instant a card lifts off the fan, rather
+      // than carrying its resting tilt around under the thumb — a card you're
+      // holding reads as held, not still leaning the way it happened to sit
+      // in the hand. Nothing here persists past the gesture.
+      whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
+      onDragStart={() => {
+        dragging.current = true
+        onLift()
+      }}
+      onDrag={(_event, info: PanInfo) => onCarry(info.point)}
+      onDragEnd={(_event, info: PanInfo) => {
+        dragging.current = false
+        onRelease(info.point)
+        // Back to its seat in the fan. If the drop played the card this is
+        // moot — it has already left the hand and unmounted.
+        animate(x, pose.x, FAN_SPRING)
+        animate(y, pose.y, FAN_SPRING)
+      }}
+      whileTap={onClick ? { scale: 0.95 } : undefined}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </motion.button>
   )
 }
 
