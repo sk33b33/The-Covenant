@@ -51,6 +51,16 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A woman standing beneath heavy fruit-laden branches, long dark hair unbound, a fig leaf caught in her fingers. She is half-turned away from a fruit tree behind her, weight shifting, caught in the instant before a decision rather than after it.',
   },
+  abel: {
+    shape: 'portrait',
+    scene:
+      'A young shepherd kneeling at a low stone altar, a lamb\'s fleece folded over his forearms and the smoke of his offering going straight up through still air. Unshorn hair, undyed tunic, hands that have handled animals since he could walk. He is watching the smoke rise, not the viewer.',
+  },
+  seth: {
+    shape: 'portrait',
+    scene:
+      'A man in early middle age at a newly raised family altar, hands open at his sides, mouth just parted on the first word of a prayer. Low dwellings and cook-fires behind him, a line starting over. He carries his dead brother\'s face and does not know it.',
+  },
   enoch: {
     shape: 'portrait',
     scene:
@@ -71,10 +81,20 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'The same man, older and grander, standing beneath a night-bright sky thick with stars, arms loose at his sides, head tipped back to count what cannot be counted. Silver in his beard now, a heavier striped mantle, deep calm in the face.',
   },
+  isaac: {
+    shape: 'portrait',
+    scene:
+      'A young man on his back atop a stack of split wood, seen close and from above: bound wrists crossed on his chest, chin lifted, eyes open and steady on something past the frame. Rope, bark, and one curled horn of a ram caught in thicket behind his head.',
+  },
   melchizedek: {
     shape: 'portrait',
     scene:
       'A priest-king in white linen with a plain gold circlet, holding out a round loaf in one hand and a shallow cup of dark wine in the other. City walls of Salem behind him. No genealogy in the face — he could be forty or four hundred.',
+  },
+  'jesus-carrying-cross': {
+    shape: 'portrait',
+    scene:
+      'A man bent almost double beneath a rough crossbeam lashed across his shoulders, one hand gripping the wood, the other braced against the stones of a narrow street. Blood dried at the hairline, dust in the beard, breath held. The frame stays with him; no one in the crowd is given a face.',
   },
   'the-garden-of-eden': {
     shape: 'scene',
@@ -89,6 +109,11 @@ export const ART_DIRECTION: Record<string, Direction> = {
 
   /* ---------------------------------------------------------------- Earth */
 
+  jacob: {
+    shape: 'portrait',
+    scene:
+      'A traveller sitting up out of sleep on open stony ground at first light, one hand still resting on the flat stone he used for a pillow, looking at the empty air above the hillside where something was. Cloak twisted from the night, dust on one cheek, wholly awake.',
+  },
   israel: {
     shape: 'portrait',
     scene:
@@ -428,11 +453,12 @@ export const ART_DIRECTION: Record<string, Direction> = {
   },
 }
 
-/** Cards this map deliberately does not cover: the five that already have art. */
-export const ALREADY_ILLUSTRATED: string[] = [
-  'abel',
-  'isaac',
-  'jacob',
-  'jesus-carrying-cross',
-  'seth',
-]
+/**
+ * Cards this map deliberately does not cover, because they already have art.
+ *
+ * Empty at the moment: the five shipped illustrations were pulled so they can
+ * be replaced, so every card in the set is back on a placeholder and every one
+ * of them needs direction. Add an id here — and delete its entry above — as
+ * each card's artwork lands.
+ */
+export const ALREADY_ILLUSTRATED: string[] = []
