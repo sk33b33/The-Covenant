@@ -177,6 +177,27 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const setupBench = setup.bench
   const [actionOpen, setActionOpen] = useState(false)
 
+  /**
+   * Which side's discard banner is open, if either — lifted up here rather
+   * than kept local to the button that opens it, and rendered from the
+   * top-level overlay list below rather than beside that button.
+   *
+   * Both halves matter. `DiscardButton`/`DiscardPile` sit deep inside the
+   * board's own `z-10` column, one sibling among several at the app's root;
+   * the hand tray is a *different* z-10 sibling, later in the DOM. Tying
+   * for z-index resolves by DOM order, and stacking contexts don't let a
+   * high z-index buried inside one sibling reach outside it to outrank a
+   * different sibling — so a banner rendered from inside the board column,
+   * however high its own z-index claimed to be, could never actually paint
+   * above the hand tray next to it. That was the bug: opening the discard
+   * strip left the fanned hand drawn on top of it. Rendering the strip from
+   * this component's own top-level overlay list — the same list AttackFx,
+   * TurnAnnounce and Result already use — puts it in the one stacking
+   * context that is actually a sibling of the hand tray, which is what
+   * lets it finally sit above it.
+   */
+  const [viewingDiscard, setViewingDiscard] = useState<PlayerId | null>(null)
+
   const you = state.players.you
   const foe = state.players.foe
   // Simulate hands your side to the AI, so none of the manual controls that
@@ -966,7 +987,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               what actually mirrors it: Discard closer to the shared centre,
               Deck out at their own edge, exactly as it reads on your side. */}
           <div className="flex items-start gap-2">
-            <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
+            <DiscardButton count={foe.discard.length} onOpen={() => setViewingDiscard('foe')} />
             <div className="flex flex-col items-center">
               <PileCount count={foe.deck.length} />
               <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
@@ -981,16 +1002,23 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           <TurnBanner state={state} simulating={simulating} />
         </div>
 
+        {/* Your own row reorganised around the deck rather than a mirror of
+            the opponent's own arrangement above: the discard pile sits
+            face up directly under the deck it came from — its own vertical
+            stack — and the clock, points and turn countdown form a second
+            stack on the row's other edge, the clock first so it's "in line
+            with" (level with) the deck it stands opposite. */}
         <div className="w-full flex items-start justify-between gap-2 px-0.5">
-          <div className="flex items-start gap-2">
-            <div className="flex flex-col items-center">
-              <PileCount count={you.deck.length} />
-              <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
-              <MatchClock seconds={clocks.you} />
-            </div>
-            <DiscardButton count={you.discard.length} cardIds={you.discard} />
+          <div className="flex flex-col items-center gap-1">
+            <PileCount count={you.deck.length} />
+            <DiscardPile cardIds={you.discard} onOpen={() => setViewingDiscard('you')} />
           </div>
-          <StatsChip points={you.points} />
+
+          <div className="flex flex-col items-end gap-1">
+            <MatchClock seconds={clocks.you} />
+            <StatsChip points={you.points} />
+            <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
+          </div>
         </div>
 
         {/* Lifted via `transform`, not margin: this whole board block is
@@ -1197,6 +1225,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
       <AnimatePresence>
         {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewingDiscard && (
+          <DiscardStrip
+            cardIds={viewingDiscard === 'you' ? you.discard : foe.discard}
+            onClose={() => setViewingDiscard(null)}
+          />
+        )}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -2085,47 +2122,96 @@ function PileCount({ count }: { count: number }) {
  * letterform for it instead. Tapping opens the same fanned strip the old
  * pile slot did.
  */
-function DiscardButton({ count, cardIds }: { count: number; cardIds: string[] }) {
-  const [open, setOpen] = useState(false)
+/** A plain trigger — opening the strip itself is the caller's job now (see
+ *  `viewingDiscard` on the Battle component), so the same banner can be
+ *  reached from this button on the opponent's side and from `DiscardPile`'s
+ *  face-up card on yours without either owning its own copy of that state. */
+function DiscardButton({ count, onOpen }: { count: number; onOpen: () => void }) {
+  return (
+    <button
+      onClick={() => count > 0 && onOpen()}
+      disabled={count === 0}
+      className="relative shrink-0 rounded-pill grid place-items-center"
+      style={{
+        width: 34,
+        height: 34,
+        background: 'var(--bg-sunk)',
+        border: '1px solid rgba(229,192,140,.25)',
+        opacity: count === 0 ? 0.4 : 1,
+      }}
+      aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
+    >
+      <DiscardIcon size={15} className="text-ink-faint" />
+      {count > 0 && (
+        <span
+          className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
+          style={{
+            minWidth: 15,
+            height: 15,
+            padding: '0 3px',
+            fontSize: 9,
+            background: 'var(--surface-raised)',
+            border: '1px solid rgba(229,192,140,.3)',
+            color: 'rgba(229,192,140,.85)',
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  )
+}
+
+/**
+ * The discard pile itself, face up — the last card actually discarded,
+ * shown at its own size rather than a generic "D" glyph, sat directly
+ * under the deck it belongs to. A bit smaller than the deck: this is what
+ * has already left play, not the pile still deciding the game.
+ *
+ * Tapping it opens the same strip `DiscardButton` does (see `onOpen`), not
+ * a peek at this one card — `noPeek` on the `PressableCard` beneath turns
+ * off its own long-press viewer for exactly that reason, and the actual
+ * click handler lives on this wrapping button, not on the card.
+ */
+function DiscardPile({ cardIds, onOpen }: { cardIds: string[]; onOpen: () => void }) {
+  const count = cardIds.length
+  const size = 42
+  const top = cardIds[count - 1]
 
   return (
-    <>
-      <button
-        onClick={() => count > 0 && setOpen((v) => !v)}
-        disabled={count === 0}
-        className="relative shrink-0 rounded-pill grid place-items-center"
-        style={{
-          width: 34,
-          height: 34,
-          background: 'var(--bg-sunk)',
-          border: '1px solid rgba(229,192,140,.25)',
-          opacity: count === 0 ? 0.4 : 1,
-        }}
-        aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
-      >
-        <DiscardIcon size={15} className="text-ink-faint" />
-        {count > 0 && (
-          <span
-            className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
-            style={{
-              minWidth: 15,
-              height: 15,
-              padding: '0 3px',
-              fontSize: 9,
-              background: 'var(--surface-raised)',
-              border: '1px solid rgba(229,192,140,.3)',
-              color: 'rgba(229,192,140,.85)',
-            }}
-          >
-            {count}
-          </span>
-        )}
-      </button>
+    <button
+      onClick={() => count > 0 && onOpen()}
+      disabled={count === 0}
+      className="relative shrink-0 rounded-sm overflow-hidden"
+      style={{ width: size, aspectRatio: '63/88' }}
+      aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
+    >
+      {top ? (
+        <PressableCard card={requireCard(top)} compact noHolo noPeek standalone />
+      ) : (
+        <div
+          className="absolute inset-0 rounded-sm"
+          style={{ background: 'var(--bg-sunk)', border: '1px dashed rgba(229,192,140,.2)' }}
+        />
+      )}
 
-      <AnimatePresence>
-        {open && <DiscardStrip cardIds={cardIds} onClose={() => setOpen(false)} />}
-      </AnimatePresence>
-    </>
+      {count > 0 && (
+        <span
+          className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
+          style={{
+            minWidth: 15,
+            height: 15,
+            padding: '0 3px',
+            fontSize: 9,
+            background: 'var(--surface-raised)',
+            border: '1px solid rgba(229,192,140,.3)',
+            color: 'rgba(229,192,140,.85)',
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   )
 }
 
