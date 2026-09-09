@@ -113,6 +113,7 @@ function makePlayer(id: PlayerId, deck: string[], energy: EnergyType[], rng: Rng
     covenantsThisTurn: 0,
     retreatsThisTurn: 0,
     attackedThisTurn: false,
+    ascendedThisTurn: [],
     covenantsLocked: false,
     extraCovenant: false,
   }

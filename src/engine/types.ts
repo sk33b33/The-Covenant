@@ -98,6 +98,16 @@ export interface PlayerState {
   covenantsThisTurn: number
   retreatsThisTurn: number
   attackedThisTurn: boolean
+  /**
+   * Uids that have already ascended this turn — one ascension per slot per
+   * turn, not per Figure across its whole time in play. A Figure's own uid
+   * survives its own ascension (`cardId` changes, the object doesn't), so
+   * the uid already identifies the *slot* for exactly as long as the
+   * enteredOnTurn rule already allows an ascension to be considered at all;
+   * nothing can occupy that slot mid-turn and reach this list too, since a
+   * freshly entered Figure is blocked from ascending by that same rule.
+   */
+  ascendedThisTurn: string[]
   /** Set by Babel: this player may not play Covenants on their next turn. */
   covenantsLocked: boolean
   /** Set by The Signet Ring: one Covenant this turn is free of the limit. */

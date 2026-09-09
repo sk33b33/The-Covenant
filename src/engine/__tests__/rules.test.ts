@@ -281,6 +281,41 @@ describe('ascension', () => {
     }
   })
 
+  it('refuses a second ascension of the same slot in one turn', () => {
+    // Rigged rather than left to the dealt hand, unlike the test above: this
+    // one needs a real two-step lineage (abram -> abraham -> isaac) to chain
+    // in a single turn, not a random hand that may or may not carry it.
+    let state = started({ forceFirst: 'you' })
+    state = reduce(state, { type: 'END_TURN' }) // foe's turn
+    state = reduce(state, { type: 'END_TURN' }) // back to you — the Active
+    // Figure has now lived through a full turn, clear of the
+    // enters-play-this-turn guard on its own.
+
+    const active = state.players.you.active!
+    active.cardId = 'abram'
+    active.enteredOnTurn = 1
+    state.players.you.hand.push('abraham', 'isaac')
+    const abrahamHand = state.players.you.hand.indexOf('abraham')
+
+    const afterFirst = reduce(state, { type: 'ASCEND', hand: abrahamHand, uid: active.uid })
+    const ascended = afterFirst.players.you.active!
+    expect(ascended.cardId).toBe('abraham')
+
+    // Same slot (the uid survives its own ascension), same turn: refused,
+    // even though isaac legitimately ascends from what this slot holds now.
+    const isaacHand = afterFirst.players.you.hand.indexOf('isaac')
+    expect(() =>
+      reduce(afterFirst, { type: 'ASCEND', hand: isaacHand, uid: ascended.uid }),
+    ).toThrow(/already ascended this turn/)
+
+    // A fresh turn clears the block.
+    const yourNextTurn = reduce(reduce(afterFirst, { type: 'END_TURN' }), { type: 'END_TURN' })
+    const stillThere = yourNextTurn.players.you.active!
+    const isaacHandNow = yourNextTurn.players.you.hand.indexOf('isaac')
+    const final = reduce(yourNextTurn, { type: 'ASCEND', hand: isaacHandNow, uid: stillThere.uid })
+    expect(final.players.you.active?.cardId).toBe('isaac')
+  })
+
   it('refuses to ascend onto the wrong Figure', () => {
     const state = started({ forceFirst: 'you' })
     const active = state.players.you.active!

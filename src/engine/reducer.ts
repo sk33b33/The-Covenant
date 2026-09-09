@@ -219,6 +219,7 @@ function beginTurn(state: MatchState) {
   player.covenantsThisTurn = 0
   player.retreatsThisTurn = 0
   player.attackedThisTurn = false
+  player.ascendedThisTurn = []
   player.extraCovenant = false
 
   // Statuses lapse by turn number, not at the end of the owner's turn, so a
@@ -454,12 +455,16 @@ export function reduce(input: MatchState, action: Action): MatchState {
       if (figure.enteredOnTurn >= state.turn) {
         throw new IllegalAction('A Figure cannot ascend on the turn it entered play')
       }
+      if (player.ascendedThisTurn.includes(figure.uid)) {
+        throw new IllegalAction('That slot has already ascended this turn')
+      }
 
       player.hand.splice(action.hand, 1)
       figure.beneath.push(figure.cardId)
       figure.cardId = cardId
       // Ascension is a fresh start: damage and energy carry, conditions do not.
       figure.statuses = []
+      player.ascendedThisTurn.push(figure.uid)
       log(state, me, `${card.name} ascends.`)
       return state
     }

@@ -70,6 +70,7 @@ export function legalActions(state: MatchState): Action[] {
     for (const figure of figuresInPlay(player)) {
       if (figure.cardId !== card.ascendsFrom) continue
       if (figure.enteredOnTurn >= state.turn) continue
+      if (player.ascendedThisTurn.includes(figure.uid)) continue
       actions.push({ type: 'ASCEND', hand, uid: figure.uid })
     }
   })
