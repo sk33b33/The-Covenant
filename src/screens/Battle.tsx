@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AnimatePresence,
   DragControls,
@@ -11,7 +11,7 @@ import {
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { AltarIcon, CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
+import { CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -226,6 +226,30 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   /** A Figure a fatal blow has taken off the board, held on the mat until
    *  the strike that felled it has finished playing. */
   const [dying, setDying] = useState<{ side: PlayerId; figure: FigureInPlay } | null>(null)
+
+  /**
+   * The last real type either side's Altar actually held, kept across the
+   * gap after it's spent.
+   *
+   * The Altar goes back to `null` the instant its energy is attached — the
+   * same turn it was granted — and stays `null` for the rest of that turn
+   * and the whole of the opponent's, right up until the next real grant. A
+   * greyed-out zone has to show *something* through that whole stretch, and
+   * the honest thing to show is what was just spent, not a fresh guess.
+   * Seeded from `nextAltar` rather than left empty, so the very first time a
+   * side's Altar has never held anything yet — before its own opening turn
+   * — there is still a real, correct type to grey out rather than nothing.
+   */
+  const lastAltarType = useRef<{ you: EnergyType; foe: EnergyType }>({
+    you: you.nextAltar,
+    foe: foe.nextAltar,
+  })
+  useEffect(() => {
+    if (you.altar) lastAltarType.current.you = you.altar
+  }, [you.altar])
+  useEffect(() => {
+    if (foe.altar) lastAltarType.current.foe = foe.altar
+  }, [foe.altar])
 
   // Set the instant a strike starts and cleared when it has played out.
   // A ref rather than the `attackFx` state above because the turn hand-off
@@ -861,6 +885,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
       <BattleMat theme={themeType} />
 
+      {/* The opponent's own Altar, mirrored to their corner of the table —
+          a point reflection of yours (bottom-right) rather than a plain
+          flip, matching how their hand fan already leans the opposite way
+          for the same reason: this is their side of the table, seen from
+          across it. Nothing here is ever the player's own to touch, so it's
+          `AltarSocket` with no interactive child at all — a plain static
+          orb once charged, the shared greyed display at every other
+          moment, exactly like yours but read-only. */}
+      <div className="absolute left-0 top-0 pt-safe px-3 pt-2 z-10">
+        <AltarSocket current={foe.altar} lastKnown={lastAltarType.current.foe} next={foe.nextAltar}>
+          {foe.altar && <EnergyOrb type={foe.altar} size={30} />}
+        </AltarSocket>
+      </div>
+
       {/* Both halves push their Active Figure toward the centre ring, so the
           clash reads as happening in the middle of the mat rather than leaving
           a dead band between the two boards. The board is one centred block,
@@ -1112,46 +1150,14 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               />
             </button>
 
-            <div className="relative grid place-items-center">
-              {/* Charged glow: energy is attached by dragging the orb onto a
-                  Figure now, so this is the zone's only "something's here"
-                  tell besides the orb itself sitting on top of it. */}
-              {you.altar && (
-                <div
-                  className="cov-altar-glow absolute rounded-full pointer-events-none"
-                  style={{
-                    width: 46,
-                    height: 46,
-                    background: 'radial-gradient(circle, rgba(229,192,140,.55), transparent 70%)',
-                  }}
-                />
-              )}
-
-              {/* The Altar itself — the socket, not the thing being dragged.
-                  It never moves: only the orb sitting on top of it (below)
-                  drags onto a Figure, so the frame stays put as the visual
-                  anchor for "this is where energy comes from" whether or
-                  not one is resting there right now. Empty, it now carries
-                  its own icon rather than a wordmark — a horned altar, the
-                  same shape this game's own card names already draw on,
-                  instead of a label repeating what the zone's position on
-                  the tray already says. */}
-              <div
-                className="relative rounded-pill grid place-items-center"
-                style={{
-                  width: 46,
-                  height: 46,
-                  background: you.altar ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                  boxShadow: you.altar ? '0 0 14px rgba(229,192,140,.35)' : undefined,
-                }}
-                aria-hidden={you.altar !== null}
-              >
-                {!you.altar && <AltarIcon size={20} className="text-ink-faint" />}
-              </div>
-
-              {/* The energy orb, layered on top of the (stationary) Altar.
-                  No tap-to-sheet any more — dragging it onto a Figure is the
-                  only way to attach energy now. */}
+            {/* The Altar itself. `AltarSocket` is the shared, passive
+                display — the drag button below is the only thing that
+                makes *yours* interactive, and it only ever renders while
+                there's actually something to drag. It never moves: only
+                the orb inside it drags onto a Figure, so the socket stays
+                put as the visual anchor for "this is where energy comes
+                from" regardless of what it's currently showing. */}
+            <AltarSocket current={you.altar} lastKnown={lastAltarType.current.you} next={you.nextAltar}>
               {you.altar && (
                 <motion.button
                   disabled={!myTurn}
@@ -1167,30 +1173,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   <EnergyOrb type={you.altar} size={30} />
                 </motion.button>
               )}
-
-              {/* A preview of next turn's type, always showing regardless of
-                  whether this turn's own energy is still sitting here or
-                  already spent — the type itself is fixed the moment this
-                  renders (see `PlayerState.nextAltar`), not a guess, so it's
-                  safe to plan around. A corner badge rather than a second
-                  full orb: small enough to read as "coming up", not as a
-                  second Altar competing with the real one. `pointer-events`
-                  stays off so it can never intercept the drag the real orb
-                  above it depends on. */}
-              <div
-                className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center pointer-events-none"
-                style={{
-                  width: 20,
-                  height: 20,
-                  background: 'var(--bg-sunk)',
-                  border: '1.5px solid rgba(229,192,140,.4)',
-                }}
-                role="img"
-                aria-label={`Next turn's Altar energy: ${ENERGY_LABEL[you.nextAltar]}`}
-              >
-                <EnergyOrb type={you.nextAltar} size={13} />
-              </div>
-            </div>
+            </AltarSocket>
           </div>
         </div>
       </div>
@@ -1920,6 +1903,87 @@ function OpponentHand({ count }: { count: number }) {
  * absent, so the row keeps its height and the board does not shift a few
  * pixels every time the turn changes hands.
  */
+/**
+ * The Altar's own passive display: a 46px socket holding one orb — the
+ * current type, full colour and glowing, once it's actually been granted;
+ * the last type this side's Altar ever held, greyed out, at every other
+ * moment (including before the very first grant, when "last held" is really
+ * "about to hold") — plus a small corner badge always naming next turn's
+ * type. Grey rather than blank so there is always something concrete to
+ * read, whether that's a promise not yet kept or one already spent.
+ *
+ * Purely visual, and shared by both sides: the player's own Altar wraps
+ * this with the drag button that actually attaches the current orb to a
+ * Figure, layered on top only while `current` is set; the opponent's has
+ * nothing layered over it at all, since nothing here is ever the player's
+ * to drag.
+ */
+function AltarSocket({
+  current,
+  lastKnown,
+  next,
+  children,
+}: {
+  current: EnergyType | null
+  lastKnown: EnergyType
+  next: EnergyType
+  /** What fills the socket once `current` is actually granted — a
+   *  draggable button for the player's own Altar, a plain static orb for
+   *  the opponent's. Never rendered while `current` is null: the socket
+   *  shows its own greyed `lastKnown` orb in that case instead, so a
+   *  caller can pass this unconditionally without duplicating that check. */
+  children?: ReactNode
+}) {
+  return (
+    <div className="relative grid place-items-center">
+      {/* Charged glow: the zone's only "something's here" tell besides the
+          orb's own colour switching on. */}
+      {current && (
+        <div
+          className="cov-altar-glow absolute rounded-full pointer-events-none"
+          style={{
+            width: 46,
+            height: 46,
+            background: 'radial-gradient(circle, rgba(229,192,140,.55), transparent 70%)',
+          }}
+        />
+      )}
+
+      <div
+        className="relative rounded-pill grid place-items-center"
+        style={{
+          width: 46,
+          height: 46,
+          background: current ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+          boxShadow: current ? '0 0 14px rgba(229,192,140,.35)' : undefined,
+        }}
+      >
+        {current ? (
+          children
+        ) : (
+          <span className="grayscale opacity-55">
+            <EnergyOrb type={lastKnown} size={30} />
+          </span>
+        )}
+      </div>
+
+      <div
+        className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center pointer-events-none"
+        style={{
+          width: 20,
+          height: 20,
+          background: 'var(--bg-sunk)',
+          border: '1.5px solid rgba(229,192,140,.4)',
+        }}
+        role="img"
+        aria-label={`Next turn's Altar energy: ${ENERGY_LABEL[next]}`}
+      >
+        <EnergyOrb type={next} size={13} />
+      </div>
+    </div>
+  )
+}
+
 function TurnStatus({ label, active, seconds }: { label: string; active: boolean; seconds: number }) {
   return (
     <div
