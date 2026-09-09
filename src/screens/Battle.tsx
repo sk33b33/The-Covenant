@@ -53,6 +53,12 @@ import type { FigureInPlay, MatchState, PlayerId } from '@/engine/types'
 // hand, just one level up.
 const ACTIVE_W = 80
 const BENCH_W = 48
+/** The discard pile's own width — narrower than the deck it sits with,
+ *  since this is what has already left play. Shared with the spacer that
+ *  keeps the opponent's clock/points/turn stack level with their deck once
+ *  the two piles swap places, so the two never drift out of sync. */
+const DISCARD_W = 42
+const DISCARD_H = (DISCARD_W * 88) / 63
 // Smaller than before on purpose: a smaller card overlaps its neighbour by
 // less at the same fan spacing, which is real breathing room around each
 // card's own tappable centre, not just a smaller footprint.
@@ -982,19 +988,41 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             instead, while the deck/discard column moves to the right (yours
             sits at the left) and stays centred exactly as yours does — the
             same two rules from your row, just read from the opponent's own
-            side of the table. The clock stays first in its stack on both
-            sides: "in line with the deck" means level with it, and the deck
-            is the first thing in its own stack too, on both sides. */}
-        <div className="w-full flex items-start justify-between gap-2 px-0.5">
+            side of the table.
+
+            Discard and deck swap places on this side only: the deck sits
+            *below* the discard here, so it can sit closer to the row's own
+            edge and further from the clash ring's halfway line than a
+            straight copy of your own (deck-above-discard) order would have
+            left it. The clock/points/turn stack still has to land level
+            with the deck, not with whatever is first in its own column now
+            — a plain spacer, `DISCARD_H` tall, stands in for the discard
+            pile's own slot at the top of that column so the two stay in
+            sync without hand-tuning a pixel offset that would silently go
+            stale the moment either pile's own size changes.
+
+            The swap alone pushes the deck's own bottom edge past the mat's
+            halfway line — putting the discard where the deck used to sit
+            moves the deck down by the discard's own height, and there
+            wasn't that much clearance to spare. `translateY`, not a margin,
+            for the same reason `FOE_ROW_LIFT` elsewhere in this file uses
+            one: it moves the paint position without taking space out of
+            the flex column's own measurement, so nothing above or below
+            this row has to re-flow to make room for it. */}
+        <div
+          className="w-full flex items-start justify-between gap-2 px-0.5"
+          style={{ transform: 'translateY(-22px)' }}
+        >
           <div className="flex flex-col items-start gap-1">
+            <div style={{ height: DISCARD_H }} aria-hidden="true" />
             <MatchClock seconds={clocks.foe} thinking={aiThinking} />
             <StatsChip points={foe.points} />
             <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
           </div>
 
           <div className="flex flex-col items-center gap-1">
-            <PileCount count={foe.deck.length} />
             <DiscardPile cardIds={foe.discard} onOpen={() => setViewingDiscard('foe')} />
+            <PileCount count={foe.deck.length} />
           </div>
         </div>
 
@@ -2131,7 +2159,7 @@ function PileCount({ count }: { count: number }) {
  */
 function DiscardPile({ cardIds, onOpen }: { cardIds: string[]; onOpen: () => void }) {
   const count = cardIds.length
-  const size = 42
+  const size = DISCARD_W
   const top = cardIds[count - 1]
 
   return (
