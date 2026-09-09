@@ -204,14 +204,6 @@ export const ResetIcon = (p: IconProps) => (
   </Icon>
 )
 
-/** Discard: a carved-letterform "D" — the same single-glyph mark the check
- *  and reset buttons use, standing in for the pile the way those stand in
- *  for their own action rather than pointing at a picture of one. */
-export const DiscardIcon = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M7 4h4a8 8 0 0 1 0 16H7V4Z" />
-  </Icon>
-)
 
 /* ------------------------------------------------------------- currencies */
 

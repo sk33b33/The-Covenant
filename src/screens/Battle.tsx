@@ -11,7 +11,7 @@ import {
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
+import { CheckIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -182,8 +182,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
    * than kept local to the button that opens it, and rendered from the
    * top-level overlay list below rather than beside that button.
    *
-   * Both halves matter. `DiscardButton`/`DiscardPile` sit deep inside the
-   * board's own `z-10` column, one sibling among several at the app's root;
+   * Both halves matter. `DiscardPile` sits deep inside the board's own
+   * `z-10` column, one sibling among several at the app's root;
    * the hand tray is a *different* z-10 sibling, later in the DOM. Tying
    * for z-index resolves by DOM order, and stacking contexts don't let a
    * high z-index buried inside one sibling reach outside it to outrank a
@@ -976,23 +976,25 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           </motion.div>
         </div>
 
+        {/* A point reflection of your own row below, not a copy shifted
+            sideways: the clock/points/turn stack moves to the row's LEFT
+            edge (yours sits at the right) and flushes against *that* edge
+            instead, while the deck/discard column moves to the right (yours
+            sits at the left) and stays centred exactly as yours does — the
+            same two rules from your row, just read from the opponent's own
+            side of the table. The clock stays first in its stack on both
+            sides: "in line with the deck" means level with it, and the deck
+            is the first thing in its own stack too, on both sides. */}
         <div className="w-full flex items-start justify-between gap-2 px-0.5">
-          <StatsChip points={foe.points} />
-          {/* Deck-then-discard in the JSX order below reads Discard-then-Deck
-              on screen, not a mirror of your own row: `justify-between`
-              only swaps which *side* this whole cluster sits on, so with the
-              same internal order as yours, your Deck sits at your own outer
-              edge while the opponent's Discard ends up at theirs instead —
-              reversed, not reflected. Reversing the two children here is
-              what actually mirrors it: Discard closer to the shared centre,
-              Deck out at their own edge, exactly as it reads on your side. */}
-          <div className="flex items-start gap-2">
-            <DiscardButton count={foe.discard.length} onOpen={() => setViewingDiscard('foe')} />
-            <div className="flex flex-col items-center">
-              <PileCount count={foe.deck.length} />
-              <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
-              <MatchClock seconds={clocks.foe} thinking={aiThinking} />
-            </div>
+          <div className="flex flex-col items-start gap-1">
+            <MatchClock seconds={clocks.foe} thinking={aiThinking} />
+            <StatsChip points={foe.points} />
+            <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <PileCount count={foe.deck.length} />
+            <DiscardPile cardIds={foe.discard} onOpen={() => setViewingDiscard('foe')} />
           </div>
         </div>
 
@@ -2115,63 +2117,17 @@ function PileCount({ count }: { count: number }) {
 }
 
 /**
- * The discard pile, as a touch button rather than a pile of its own — there
- * was never a stack worth looking at here (a discard pile is public
- * information regardless of how many cards are in it, unlike a face-down
- * deck), so the slot it used to occupy now carries the game's own
- * letterform for it instead. Tapping opens the same fanned strip the old
- * pile slot did.
- */
-/** A plain trigger — opening the strip itself is the caller's job now (see
- *  `viewingDiscard` on the Battle component), so the same banner can be
- *  reached from this button on the opponent's side and from `DiscardPile`'s
- *  face-up card on yours without either owning its own copy of that state. */
-function DiscardButton({ count, onOpen }: { count: number; onOpen: () => void }) {
-  return (
-    <button
-      onClick={() => count > 0 && onOpen()}
-      disabled={count === 0}
-      className="relative shrink-0 rounded-pill grid place-items-center"
-      style={{
-        width: 34,
-        height: 34,
-        background: 'var(--bg-sunk)',
-        border: '1px solid rgba(229,192,140,.25)',
-        opacity: count === 0 ? 0.4 : 1,
-      }}
-      aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
-    >
-      <DiscardIcon size={15} className="text-ink-faint" />
-      {count > 0 && (
-        <span
-          className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center font-numeric tabular-nums"
-          style={{
-            minWidth: 15,
-            height: 15,
-            padding: '0 3px',
-            fontSize: 9,
-            background: 'var(--surface-raised)',
-            border: '1px solid rgba(229,192,140,.3)',
-            color: 'rgba(229,192,140,.85)',
-          }}
-        >
-          {count}
-        </span>
-      )}
-    </button>
-  )
-}
-
-/**
  * The discard pile itself, face up — the last card actually discarded,
  * shown at its own size rather than a generic "D" glyph, sat directly
- * under the deck it belongs to. A bit smaller than the deck: this is what
- * has already left play, not the pile still deciding the game.
+ * under the deck it belongs to on both sides now. A bit smaller than the
+ * deck: this is what has already left play, not the pile still deciding
+ * the game.
  *
- * Tapping it opens the same strip `DiscardButton` does (see `onOpen`), not
- * a peek at this one card — `noPeek` on the `PressableCard` beneath turns
- * off its own long-press viewer for exactly that reason, and the actual
- * click handler lives on this wrapping button, not on the card.
+ * Tapping it opens the fanned strip below (see `viewingDiscard` on the
+ * Battle component, which owns that state so this doesn't have to), not a
+ * peek at this one card — `noPeek` on the `PressableCard` beneath turns off
+ * its own long-press viewer for exactly that reason, and the actual click
+ * handler lives on this wrapping button, not on the card.
  */
 function DiscardPile({ cardIds, onOpen }: { cardIds: string[]; onOpen: () => void }) {
   const count = cardIds.length
