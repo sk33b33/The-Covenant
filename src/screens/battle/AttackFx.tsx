@@ -182,6 +182,23 @@ const TIER_AMP: Record<Tier, number> = { normal: 1, weak: 1.3, ko: 1.65 }
  *  knockout hangs in the air noticeably longer than a routine hit. */
 const HITSTOP_S: Record<Tier, number> = { normal: 0.09, weak: 0.15, ko: 0.22 }
 
+/**
+ * A brief charge on the attacker's own card, before anything leaves it.
+ *
+ * Everything above throws something *at* the defender; nothing previously
+ * happened *to* the attacker beyond a plain lunge — the same up-and-down
+ * recoil regardless of element, throwing a fireball or a shadow the same way
+ * as drawing on light. This is the missing beat: the element visibly gathers
+ * into the card first, so the strike reads as the card's own power being
+ * spent rather than a projectile that simply happens to leave from there.
+ *
+ * Tier-scaled like the hit-stop hold it mirrors, so a knockout telegraphs a
+ * touch longer than a routine hit — never long enough to feel sluggish; the
+ * whole point of pacing this game out was to let a beat be seen, not to
+ * make every strike wait through one.
+ */
+const WINDUP_S: Record<Tier, number> = { normal: 0.14, weak: 0.19, ko: 0.26 }
+
 /** How hard the defender's own card shakes, before the tier multiplier
  *  below — read by Battle.tsx so the real board piece's shake matches. */
 const IMPACT_SHAKE: Record<EnergyType, { amount: number; seconds: number }> = {
@@ -208,8 +225,22 @@ export function shakeFor(event: AttackEvent): { amount: number; seconds: number 
  *  plus the hit-stop hold — so Battle.tsx can start the defender's shake
  *  exactly when the impact visually lands rather than when the projectile
  *  merely arrives. */
+/** Seconds the charge plays before the strike actually leaves the card —
+ *  read by Battle.tsx to time the attacker's own coil-and-glow against it. */
+export function windupDelaySeconds(event: AttackEvent): number {
+  return WINDUP_S[tierOf(event)]
+}
+
+/** The two colours Battle.tsx borrows for the attacker's own glow, so that
+ *  colour lives in exactly one place — this file's own element table —
+ *  rather than a second copy of it drifting out of sync in Battle.tsx. */
+export function attackGlow(event: AttackEvent): { core: string; glow: string } {
+  const theme = THEME[event.type]
+  return { core: theme.core, glow: theme.glow }
+}
+
 export function impactDelaySeconds(event: AttackEvent): number {
-  return THEME[event.type].travel + HITSTOP_S[tierOf(event)]
+  return WINDUP_S[tierOf(event)] + THEME[event.type].travel + HITSTOP_S[tierOf(event)]
 }
 
 const TAG_BASE_S = 1.05
@@ -236,8 +267,10 @@ interface Props {
   onDone: () => void
 }
 
+const EMPTY_SHOW = { windup: false, projectile: false, spark: false, impact: false, tag: false }
+
 export function AttackFx({ trigger, onDone }: Props) {
-  const [show, setShow] = useState({ projectile: false, spark: false, impact: false, tag: false })
+  const [show, setShow] = useState(EMPTY_SHOW)
 
   useEffect(() => {
     if (!trigger) return
@@ -247,37 +280,47 @@ export function AttackFx({ trigger, onDone }: Props) {
     const missed = event.missed
     const hitStop = HITSTOP_S[tier]
     const tagSeconds = TAG_BASE_S + TAG_TIER_BONUS_S[tier]
+    // Every timer below is shifted by this — the whole existing sequence
+    // (launch, contact, impact, clear) still plays exactly as it did, just
+    // starting once the charge has gathered rather than at the trigger
+    // itself.
+    const windupMs = WINDUP_S[tier] * 1000
 
     // A miss fizzles short of the target rather than travelling the full
     // distance — see the shortened `dy` below, which uses the same fraction —
     // and has nothing to hit, so it skips the hit-stop hold entirely.
-    const landAt = (missed ? theme.travel * 0.55 : theme.travel) * 1000
+    const landAt = windupMs + (missed ? theme.travel * 0.55 : theme.travel) * 1000
 
-    setShow({ projectile: true, spark: false, impact: false, tag: false })
+    setShow({ ...EMPTY_SHOW, windup: true })
+
+    const launch = setTimeout(() => {
+      setShow({ ...EMPTY_SHOW, projectile: true })
+    }, windupMs)
 
     const spark = setTimeout(() => {
       if (missed) {
-        setShow({ projectile: false, spark: false, impact: false, tag: true })
+        setShow({ ...EMPTY_SHOW, tag: true })
       } else {
-        setShow({ projectile: false, spark: true, impact: false, tag: false })
+        setShow({ ...EMPTY_SHOW, spark: true })
       }
     }, landAt)
 
     const land = missed
       ? null
       : setTimeout(() => {
-          setShow({ projectile: false, spark: false, impact: true, tag: true })
+          setShow({ ...EMPTY_SHOW, impact: true, tag: true })
         }, landAt + hitStop * 1000)
 
     const clear = setTimeout(
       () => {
-        setShow({ projectile: false, spark: false, impact: false, tag: false })
+        setShow(EMPTY_SHOW)
         onDone()
       },
       landAt + (missed ? 0 : hitStop * 1000) + tagSeconds * 1000,
     )
 
     return () => {
+      clearTimeout(launch)
       clearTimeout(spark)
       if (land) clearTimeout(land)
       clearTimeout(clear)
@@ -304,6 +347,17 @@ export function AttackFx({ trigger, onDone }: Props) {
   return (
     <div className="cov-attack-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
       <AnimatePresence>
+        {show.windup && (
+          <Charge
+            key="charge"
+            theme={theme}
+            scale={scale}
+            fromX={fromX}
+            fromY={fromY}
+            seconds={WINDUP_S[tier]}
+          />
+        )}
+
         {show.projectile && (
           <Projectile
             key="projectile"
@@ -357,6 +411,117 @@ export function AttackFx({ trigger, onDone }: Props) {
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ charge */
+
+/**
+ * The element gathering into the attacker's own card, just before it leaves.
+ *
+ * Reuses each element's own wake layers rather than a second, bespoke table
+ * — the same particles the projectile sheds on its way out are drawn here
+ * from the opposite direction, closing in on the card instead of trailing
+ * behind it, so the charge reads as the same substance being drawn together
+ * rather than an unrelated flourish stitched on first.
+ *
+ * Unlike `Projectile`/`Impact` below, nothing here carries an `exit` prop —
+ * consistent with them: AnimatePresence only drives an exit animation on a
+ * bare `motion.*` element it renders directly, not through the plain
+ * function-component wrapper both this and they are, so one here would be
+ * silently inert. The core is timed to peak right as this unmounts instead,
+ * which is the swap into the projectile's own mount-in — an abrupt handoff
+ * at the brightest instant reads as the release itself, not a cut.
+ */
+function Charge({
+  theme,
+  scale,
+  fromX,
+  fromY,
+  seconds,
+}: {
+  theme: ElementTheme
+  scale: number
+  fromX: number
+  fromY: number
+  seconds: number
+}) {
+  const core = 34 * scale
+
+  return (
+    <span>
+      {theme.wake.map((layer, layerIndex) =>
+        // A little sparser than the trail it mirrors — this is a beat, not
+        // the main event, and the projectile is about to spend the same
+        // colours again on the way out.
+        Array.from({ length: Math.ceil(layer.count * 0.6) }, (_, i) => {
+          const size = layer.size * scale * 0.75
+          const radius = (26 + layerIndex * 14) * scale
+          const angle = rand(i, layerIndex + 31) * Math.PI * 2
+          const px = Math.cos(angle) * radius
+          const py = Math.sin(angle) * radius
+          const color =
+            layer.color === 'core' ? theme.core : layer.color === 'glow' ? theme.glow : layer.color
+
+          return (
+            <motion.span
+              key={`${layerIndex}-${i}`}
+              className="absolute"
+              style={{
+                left: fromX - size / 2,
+                top: fromY - size / 2,
+                width: size,
+                height: size,
+                borderRadius: '50%',
+                background: layer.soft
+                  ? `radial-gradient(circle, ${color}, transparent 70%)`
+                  : color,
+                boxShadow: layer.soft ? undefined : `0 0 ${4 * scale}px ${1 * scale}px ${color}`,
+              }}
+              initial={{ x: px, y: py, opacity: 0, scale: 0.6 }}
+              animate={{ x: px * 0.12, y: py * 0.12, opacity: [0, layer.opacity, 0], scale: [0.6, 1, 0.5] }}
+              transition={{
+                duration: seconds,
+                delay: (i / Math.max(1, layer.count)) * seconds * 0.25,
+                ease: 'easeIn',
+              }}
+            />
+          )
+        }),
+      )}
+
+      {/* The aperture closing — the plainest tell that something is being
+          drawn in rather than thrown out. */}
+      <motion.span
+        className="absolute rounded-pill"
+        style={{
+          left: fromX - core,
+          top: fromY - core,
+          width: core * 2,
+          height: core * 2,
+          border: `2px solid ${theme.glow}`,
+        }}
+        initial={{ scale: 1.5, opacity: 0 }}
+        animate={{ scale: [1.5, 0.65], opacity: [0, 0.7, 0] }}
+        transition={{ duration: seconds, ease: 'easeIn' }}
+      />
+
+      {/* The core itself brightening, climaxing right where this hands off
+          to the projectile's own launch. */}
+      <motion.span
+        className="absolute rounded-pill"
+        style={{
+          left: fromX - core / 2,
+          top: fromY - core / 2,
+          width: core,
+          height: core,
+          background: `radial-gradient(circle, ${theme.core}, ${theme.glow} 55%, transparent 78%)`,
+        }}
+        initial={{ scale: 0.3, opacity: 0 }}
+        animate={{ scale: [0.3, 0.55, 0.95], opacity: [0, 0.5, 1] }}
+        transition={{ duration: seconds, ease: 'easeIn' }}
+      />
+    </span>
   )
 }
 

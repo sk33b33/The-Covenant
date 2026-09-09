@@ -23,7 +23,14 @@ import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
-import { AttackFx, impactDelaySeconds, shakeFor, type AttackFxTrigger } from './battle/AttackFx'
+import {
+  AttackFx,
+  attackGlow,
+  impactDelaySeconds,
+  shakeFor,
+  windupDelaySeconds,
+  type AttackFxTrigger,
+} from './battle/AttackFx'
 import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -256,9 +263,38 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
     // A bigger recoil than a routine card game needs, deliberately — this
     // effect is meant to read as amplified, not restrained.
+    //
+    // Prefixed with a short coil-and-glow rather than firing the lunge cold:
+    // AttackFx now spends `windupSeconds` gathering the element into the
+    // card before anything leaves it (see AttackFx.tsx's own `Charge`), and
+    // this is the real board piece's half of that same beat — a small pull
+    // *away* from the lunge direction while an element-coloured glow builds
+    // on the card, both timed to peak exactly where the coil hands off to
+    // the release. The glow's colour is fixed across every keyframe on
+    // purpose: framer can only tween a `filter` smoothly when every stop
+    // shares the same function list, so only the blur radius and brightness
+    // move — a colour that also changed would make the browser step between
+    // keyframes instead of blending them.
+    const windupSeconds = windupDelaySeconds(ev)
+    const lungeSeconds = 0.42
+    const totalSeconds = windupSeconds + lungeSeconds
+    const coiledAt = windupSeconds / totalSeconds
+    const releasedAt = (windupSeconds + lungeSeconds * 0.4) / totalSeconds
+    const glowColor = attackGlow(ev).glow
+
     attacker.start({
-      y: [0, lungeDir * 20, 0],
-      transition: { duration: 0.42, times: [0, 0.4, 1], ease: 'easeOut' },
+      y: [0, -lungeDir * 6, lungeDir * 20, 0],
+      filter: [
+        `drop-shadow(0 0 0px ${glowColor}) brightness(1)`,
+        `drop-shadow(0 0 7px ${glowColor}) brightness(1.05)`,
+        `drop-shadow(0 0 18px ${glowColor}) brightness(1.3)`,
+        `drop-shadow(0 0 0px ${glowColor}) brightness(1)`,
+      ],
+      transition: {
+        duration: totalSeconds,
+        times: [0, coiledAt, releasedAt, 1],
+        ease: 'easeOut',
+      },
     })
 
     if (!ev.missed) {
