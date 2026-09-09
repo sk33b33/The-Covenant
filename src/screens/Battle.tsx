@@ -743,14 +743,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const [magnet, setMagnet] = useState<{ target: MagnetTarget; cardId: string } | null>(null)
 
   // The live "will this land here?" highlight is applied straight to the DOM
-  // rather than through React state. A card in hand fires this on every frame
-  // of the drag, and re-rendering the whole board that often turned out to be
+  // rather than through React state. A card fires this on every frame of a
+  // drag, and re-rendering the whole board that often turned out to be
   // enough to make framer's own drag recognition occasionally drop the
   // gesture entirely — the highlight is worth showing, but not at the cost of
   // the drag itself sometimes silently failing to register. The same slot
-  // refs serve two different drags — a hand card looking for an empty Active
-  // or Bench slot during setup, and (below) the Altar looking for an occupied
-  // one to attach to — so this checks for either child rather than assuming
+  // refs serve two different drags — the Altar looking for an occupied one to
+  // attach to, and (below) a hand card during setup, where every slot is a
+  // legal target and there's nothing to distinguish this from the persistent
+  // multi-slot glow — so this checks for either child rather than assuming
   // which one is present.
   const lastHighlighted = useRef<HTMLDivElement | null>(null)
   const setHighlight = (el: HTMLDivElement | null) => {
@@ -761,6 +762,63 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     el?.querySelector('.cov-slot-outline, .cov-figure-card')?.classList.add('cov-slot-drag-target')
     lastHighlighted.current = el
   }
+
+  /** The Figure occupying a uid, resolved back to the slot element it's
+   *  standing in — the inverse of `figureAt` below, needed for ASCEND
+   *  targets, which name a uid rather than a slot index. */
+  const elForUid = (uid: string): HTMLDivElement | null => {
+    if (you.active?.uid === uid) return activeSlotRef.current
+    const index = you.bench.findIndex((figure) => figure?.uid === uid)
+    return index !== -1 ? (benchSlotRefs.current[index] ?? null) : null
+  }
+
+  /**
+   * Every slot a hand card could legally land on right now, mid-match — a
+   * PLAY_FIGURE names its own empty Bench slot directly, an ASCEND names the
+   * uid of the Figure it lands on. During setup every slot is legal for any
+   * Basic (a pick always overwrites whatever it was resting on), so there's
+   * nothing to enumerate from `legal` there.
+   */
+  const viableSlotsFor = (index: number): HTMLDivElement[] => {
+    if (setupPhase) {
+      if (!basicsInHand.some((b) => b.index === index)) return []
+      return [activeSlotRef.current, ...benchSlotRefs.current].filter(
+        (el): el is HTMLDivElement => el !== null,
+      )
+    }
+    const actions = actionsFor.byHand.get(index) ?? []
+    const els: HTMLDivElement[] = []
+    for (const action of actions) {
+      const el =
+        action.type === 'PLAY_FIGURE'
+          ? benchSlotRefs.current[action.slot]
+          : action.type === 'ASCEND'
+            ? elForUid(action.uid)
+            : null
+      if (el) els.push(el)
+    }
+    return els
+  }
+
+  // The green "you can drop it here" glow that fills every viable slot for
+  // the whole length of a hand-card drag, not just whichever one the finger
+  // is nearest — computed once, the moment the card leaves the fan, rather
+  // than on every frame like `setHighlight` above: the set of legal targets
+  // for a given card can't change mid-drag (nothing but this player's own
+  // dispatch changes `legal`, and dragging isn't one), so there's nothing to
+  // re-derive on each frame, only to set once and clear once.
+  const glowingSlots = useRef<HTMLDivElement[]>([])
+  const setViableGlow = (els: HTMLDivElement[]) => {
+    glowingSlots.current.forEach((el) =>
+      el.querySelector('.cov-slot-outline, .cov-figure-card')?.classList.remove('cov-slot-viable-glow'),
+    )
+    glowingSlots.current = els
+    els.forEach((el) =>
+      el.querySelector('.cov-slot-outline, .cov-figure-card')?.classList.add('cov-slot-viable-glow'),
+    )
+  }
+
+  const handleHandDragStart = (index: number) => setViableGlow(viableSlotsFor(index))
 
   /** The Figure a drop target's own ref currently belongs to, if any — the
    *  Active slot's ref and each Bench slot's ref outlive whichever Figure
@@ -797,7 +855,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   const handleHandDrag = (index: number, point: { x: number; y: number }) => {
     if (setupPhase) {
-      setHighlight(slotAt(point))
       // Any slot within magnet range is a legal target during setup — a
       // pick always overwrites whatever it was resting on (clearPick), so
       // there's no equivalent of an "occupied, not for you" slot to exclude.
@@ -813,11 +870,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // rather than a preview of where this one is headed.
     const target = magnetDrop && magnetDrop.action.type === 'PLAY_FIGURE' ? magnetTargetOf(magnetDrop.el) : null
     setMagnet(target ? { target, cardId: you.hand[index]! } : null)
-    setHighlight(legalHandDrop(index, point)?.el ?? null)
   }
 
   const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
-    setHighlight(null)
+    setViableGlow([])
     setMagnet(null)
     if (setupPhase) {
       // Only a Basic Figure can open on the board. This used to be enforced
@@ -1156,6 +1212,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 // tap still opens the card's own sheet of plays.
                 if (!setupPhase) openHandCard(index)
               }}
+              onDragStart={handleHandDragStart}
               onDropEnd={handleHandDragEnd}
               onDragMove={handleHandDrag}
             />
@@ -1414,6 +1471,7 @@ function PlayerHand({
   simulating,
   playable,
   onTap,
+  onDragStart,
   onDropEnd,
   onDragMove,
 }: {
@@ -1427,6 +1485,7 @@ function PlayerHand({
   simulating: boolean
   playable: Map<number, Action[]>
   onTap: (index: number, isBasic: boolean) => void
+  onDragStart: (index: number) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
   onDragMove: (index: number, point: { x: number; y: number }) => void
 }) {
@@ -1770,6 +1829,7 @@ function PlayerHand({
               draggingIndex.current = index
               draggingCard.current = true
               endGesture()
+              onDragStart(index)
             }}
             onCarry={(point) => onDragMove(index, point)}
             onRelease={(point) => {

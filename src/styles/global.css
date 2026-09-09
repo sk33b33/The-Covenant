@@ -403,6 +403,26 @@
     border-radius: 4.5% / 3.22%;
   }
 
+  /* Every slot a card in hand could legally land on, lit green for the whole
+   * length of the drag rather than just whichever one the finger is nearest
+   * — set once when the card leaves the fan and cleared once on release (see
+   * Battle.tsx's `setViableGlow`), not per frame like `cov-slot-drag-target`
+   * above, since the set of legal targets can't change mid-drag. */
+  .cov-slot-outline.cov-slot-viable-glow {
+    border: 2px solid rgb(84, 214, 122);
+    box-shadow:
+      0 0 0 2px rgba(84, 214, 122, 0.28),
+      0 0 16px rgba(84, 214, 122, 0.55);
+    background: rgba(84, 214, 122, 0.16);
+  }
+
+  .cov-figure-card.cov-slot-viable-glow {
+    box-shadow:
+      0 0 0 2.5px rgb(84, 214, 122),
+      0 0 18px rgba(84, 214, 122, 0.65);
+    border-radius: 4.5% / 3.22%;
+  }
+
   /* A soft pulse beneath the Altar once it holds energy — the zone reading
    * as "charged" at a glance, not just from the orb sitting on top of it. */
   @keyframes cov-pulse-glow {
