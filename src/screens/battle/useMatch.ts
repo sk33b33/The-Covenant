@@ -200,17 +200,46 @@ export function useMatch(config: MatchConfig, presenting = false) {
   useEffect(() => {
     if (!coinSettled || state.phase === 'ended' || state.phase === 'setup') return
 
-    const side = state.current
+    // Nothing on screen is asking anyone to decide anything yet: the strike
+    // is still crossing the mat, or the turn card is up. Charging a player
+    // for seconds they cannot act in is the one thing a chess clock must not
+    // do, and here it was charging the wrong player as well — an ATTACK ends
+    // the attacker's turn in the same reducer call it resolves in, so from
+    // the first frame of the animation `current` is already the side that
+    // has not been given the board yet. Their clock ran down through the
+    // projectile, the hit, the knockout flourish and a 1.75s turn card
+    // before they could touch a card.
+    //
+    // The same hold that keeps the AI from moving over its own animation
+    // (see `presenting` above), applied to the clock as well. It is bounded
+    // by the animations themselves, so it cannot be used to stall.
+    if (presenting) return
+
+    // Whose second this is. Usually the player to move — but during a
+    // promotion it is whoever owes the promotion, who is often not the same
+    // person. Knock out the opponent's Active and the phase turns to
+    // `promote` with `current` still set to you, so the opponent's
+    // deliberation was billed to your clock, for a turn that PROMOTE ends
+    // anyway. Charging the promoting player instead is both the honest
+    // reading and the one that keeps a stall costing the staller.
+    const side = state.phase === 'promote' ? state.promoting : state.current
+    if (!side) return
+
     const id = window.setInterval(() => {
       setClocks((prev) => ({
         ...prev,
         [side]: Math.max(0, prev[side] - 1),
-        turn: Math.max(0, prev.turn - 1),
+        // The turn clock measures a turn in progress, and a promotion is not
+        // one: PROMOTE ends the turn the moment it resolves. It is also the
+        // clock the player can actually see, under their own deck, so
+        // running it against a decision that is not the turn reads as time
+        // being taken for nothing.
+        turn: state.phase === 'main' ? Math.max(0, prev.turn - 1) : prev.turn,
       }))
     }, 1000)
 
     return () => window.clearInterval(id)
-  }, [coinSettled, state.phase, state.current])
+  }, [coinSettled, state.phase, state.current, state.promoting, presenting])
 
   // The turn clock restarts whenever the turn changes hands.
   useEffect(() => {
