@@ -83,6 +83,14 @@ export interface PlayerState {
   energyTypes: EnergyType[]
   /** Energy generated this turn and not yet attached. */
   altar: EnergyType | null
+  /**
+   * The type the Altar will supply on this player's *next* turn — rolled one
+   * turn ahead of when it's actually granted, rather than at the moment it's
+   * needed, so the screen can show it in advance. `energyTypes` is the only
+   * other source that decides one, and it never runs out: `beginTurn` always
+   * refills this the instant it hands the current value off to `altar`.
+   */
+  nextAltar: EnergyType
   points: number
 
   /* Per-turn counters, reset at the start of each of this player's turns. */

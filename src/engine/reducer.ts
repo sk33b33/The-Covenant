@@ -231,12 +231,18 @@ function beginTurn(state: MatchState) {
   if (state.phase === 'ended') return
 
   // The turn-1 handicap: the player who went first gets no energy and cannot
-  // attack, trading tempo for the first Ascension on round two.
+  // attack, trading tempo for the first Ascension on round two. `nextAltar`
+  // is left untouched here — it was rolled for this player's first *real*
+  // turn, which this skipped one is not.
   if (isFirstPlayersOpeningTurn(state)) {
     player.altar = null
     log(state, playerId, 'Going first: no energy this turn, and no attack.')
   } else {
-    player.altar = withRng(state, (rng) => rng.pick(player.energyTypes))
+    // Hand off the value already promised, then roll the next one — a
+    // player who has been shown what's coming can never have that answer
+    // change out from under them once it's their turn to receive it.
+    player.altar = player.nextAltar
+    player.nextAltar = withRng(state, (rng) => rng.pick(player.energyTypes))
   }
 }
 

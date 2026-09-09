@@ -189,6 +189,38 @@ describe('energy', () => {
     const theirActive = state.players.foe.active!
     expect(() => reduce(state, { type: 'ATTACH', uid: theirActive.uid })).toThrow(IllegalAction)
   })
+
+  it('rolls the Altar one turn ahead, so the type is fixed before it is granted', () => {
+    // The screen previews `nextAltar` before a player has actually received
+    // it, which only means something if the value cannot still change
+    // between the preview and the turn that grants it. A single-type pool
+    // makes a *fresh* roll fully predictable — there is nothing else it
+    // could produce — so pinning `nextAltar` to a different type makes it
+    // unambiguous which of the two a turn actually hands out: a 50/50 pool
+    // would let a broken implementation pass this by pure chance half the
+    // time it's run.
+    const state = started({
+      forceFirst: 'foe',
+      you: { deck: DECK, energy: ['earth'] },
+      foe: { deck: DECK, energy: ['water'] },
+    })
+    state.players.you.nextAltar = 'fire'
+    state.players.foe.nextAltar = 'light'
+
+    // Turn 1 (foe, handicapped — no altar, `nextAltar` left exactly as
+    // pinned) hands off to turn 2: you, a normal first turn.
+    const turn2 = reduce(state, { type: 'END_TURN' })
+    expect(turn2.players.foe.altar).toBeNull()
+    expect(turn2.players.foe.nextAltar).toBe('light') // untouched by the handicap turn
+    expect(turn2.players.you.altar).toBe('fire') // the pinned promise, not a fresh roll
+    expect(turn2.players.you.nextAltar).toBe('earth') // the only value ['earth'] can produce
+
+    // Turn 2 hands off to turn 3 — foe's own first real turn, their
+    // handicap already spent on turn 1.
+    const turn3 = reduce(turn2, { type: 'END_TURN' })
+    expect(turn3.players.foe.altar).toBe('light') // the promise pinned before turn 1
+    expect(turn3.players.foe.nextAltar).toBe('water')
+  })
 })
 
 /* ------------------------------------------------------------- hand limit */

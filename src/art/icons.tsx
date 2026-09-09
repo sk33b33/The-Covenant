@@ -213,6 +213,19 @@ export const DiscardIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** A horned altar with its offering flame — replaces the plain "ALTAR"
+ *  wordmark that used to mark the empty zone. The dip between two raised
+ *  corners echoes the horned altars this game's own card names already draw
+ *  on, rather than a generic table or brazier. */
+export const AltarIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6.2 19.6h11.6" />
+    <path d="M7.6 19.6 8.2 12.8h7.6l.6 6.8" />
+    <path d="M8.2 12.8a3.8 3.8 0 0 0 7.6 0" />
+    <path d="M12 5.2c1.6 2.2 2.3 3.7 2.3 4.8a2.3 2.3 0 1 1-4.6 0c0-1.1.7-2.6 2.3-4.8Z" />
+  </Icon>
+)
+
 /* ------------------------------------------------------------- currencies */
 
 /** Talents: a stack of coins. */

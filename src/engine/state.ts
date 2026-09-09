@@ -102,6 +102,12 @@ function makePlayer(id: PlayerId, deck: string[], energy: EnergyType[], rng: Rng
     bench: Array(RULES.BENCH_SIZE).fill(null),
     energyTypes: energy,
     altar: null,
+    // Rolled here, at the same point the opening hand is dealt, rather than
+    // waiting for this player's first real turn — that's what lets the
+    // screen show it before then. `beginTurn` re-rolls this every time it
+    // hands the value off to `altar`, so it always names the turn after the
+    // one about to start.
+    nextAltar: rng.pick(energy),
     points: 0,
     attachedThisTurn: 0,
     covenantsThisTurn: 0,

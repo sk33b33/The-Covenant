@@ -11,13 +11,13 @@ import {
 import { BattleMat } from '@/art/BattleMat'
 import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
+import { AltarIcon, CheckIcon, DiscardIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
 import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
-import { isFigure, type EnergyType } from '@/game/types'
+import { ENERGY_LABEL, isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
@@ -1131,7 +1131,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   It never moves: only the orb sitting on top of it (below)
                   drags onto a Figure, so the frame stays put as the visual
                   anchor for "this is where energy comes from" whether or
-                  not one is resting there right now. */}
+                  not one is resting there right now. Empty, it now carries
+                  its own icon rather than a wordmark — a horned altar, the
+                  same shape this game's own card names already draw on,
+                  instead of a label repeating what the zone's position on
+                  the tray already says. */}
               <div
                 className="relative rounded-pill grid place-items-center"
                 style={{
@@ -1142,7 +1146,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 }}
                 aria-hidden={you.altar !== null}
               >
-                {!you.altar && <span className="text-[9px] text-ink-faint tracking-wide">ALTAR</span>}
+                {!you.altar && <AltarIcon size={20} className="text-ink-faint" />}
               </div>
 
               {/* The energy orb, layered on top of the (stationary) Altar.
@@ -1163,6 +1167,29 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   <EnergyOrb type={you.altar} size={30} />
                 </motion.button>
               )}
+
+              {/* A preview of next turn's type, always showing regardless of
+                  whether this turn's own energy is still sitting here or
+                  already spent — the type itself is fixed the moment this
+                  renders (see `PlayerState.nextAltar`), not a guess, so it's
+                  safe to plan around. A corner badge rather than a second
+                  full orb: small enough to read as "coming up", not as a
+                  second Altar competing with the real one. `pointer-events`
+                  stays off so it can never intercept the drag the real orb
+                  above it depends on. */}
+              <div
+                className="absolute -bottom-1 -right-1 rounded-pill grid place-items-center pointer-events-none"
+                style={{
+                  width: 20,
+                  height: 20,
+                  background: 'var(--bg-sunk)',
+                  border: '1.5px solid rgba(229,192,140,.4)',
+                }}
+                role="img"
+                aria-label={`Next turn's Altar energy: ${ENERGY_LABEL[you.nextAltar]}`}
+              >
+                <EnergyOrb type={you.nextAltar} size={13} />
+              </div>
             </div>
           </div>
         </div>
