@@ -956,7 +956,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         </div>
 
         <div className="w-full flex items-start justify-between gap-2 px-0.5">
-          <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
+          <StatsChip points={foe.points} />
           {/* Deck-then-discard in the JSX order below reads Discard-then-Deck
               on screen, not a mirror of your own row: `justify-between`
               only swaps which *side* this whole cluster sits on, so with the
@@ -970,6 +970,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             <div className="flex flex-col items-center">
               <PileCount count={foe.deck.length} />
               <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
+              <MatchClock seconds={clocks.foe} thinking={aiThinking} />
             </div>
           </div>
         </div>
@@ -985,10 +986,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             <div className="flex flex-col items-center">
               <PileCount count={you.deck.length} />
               <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
+              <MatchClock seconds={clocks.you} />
             </div>
             <DiscardButton count={you.discard.length} cardIds={you.discard} />
           </div>
-          <StatsChip points={you.points} seconds={clocks.you} />
+          <StatsChip points={you.points} />
         </div>
 
         {/* Lifted via `transform`, not margin: this whole board block is
@@ -1243,24 +1245,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 /* --------------------------------------------------------------- pieces */
 
 /**
- * Points and time left, with no name attached — the name lived in a full-width
- * bar across the top and bottom of the mat; without it, this is small enough
- * to tuck into a corner of the board instead. `corner` places it in that
- * side's own outer corner, top for the opponent and bottom for you, on the
- * same mat so the two read as one mirrored rule rather than two bars.
+ * Points, with no name attached — the name lived in a full-width bar across
+ * the top and bottom of the mat; without it, this is small enough to tuck
+ * into a corner of the board instead. Placed in that side's own outer
+ * corner, top for the opponent and bottom for you, on the same mat so the
+ * two read as one mirrored rule rather than two bars.
+ *
+ * The match clock used to live here too, but that put a side's own time
+ * left on the opposite edge of the row from everything else that's theirs —
+ * their deck, their turn countdown. `MatchClock` now sits with those
+ * instead, directly under the deck it belongs to, which leaves this chip
+ * with only what doesn't already have a home: the points.
  */
-function StatsChip({
-  points,
-  seconds,
-  thinking,
-}: {
-  points: number
-  seconds: number
-  thinking?: boolean
-}) {
-  const minutes = Math.floor(seconds / 60)
-  const rest = seconds % 60
-
+function StatsChip({ points }: { points: number }) {
   return (
     <div
       className="shrink-0 z-10 flex items-center gap-1.5 rounded-pill px-2 py-1"
@@ -1281,15 +1278,29 @@ function StatsChip({
           />
         ))}
       </span>
-
-      <span
-        className="text-[11px] font-numeric tabular-nums"
-        style={{ color: seconds < 60 ? '#ef8f7c' : 'rgba(229,192,140,.75)' }}
-      >
-        {minutes}:{String(rest).padStart(2, '0')}
-        {thinking && '…'}
-      </span>
     </div>
+  )
+}
+
+/**
+ * The total match time this side has left, stacked under `TurnStatus` in
+ * the same column as the deck it belongs to. Unlike `TurnStatus`, which
+ * only shows anything on that side's own turn, this is always visible —
+ * the match clock keeps running on both sides regardless of whose turn it
+ * is, so hiding it the rest of the time would misrepresent it as paused.
+ */
+function MatchClock({ seconds, thinking }: { seconds: number; thinking?: boolean }) {
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+
+  return (
+    <span
+      className="mt-0.5 font-numeric tabular-nums text-[9px]"
+      style={{ color: seconds < 60 ? '#ef8f7c' : 'rgba(229,192,140,.5)' }}
+    >
+      {minutes}:{String(rest).padStart(2, '0')}
+      {thinking && '…'}
+    </span>
   )
 }
 
