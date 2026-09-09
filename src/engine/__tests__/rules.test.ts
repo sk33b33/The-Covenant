@@ -426,6 +426,15 @@ describe('knockouts and points', () => {
     const after = reduce(state, { type: 'ATTACK', attackIndex: 0 })
     expect(after.phase).toBe('promote')
     expect(after.promoting).toBe('foe')
+    // ATTACK does not call endTurn while a promotion is pending, so `current`
+    // is left exactly where it was — the attacker, 'you' — while `promoting`
+    // names the defender who has to fill the gap. The screen's turn clock
+    // reads this divergence directly (useMatch.ts's clock effect charges
+    // `promoting` rather than `current` once the phase is 'promote'), since
+    // charging the attacker for the defender's decision would bill the
+    // wrong player for time they did not get to spend.
+    expect(after.current).toBe('you')
+    expect(after.current).not.toBe(after.promoting)
 
     // Nothing else may happen until it is resolved.
     expect(() => reduce(after, { type: 'END_TURN' })).toThrow(/must be promoted/)
@@ -488,6 +497,12 @@ describe('knockouts and points', () => {
     expect(after.phase).toBe('promote')
     expect(after.promoting).toBe('foe')
     expect(after.players.you.active?.cardId).toBe('seth')
+    // A second way the same divergence arises: PROMOTE only calls endTurn
+    // once every vacancy is filled, so resolving the first one here leaves
+    // `current` sitting on 'you' — the player who just acted — while
+    // `promoting` has already moved on to 'foe' for the one still open.
+    expect(after.current).toBe('you')
+    expect(after.current).not.toBe(after.promoting)
 
     after = reduce(after, { type: 'PROMOTE', benchIndex: 0 })
 
