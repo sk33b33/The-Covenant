@@ -102,7 +102,7 @@ const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> 
 /** How far your own Active/Bench row is pulled up past its normal flex flow,
  *  so it crosses into the mat's clash ring instead of merely approaching its
  *  edge — see the render site for the measurement this is based on. */
-const YOU_ROW_LIFT = 80
+const YOU_ROW_LIFT = 139.3
 
 /** A small nudge of the opponent's Active/Bench row toward the halfway
  *  line, the mirror of YOU_ROW_LIFT but far more modest — their side
@@ -1065,7 +1065,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             used to sit almost exactly on the clash ring's outer boundary —
             a ~117px gap from the true halfway line versus the opponent's
             ~73px above it — rather than crossing into the ring at all.
-            YOU_ROW_LIFT pulls it in far enough to sit inside the ring. */}
+            YOU_ROW_LIFT pulls it in far enough to sit inside the ring.
+
+            It also now carries the extra lift that brings Active level
+            with your deck once the deck/discard swap moved the deck to
+            sit just under the halfway line: the deck's top and Active's
+            top were 59.3px apart, so that's the amount added here. Bench
+            reads off the same constant (`YOU_ROW_LIFT - BENCH_CLEARANCE`),
+            so it rides up by the same 59.3px and keeps its existing gap
+            to Active untouched. */}
         <div
           ref={activeSlotRef}
           className="shrink-0"
