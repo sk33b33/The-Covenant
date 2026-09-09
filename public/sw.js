@@ -27,9 +27,16 @@
  * whenever an existing art or audio file's *content* changes, not just when
  * new ones are added. `activate` deletes anything not carrying the current
  * VERSION, which is what actually forces a fresh fetch.
+ *
+ * Deleting a file counts too, and is the easier one to forget. Removing the
+ * five card illustrations took them off the server but not off any device
+ * that had already loaded them: cache-first found a hit and never asked. With
+ * the cache dropped, the request reaches the network, 404s, isn't stored
+ * (`!response.ok` below), and the card falls back to its placeholder — which
+ * is what removing the art was supposed to do.
  */
 
-const VERSION = 'covenant-v4'
+const VERSION = 'covenant-v5'
 const SHELL = `${VERSION}-shell`
 
 /*
