@@ -957,12 +957,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
         <div className="w-full flex items-start justify-between gap-2 px-0.5">
           <StatsChip points={foe.points} seconds={clocks.foe} thinking={aiThinking} />
+          {/* Deck-then-discard in the JSX order below reads Discard-then-Deck
+              on screen, not a mirror of your own row: `justify-between`
+              only swaps which *side* this whole cluster sits on, so with the
+              same internal order as yours, your Deck sits at your own outer
+              edge while the opponent's Discard ends up at theirs instead —
+              reversed, not reflected. Reversing the two children here is
+              what actually mirrors it: Discard closer to the shared centre,
+              Deck out at their own edge, exactly as it reads on your side. */}
           <div className="flex items-start gap-2">
+            <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
             <div className="flex flex-col items-center">
               <PileCount count={foe.deck.length} />
               <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
             </div>
-            <DiscardButton count={foe.discard.length} cardIds={foe.discard} />
           </div>
         </div>
 
