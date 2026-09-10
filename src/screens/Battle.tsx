@@ -69,6 +69,37 @@ const HAND_W = 54
  *  this game deals — scaled down along with HAND_W. */
 const HAND_HEIGHT = 90
 
+/*
+ * One fan, read from both ends of the table.
+ *
+ * Both hands are the same shape at the same size — the opponent's is a point
+ * reflection of yours, not a smaller cousin of it — so the numbers that give
+ * the fan its shape live here rather than being tuned twice. They were tuned
+ * twice, and drifted: the opponent's had its own spread, its own arc and its
+ * own card width, and "make them match" meant reconciling three pairs of
+ * numbers by hand instead of one.
+ *
+ * Only the *signs* differ between the two, at the call sites: yours pivots at
+ * the cards' feet and arcs downward toward your own hand, theirs pivots at
+ * their heads and arcs upward toward the far edge.
+ */
+
+/** Divided by count rather than count-1, and with no flat ceiling for the
+ *  hand sizes this game actually deals: the old cap saturated at max spread
+ *  for anything up to eight or nine cards, so drawing a card never visibly
+ *  tightened the fan until a hand was already unusually large. */
+const fanRotateStep = (count: number) => (count > 1 ? Math.min(10, Math.max(2, 30 / count)) : 0)
+
+/** The floor keeps a very large hand from packing so tight that neighbours
+ *  bury most of each other's card — the z-index rule in `PlayerHand` is what
+ *  actually guarantees a draggable card stays tappable regardless of overlap,
+ *  this just keeps the overlap itself from getting absurd at extreme hand
+ *  sizes. */
+const fanSpanStep = (count: number) => (count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0)
+
+/** How far a card's own distance from the fan's middle bows it along the arc. */
+const FAN_ARC = 1.4
+
 /** How long a finger has to stay down on the hand before it starts browsing
  *  (widening the fan, popping up whichever card it's over) rather than
  *  simply being the start of an ordinary tap or drag. */
@@ -1593,16 +1624,8 @@ function PlayerHand({
     .filter((i) => !(setupPhase && (setupActive === i || setupBench.includes(i))))
   const count = visibleIndices.length
   const mid = (count - 1) / 2
-  // Divided by count rather than count-1, and with no flat ceiling for the
-  // hand sizes this game actually deals: the old cap saturated at max spread
-  // for anything up to eight or nine cards, so drawing a card never visibly
-  // tightened the fan until a hand was already unusually large.
-  const rotateStep = count > 1 ? Math.min(10, Math.max(2, 30 / count)) : 0
-  // The floor keeps a very large hand from packing so tight that neighbours
-  // bury most of each other's card — the z-index rule below is what actually
-  // guarantees a draggable card stays tappable regardless of overlap, this
-  // just keeps the overlap itself from getting absurd at extreme hand sizes.
-  const spanStep = count > 1 ? Math.min(34, Math.max(18, 120 / count)) : 0
+  const rotateStep = fanRotateStep(count)
+  const spanStep = fanSpanStep(count)
 
   // The lift a card gets as a thumb brushes across the fan without yet
   // committing to a drag — the same tell a hand of real cards gives when
@@ -1894,7 +1917,7 @@ function PlayerHand({
               // handoff between the two reads as one continuous motion
               // instead of the fan itself lurching.
               x: offset * spanStep,
-              y: offset * offset * 1.4 - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
+              y: offset * offset * FAN_ARC - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
               rotate: offset * rotateStep,
               scale: isFocused ? BROWSE_SCALE : 1,
               // A plain ribbon spread: stacking order always follows hand
@@ -2088,31 +2111,30 @@ function HandCard({
  * left-to-right from their side of the table. Fanning it the same way as
  * yours read as a second hand belonging to you.
  *
- * Smaller and inert: nothing here is a target for anything, it only tells
- * you how many
- * cards are left to worry about.
+ * Inert: nothing here is a target for anything, it only tells you how many
+ * cards are left to worry about. Sized off `HAND_W` like your own, so the
+ * two hands read as the same cards seen from opposite sides of the table.
  */
 function OpponentHand({ count }: { count: number }) {
   if (count === 0) return null
 
   const mid = (count - 1) / 2
-  // Angles are scale-free, so the lean is the one thing that does *not*
-  // double with the rest: the same rotation on a card twice the size is the
-  // same fan, twice the size. Spread and arc depth are distances and do.
-  const rotateStep = count > 1 ? Math.min(9, Math.max(2, 26 / count)) : 0
-  const spanStep = count > 1 ? Math.min(32, Math.max(16, 112 / count)) : 0
-  const width = 60
+  // The same three numbers your own fan is built from, so the two hands are
+  // one shape read from either end of the table — same card size, same
+  // spread, same arc, differing only in the signs applied below.
+  const rotateStep = fanRotateStep(count)
+  const spanStep = fanSpanStep(count)
+  const width = HAND_W
 
   return (
-    // The reserved height stays what it was while the cards themselves
-    // doubled, so it no longer bounds them — deliberately. The cards are
-    // absolutely positioned and only ever overflowed this box anyway, but
-    // this board is a `justify-center` column: growing this child by the
-    // ~42px the taller cards actually occupy would re-centre the whole
-    // column and carry every row under it up by half of that, which is
-    // exactly the alignment (their Active level with their points chip)
-    // that was just measured into place. The cards spill down into the
-    // clearance that already sits between this hand and their Bench.
+    // This reserves 34px of flow while the cards standing in it are 75 tall,
+    // and does not bound them — deliberately. They are absolutely positioned
+    // and have always overflowed this box, but the board is a
+    // `justify-center` column: reserving their true height would re-centre
+    // the whole column and carry every row beneath it up by half the
+    // difference, which is exactly the alignment (their Active level with
+    // their points chip) that was measured into place. The cards spill down
+    // into the clearance that already sits above their Bench.
     <div className="relative shrink-0 pointer-events-none" style={{ height: 34, width: '100%' }}>
       {Array.from({ length: count }, (_, index) => {
         const offset = index - mid
@@ -2129,7 +2151,7 @@ function OpponentHand({ count }: { count: number }) {
               // (`rotate: offset * step`, `y: offset² * k`, pivoting at the
               // bottom): pivoting at the top with the signs flipped is the
               // same fan turned to face the other way down the table.
-              transform: `translateY(${-offset * offset * 2.2}px) rotate(${-offset * rotateStep}deg)`,
+              transform: `translateY(${-offset * offset * FAN_ARC}px) rotate(${-offset * rotateStep}deg)`,
               transformOrigin: 'top center',
               zIndex: count - index,
               boxShadow: '0 2px 8px rgba(0,0,0,.5)',
