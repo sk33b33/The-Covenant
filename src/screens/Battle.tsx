@@ -111,15 +111,18 @@ const HOLD_TO_FAN_MS = 130
  *  `.cov-hand-glow` in that file were, for reasons never pinned down,
  *  silently dropped from the stylesheet the browser actually loaded. */
 const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> = {
-  // Twice the luminosity of the other two: alpha pushed to its ceiling
-  // (doubling .55/.3/.75 and clamping at the opaque max is what "double" means
-  // once a channel is already past half) and the blur radius itself doubled
-  // to keep growing where alpha alone has nowhere left to go.
+  // Purple, and the only one of the three that is not the colour of the
+  // thing it marks — the other two borrow from the board (white for the
+  // ascension flash, red for a Covenant). It also carries twice the
+  // luminosity of either: alpha at its ceiling (doubling .55/.3/.75 and
+  // clamping at the opaque max is what "double" means once a channel is
+  // already past half) and the blur radius doubled to keep growing where
+  // alpha alone has nowhere left to go.
   use: {
-    ['--cov-hand-glow-dim-ring' as string]: 'rgba(229,192,140,1)',
-    ['--cov-hand-glow-dim-blur' as string]: 'rgba(229,192,140,.6)',
-    ['--cov-hand-glow-bright-ring' as string]: 'var(--gold-bright)',
-    ['--cov-hand-glow-bright-blur' as string]: 'rgba(229,192,140,1)',
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(154,96,214,1)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(154,96,214,.6)',
+    ['--cov-hand-glow-bright-ring' as string]: 'rgb(190,142,246)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(154,96,214,1)',
     ['--cov-hand-glow-dim-blur-size' as string]: '12px',
     ['--cov-hand-glow-bright-blur-size' as string]: '32px',
   } as React.CSSProperties,
@@ -1176,7 +1179,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           className="w-full flex items-start justify-between gap-2 px-0.5"
           style={{ transform: 'translateY(-22px)' }}
         >
-          <div className="flex flex-col items-start gap-1">
+          {/* Centred on each other rather than flushed to the row's outer
+              edge, which left the clock — barely half the chip's width —
+              hanging 14px off to one side of the chip it belongs to. The
+              column itself still sits at that outer edge; only its contents
+              line up on their own middle now. */}
+          <div className="flex flex-col items-center gap-1">
             <div style={{ height: DISCARD_H }} aria-hidden="true" />
             <MatchClock seconds={clocks.foe} thinking={aiThinking} />
             <StatsChip points={foe.points} />
@@ -1207,7 +1215,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             <DiscardPile cardIds={you.discard} onOpen={() => setViewingDiscard('you')} />
           </div>
 
-          <div className="flex flex-col items-end gap-1">
+          {/* Centred on each other, exactly as the opponent's is above. */}
+          <div className="flex flex-col items-center gap-1">
             <MatchClock seconds={clocks.you} />
             <StatsChip points={you.points} />
             <TurnStatus label="Your Turn" active={youTurn} seconds={clocks.turn} />
@@ -1708,7 +1717,7 @@ function PlayerHand({
   }
 
   /** Which of the three things make a card glow, if any — each reads as a
-   *  different colour (see VIABILITY_GLOW below): gold for something
+   *  different colour (see VIABILITY_GLOW below): purple for something
    *  placeable, white for an ascension, red for a Covenant or Relic's own
    *  ability. Unlike a card's *liftability*, this also covers those last two —
    *  they're played through the tap sheet, not a drag, but are every bit as
