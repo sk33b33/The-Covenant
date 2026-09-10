@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { RULES } from '@/game/config'
 import { createRng, randomSeed } from '@/game/rng'
 import { DIFFICULTY, aiSetup, chooseAction, type AiConfig } from '@/engine/ai'
@@ -7,7 +7,7 @@ import { IllegalAction, reduce } from '@/engine/reducer'
 import { createMatch } from '@/engine/state'
 import type { Action } from '@/engine/actions'
 import type { EnergyType } from '@/game/types'
-import type { MatchState } from '@/engine/types'
+import type { MatchState, PlayerId } from '@/engine/types'
 
 /**
  * Drives a match from the screen.
@@ -48,8 +48,18 @@ const AI_THINKING_MS = 1400
  *   move arriving under its own turn card, or its next move landing on top
  *   of the attack you are still watching. The screen owns what counts as
  *   "still showing"; this only agrees to wait for it.
+ * @param stageAttack Offered every ATTACK the AI decides on, *before* it is
+ *   applied, so the screen can fly the attacking card out first and dispatch
+ *   the action itself when the card lands (see AttackSortie). Held as a ref
+ *   because the screen can only build that callback out of `dispatch`, which
+ *   it does not have until this hook has returned. Left unset, or set to a
+ *   handler that declines, the action is applied here as it always was.
  */
-export function useMatch(config: MatchConfig, presenting = false) {
+export function useMatch(
+  config: MatchConfig,
+  presenting = false,
+  stageAttack?: MutableRefObject<((side: PlayerId, action: Action) => boolean) | undefined>,
+) {
   const [state, setState] = useState<MatchState>(() =>
     createMatch({
       seed: config.seed ?? randomSeed(),
@@ -76,6 +86,11 @@ export function useMatch(config: MatchConfig, presenting = false) {
   const [coinSettled, setCoinSettled] = useState(false)
 
   const difficulty = config.difficulty ?? DIFFICULTY.steady
+
+  // The match as of the last render, for the AI's own deferred step below to
+  // read at the moment it fires rather than as it was when the pause started.
+  const latest = useRef(state)
+  latest.current = state
 
   /* --------------------------------------------------------------- acting */
 
@@ -173,23 +188,35 @@ export function useMatch(config: MatchConfig, presenting = false) {
 
     setAiThinking(toMove === 'foe')
     const timer = setTimeout(() => {
-      setState((s) => {
-        // Re-check inside the updater: the match may have moved on while the
-        // pause elapsed, and acting on stale state would desync the board.
-        const stillToMove = s.phase === 'promote' ? s.promoting : s.phase === 'main' ? s.current : null
-        const stillAi = stillToMove === 'foe' || (simulating && stillToMove === 'you')
-        if (!stillAi || !stillToMove) return s
-
-        // A fresh Rng every step rather than one carried across the whole
-        // turn — seeded off `log.length` as well as `rngState` so consecutive
-        // steps within the same turn still draw independent "mistake" rolls,
-        // since `rngState` itself only moves when a game action consumes
-        // real randomness (a coin flip, a Blinded miss), not on every action.
-        const rng = createRng(s.rngState ^ 0x9e3779b9 ^ (s.log.length * 0x1000193))
-        const action = chooseAction(s, stillToMove, difficulty, rng)
-        return action ? reduce(s, action) : s
-      })
       setAiThinking(false)
+
+      // Chosen out here rather than inside a `setState` updater, which is
+      // where this used to live. An updater has to be pure — React is free to
+      // run it twice — and handing an ATTACK to the screen to stage is a side
+      // effect, which would fire two sorties for one strike. `latest` stands
+      // in for the freshness the updater gave for free: it is written on
+      // every render, and any commit that moved the match on would have
+      // re-run this effect and cleared this timer before it could fire.
+      const s = latest.current
+      const stillToMove = s.phase === 'promote' ? s.promoting : s.phase === 'main' ? s.current : null
+      const stillAi = stillToMove === 'foe' || (simulating && stillToMove === 'you')
+      if (!stillAi || !stillToMove) return
+
+      // A fresh Rng every step rather than one carried across the whole
+      // turn — seeded off `log.length` as well as `rngState` so consecutive
+      // steps within the same turn still draw independent "mistake" rolls,
+      // since `rngState` itself only moves when a game action consumes
+      // real randomness (a coin flip, a Blinded miss), not on every action.
+      const rng = createRng(s.rngState ^ 0x9e3779b9 ^ (s.log.length * 0x1000193))
+      const action = chooseAction(s, stillToMove, difficulty, rng)
+      if (!action) return
+
+      // The screen gets first refusal on a strike, so the attacking card can
+      // fly before it lands. It dispatches the action itself once the card is
+      // home; anything it declines is applied here and now, as ever.
+      if (action.type === 'ATTACK' && stageAttack?.current?.(stillToMove, action)) return
+
+      setState((current) => reduce(current, action))
     }, AI_THINKING_MS)
 
     return () => clearTimeout(timer)

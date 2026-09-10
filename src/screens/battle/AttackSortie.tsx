@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo } from 'react'
 import { motion, type TargetAndTransition, type Transition } from 'framer-motion'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
+import type { PlayerId } from '@/engine/types'
 import type { EnergyType } from '@/game/types'
 import { Head, elementTheme, type ElementTheme } from './AttackFx'
 
@@ -27,6 +28,9 @@ export interface AttackSortieTrigger {
   id: number
   cardId: string
   type: EnergyType
+  /** Whose card is flying — which is what decides the way it lifts: yours
+   *  rises off the bottom half, theirs descends from the top. */
+  side: PlayerId
   /** The slot to lift out of and drop back into, as it sat at launch. */
   slotRect: DOMRect
 }
@@ -55,6 +59,21 @@ const MAX_REACH = 112
 /** Radius the element's sigils orbit at, as a multiple of the flying card's
  *  own half-width — outside its edges at the scale it flies at. */
 const ORBIT = 1.5
+
+/**
+ * The least the card will rise, as a multiple of its own height.
+ *
+ * The flight aims for the middle of the screen, where the mat draws its clash
+ * ring — but "the middle of the screen" is not a distance, and both Actives
+ * now sit close to it (they were each moved to line up with the deck and the
+ * points chip). Measured on a 390×844 viewport your card had only 79px to
+ * travel, and since it grows by a third on the way up, most of that read as
+ * the card getting bigger rather than leaving the mat; on a shorter viewport
+ * the gap closes further and the lift disappears entirely. So the target is a
+ * floor, not a destination: the card always clears its slot by most of its own
+ * height, and only flies further when the arena is actually further away.
+ */
+const MIN_LIFT = 0.85
 
 /* Every repeating animation below is a module constant rather than an inline
  * literal. The board re-renders on every tick of the match clock, which lands
@@ -103,11 +122,15 @@ export function AttackSortie({
     const centreY = slotRect.top + slotRect.height / 2
     const flownHalfWidth = (slotRect.width * SHOW_SCALE) / 2
 
-    // Both sides fly to the same place — the middle of the screen, which is
-    // where the mat draws its own halfway line and clash ring. Signed rather
-    // than absolute, so your card rises to it and theirs would descend to it
-    // off the one number.
-    const rise = window.innerHeight / 2 - centreY
+    // Toward the middle of the screen, where the mat draws its own halfway
+    // line and clash ring — but never less than MIN_LIFT, and always away
+    // from the flyer's own edge of the board rather than in whichever
+    // direction the arena happens to lie. Taking the direction from the side
+    // rather than from the sign of the distance is what keeps a card whose
+    // slot already sits on the halfway line from lifting the wrong way.
+    const away = trigger.side === 'you' ? -1 : 1
+    const toArena = Math.abs(window.innerHeight / 2 - centreY)
+    const rise = away * Math.max(slotRect.height * MIN_LIFT, toArena)
 
     // Whichever side has less room decides the reach, so the pass stays
     // symmetric and the card never leaves the screen on a narrow one.
@@ -139,6 +162,17 @@ export function AttackSortie({
         // Banks into each leg of the pass and comes level for the drop, so
         // the travel reads as carried rather than slid.
         rotate: [0, 0, -6, 6, 0],
+        // Cast beneath the card and deepening as it climbs. Height off a
+        // surface is read from its shadow before anything else, and this is
+        // what separates a card that has risen off the mat from one that has
+        // merely been scaled up in place.
+        filter: [
+          'drop-shadow(0 0px 0px rgba(0,0,0,0))',
+          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
+          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
+          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
+          'drop-shadow(0 0px 0px rgba(0,0,0,0))',
+        ],
         transition,
       },
       // Lit for the flight and gone by the landing — every layer around the

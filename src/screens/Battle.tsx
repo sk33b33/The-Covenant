@@ -167,6 +167,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // on top of the attack you just watched it make.
   const presenting = attackFx !== null || turnCue !== null || sortie !== null
 
+  // Filled in below, once `dispatch` exists to build it out of.
+  const stageAttack = useRef<((side: PlayerId, action: Action) => boolean) | undefined>(undefined)
+
   const {
     state,
     dispatch,
@@ -179,7 +182,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     settleCoin,
     simulating,
     simulate,
-  } = useMatch(config, presenting)
+  } = useMatch(config, presenting, stageAttack)
 
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
@@ -444,22 +447,36 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const pendingAttack = useRef<Action | null>(null)
   const sortieId = useRef(0)
 
-  const launchSortie = (attackIndex: number) => {
-    const action: Action = { type: 'ATTACK', attackIndex }
-    const slot = activeSlotRef.current
-    const figure = you.active
-    if (!slot || !figure || sortie) {
-      dispatch(action)
-      return
-    }
+  /** Both sides fly, off the one function. Returns whether the flight was
+   *  actually taken up, so the AI's own caller knows whether the action is
+   *  now this screen's to dispatch or still its own. */
+  const stageSortie = (side: PlayerId, action: Action): boolean => {
+    const slot = side === 'you' ? activeSlotRef.current : foeActiveSlotRef.current
+    const figure = side === 'you' ? you.active : foe.active
+    if (!slot || !figure || sortie) return false
 
     pendingAttack.current = action
     setSortie({
       id: ++sortieId.current,
+      side,
       cardId: figure.cardId,
       type: figureCard(figure).type,
       slotRect: slot.getBoundingClientRect(),
     })
+    return true
+  }
+
+  // Handed to `useMatch` so the opponent's strikes fly too. A ref because it
+  // is built out of `dispatch`, which `useMatch` itself returns — assigned
+  // after the fact rather than passed in, and only read from inside the AI's
+  // own thinking pause, long after the first commit has set it.
+  useEffect(() => {
+    stageAttack.current = stageSortie
+  })
+
+  const launchSortie = (attackIndex: number) => {
+    const action: Action = { type: 'ATTACK', attackIndex }
+    if (!stageSortie('you', action)) dispatch(action)
   }
 
   /** The card is home. Put it back on the mat and let the blow it went out
@@ -1084,7 +1101,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           ))}
         </div>
         <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
-          <motion.div animate={foeFigureFx}>
+          {/* Emptied while their card is out of it, exactly as yours is. */}
+          <motion.div animate={foeFigureFx} style={{ opacity: sortie?.side === 'foe' ? 0 : 1 }}>
             {/* `dying` only ever fills a slot the engine has already
                 emptied, and only until the strike ends — a real Figure
                 stepping up mid-effect wins over it. */}
@@ -1200,7 +1218,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               offer a second attack while the first one is mid-air. */}
           <motion.div
             animate={youFigureFx}
-            style={{ opacity: sortie ? 0 : 1, pointerEvents: sortie ? 'none' : 'auto' }}
+            style={{
+              opacity: sortie?.side === 'you' ? 0 : 1,
+              pointerEvents: sortie?.side === 'you' ? 'none' : 'auto',
+            }}
           >
             <BoardFigure
               figure={you.active ?? (dying?.side === 'you' ? dying.figure : null)}
