@@ -239,6 +239,13 @@ export function attackGlow(event: AttackEvent): { core: string; glow: string } {
   return { core: theme.core, glow: theme.glow }
 }
 
+/** The same element table, reached by type rather than by a resolved attack —
+ *  what the pre-attack sortie has to go on, since it plays *before* there is
+ *  an `AttackEvent` to read. */
+export const elementTheme = (type: EnergyType): ElementTheme => THEME[type]
+
+export type { ElementTheme }
+
 export function impactDelaySeconds(event: AttackEvent): number {
   return WINDUP_S[tierOf(event)] + THEME[event.type].travel + HITSTOP_S[tierOf(event)]
 }
@@ -643,7 +650,15 @@ function Wake({
 }
 
 /** The thing actually being thrown, built per element. */
-function Head({ theme, scale, angle }: { theme: ElementTheme; scale: number; angle: number }) {
+/**
+ * The projectile's nose — the element's own signature shape.
+ *
+ * Exported because the pre-attack sortie (see AttackSortie.tsx) orbits the
+ * same shapes around the card as it flies, so an element reads as itself
+ * whether it is being gathered, carried or thrown. Positioned around its
+ * parent's own origin, so a caller places it by placing that parent.
+ */
+export function Head({ theme, scale, angle }: { theme: ElementTheme; scale: number; angle: number }) {
   const box = (size: number, extra?: CSSProperties): CSSProperties => ({
     position: 'absolute',
     left: -size / 2,

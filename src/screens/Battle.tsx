@@ -31,6 +31,7 @@ import {
   windupDelaySeconds,
   type AttackFxTrigger,
 } from './battle/AttackFx'
+import { AttackSortie, type AttackSortieTrigger } from './battle/AttackSortie'
 import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -154,6 +155,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // rest of the presentation.
   const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
   const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
+  // The attacking card's flight, which runs *before* the attack it belongs to
+  // is dispatched — see `launchSortie`.
+  const [sortie, setSortie] = useState<AttackSortieTrigger | null>(null)
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -161,7 +165,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // without this the two run over each other in both directions: the AI's
   // first move arriving under its own turn card, or its next move arriving
   // on top of the attack you just watched it make.
-  const presenting = attackFx !== null || turnCue !== null
+  const presenting = attackFx !== null || turnCue !== null || sortie !== null
 
   const {
     state,
@@ -423,6 +427,50 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     else setTurnCue(cue)
   }, [coinSettled, simulating, state.phase, state.turn, state.current])
 
+  /**
+   * Send the attacking card out on its flight, and hold the attack itself
+   * back until it lands.
+   *
+   * The engine is deliberately not touched here. An ATTACK resolves the whole
+   * exchange in one call — damage, knockout, turn hand-off — so dispatching
+   * it now and playing the flight over the top would mean watching a card fly
+   * out to strike a board that had already taken the hit. Holding the action
+   * in a ref and dispatching it on the landing is what makes the drop the
+   * cause of the blow rather than a flourish in front of one.
+   *
+   * A missing slot (nothing rendered to measure yet) just skips the flight
+   * rather than swallowing the attack.
+   */
+  const pendingAttack = useRef<Action | null>(null)
+  const sortieId = useRef(0)
+
+  const launchSortie = (attackIndex: number) => {
+    const action: Action = { type: 'ATTACK', attackIndex }
+    const slot = activeSlotRef.current
+    const figure = you.active
+    if (!slot || !figure || sortie) {
+      dispatch(action)
+      return
+    }
+
+    pendingAttack.current = action
+    setSortie({
+      id: ++sortieId.current,
+      cardId: figure.cardId,
+      type: figureCard(figure).type,
+      slotRect: slot.getBoundingClientRect(),
+    })
+  }
+
+  /** The card is home. Put it back on the mat and let the blow it went out
+   *  for actually land. */
+  const landSortie = () => {
+    setSortie(null)
+    const action = pendingAttack.current
+    pendingAttack.current = null
+    if (action) dispatch(action)
+  }
+
   /** The strike has finished; let the felled Figure go, and show the
    *  hand-off it was holding up, if any. */
   const releaseAttackFx = () => {
@@ -645,7 +693,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           : state.turn === 1 && state.first === 'you'
             ? 'Going first: no attack on turn 1'
             : 'Not available right now',
-        onSelect: () => dispatch({ type: 'ATTACK', attackIndex }),
+        onSelect: () => launchSortie(attackIndex),
       }
     })
 
@@ -1145,7 +1193,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           className="shrink-0"
           style={{ transform: `translateY(-${YOU_ROW_LIFT}px)` }}
         >
-          <motion.div animate={youFigureFx}>
+          {/* Emptied for as long as the card is actually out of it. Opacity
+              rather than an unmount, so `activeSlotRef` keeps measuring the
+              same box the flight was launched from; `pointer-events` with it,
+              since an invisible card would otherwise still answer a tap and
+              offer a second attack while the first one is mid-air. */}
+          <motion.div
+            animate={youFigureFx}
+            style={{ opacity: sortie ? 0 : 1, pointerEvents: sortie ? 'none' : 'auto' }}
+          >
             <BoardFigure
               figure={you.active ?? (dying?.side === 'you' ? dying.figure : null)}
               width={ACTIVE_W}
@@ -1325,6 +1381,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       <AnimatePresence>
         {!coinSettled && <CoinFlip first={state.first} onDone={settleCoin} />}
       </AnimatePresence>
+
+      <AttackSortie trigger={sortie} onDone={landSortie} />
 
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
