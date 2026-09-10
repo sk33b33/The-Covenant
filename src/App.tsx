@@ -175,6 +175,13 @@ function routeKey(route: Route): string {
       return `enc:${route.encounterId}`
     case 'coming-soon':
       return `soon:${route.title}`
+    // `at` (see its own comment on the Route type) is what makes a second
+    // Quick Battle a fresh key rather than a second collision on the literal
+    // string "battle" — without it this fell into the `default` case below,
+    // identical to the first visit's key regardless of how that one's exit
+    // transition resolved.
+    case 'battle':
+      return `battle:${route.at}`
     default:
       return route.name
   }

@@ -26,7 +26,28 @@ export type Route =
   | { name: 'deck-builder'; deckId?: string }
   | { name: 'story-map' }
   | { name: 'story-encounter'; encounterId: string }
-  | { name: 'battle'; encounterId?: string; deckId?: string }
+  /**
+   * `at` gives each visit its own identity, the same reason `pack-open` keys
+   * off `packId` and `story-encounter` off `encounterId`: `routeKey` below
+   * needs a value that changes between two trips to the *same* deck, or a
+   * second Quick Battle collapses onto the identical key as the first.
+   * Battle in particular cannot rely on falling back to the bare route name
+   * the way `shop` or `profile` do — its exit transition is the one this
+   * app has already caught failing to signal completion to `AnimatePresence`
+   * (see the comment above `Result` in Battle.tsx), so a finished match can
+   * still be mounted under `battle` when the next one starts. A distinct key
+   * per visit means the new match is a genuinely new component regardless of
+   * whether the old one ever finished leaving — the same fix in kind as the
+   * `mode="wait"` removal that comment describes, just for the trip in the
+   * other direction: back into Battle rather than out of it.
+   *
+   * Required, not optional like `deckId`/`encounterId` above it: `packId`
+   * and `encounterId` are required on their own routes for the identical
+   * reason, and leaving this one optional would let a future call site omit
+   * it and quietly reintroduce this exact bug the next time someone adds a
+   * second way to reach Battle.
+   */
+  | { name: 'battle'; encounterId?: string; deckId?: string; at: number }
   /** Wherever a real screen doesn't exist yet. `icon` picks from a small fixed
    *  set in App.tsx rather than carrying a React node, so a route stays a
    *  plain, serialisable value like every other one here. */

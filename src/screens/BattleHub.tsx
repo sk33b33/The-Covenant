@@ -101,7 +101,7 @@ export function BattleHub() {
               variant="gold"
               className="flex-1 !py-2.5"
               disabled={!validation.legal}
-              onClick={() => go({ name: 'battle', deckId: deck.id })}
+              onClick={() => go({ name: 'battle', deckId: deck.id, at: Date.now() })}
             >
               {validation.legal ? 'Quick Battle' : 'Deck is not legal'}
             </Button>
