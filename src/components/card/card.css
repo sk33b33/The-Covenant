@@ -374,6 +374,18 @@
 /* ------------------------------------------------------------- text box */
 
 .cov-card__body {
+  /* The attack type's base sizes live here rather than on the rules below so
+   * a denser tier can restate them once for the whole box, and so the
+   * long-name step-downs stay a ratio of whichever base is in play instead of
+   * two more absolute sizes to keep in sync. */
+  --atk-name: 5cqw;
+  --atk-text: 3.5cqw;
+  /* A guard, not a layout tool: every card in the set is measured to fit
+   * above. It matters when the body font falls back to one with taller
+   * metrics, where a card can gain a line nothing here can predict — clipped
+   * inside the plate is recoverable, printed across the artwork and the
+   * footer is not. */
+  overflow: hidden;
   position: absolute;
   top: 82.5cqw;
   left: 5cqw;
@@ -402,19 +414,30 @@
  * row is the one thing on the face that must not move. Same bottom (124.5cqw),
  * more room above it. */
 .cov-card--miracle .cov-card__body {
-  top: 69.5cqw;
-  height: 55cqw;
+  top: 63cqw;
+  height: 61.5cqw;
+  /* A miracle plus two attacks is the most this face ever has to carry, and
+   * at the sizes above it did not fit: the block overflowed a centre-justified
+   * box in both directions at once, printing the badge over the artwork and
+   * the last attack through the footer. Neither the plate's gap nor the box's
+   * top padding can give any of that back — the first clears the badge's glow,
+   * the second the type orb — so the room comes half from the box growing
+   * further up into the art and half from the type below stepping down. */
+  gap: 1.25cqw;
+  --atk-name: 4.5cqw;
+  --atk-text: 3.15cqw;
 }
 
 /* The orb straddles the art/text seam, and the seam just moved: without this
  * it stays where the old one was and lands squarely on the badge, covering
- * the middle of the word. Same 12cqw the body's top edge travelled, so the
- * orb goes on sitting exactly where it always did relative to the box below
- * it — which is also what the body's own top padding is sized to clear.
+ * the middle of the word. It travels exactly as far as the box's top edge
+ * did, holding the same 10.9cqw above it, so the orb goes on sitting where
+ * it always did relative to the box below — which is also what the body's
+ * own top padding is sized to clear.
  * Declared above the compact rule further down, which needs to keep winning
  * for a compact card whose body is not rendered at all. */
 .cov-card--miracle .cov-card__orb {
-  top: 58.6cqw;
+  top: 52.1cqw;
 }
 
 /*
@@ -466,7 +489,7 @@
 .cov-card__miracle-text {
   font-family: var(--font-body);
   font-size: 3.3cqw;
-  line-height: 1.24;
+  line-height: 1.19;
   color: #0b0803;
   /* Reads from the same left edge the plate now starts at, so the two are
    * one block rather than a left-hung plate over centred prose. */
@@ -492,16 +515,28 @@
 
 .cov-card__attack-name {
   font-family: var(--font-display);
-  font-size: 5cqw;
+  font-size: var(--atk-name);
   font-weight: 700;
   line-height: 1.1;
   color: #2b2007;
 }
 
+/* Sized to keep the longest names in the set on one line. A wrapped name
+ * costs a whole line of the text box — far more than the point or so of type
+ * given up here, and it is the difference between a dense card fitting and
+ * spilling over the art above it and the footer below. */
+.cov-card__attack-name--long {
+  font-size: calc(var(--atk-name) * 0.86);
+}
+
+.cov-card__attack-name--longer {
+  font-size: calc(var(--atk-name) * 0.74);
+}
+
 .cov-card__attack-text {
   font-family: var(--font-body);
-  font-size: 3.5cqw;
-  line-height: 1.28;
+  font-size: var(--atk-text);
+  line-height: 1.2;
   color: #5c421f;
   margin-top: 0.5cqw;
   display: -webkit-box;

@@ -28,6 +28,15 @@ import './card.css'
 
 const HOLO_RARITIES = new Set(['anointed', 'illustration', 'sacred', 'crown'])
 
+/** Long attack names wrapping to a second line is what pushes a text-dense
+ *  Figure past its box, so they step down a size rather than a line — the
+ *  same trade the nameplate already makes for long card names. */
+function attackNameClass(name: string): string {
+  if (name.length > 19) return 'cov-card__attack-name--longer'
+  if (name.length > 13) return 'cov-card__attack-name--long'
+  return ''
+}
+
 const STAGE_LABEL: Record<FigureCard['stage'], string> = {
   basic: 'Basic',
   'ascended-1': 'Ascended I',
@@ -151,7 +160,9 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
                     <EnergyCost cost={atk.cost} size={14} />
                   </span>
                   <span className="cov-card__attack-main">
-                    <span className="cov-card__attack-name">{atk.name}</span>
+                    <span className={cx('cov-card__attack-name', attackNameClass(atk.name))}>
+                      {atk.name}
+                    </span>
                     {atk.text && <span className="cov-card__attack-text">{atk.text}</span>}
                   </span>
                   {atk.damage > 0 && <span className="cov-card__attack-damage">{atk.damage}</span>}
