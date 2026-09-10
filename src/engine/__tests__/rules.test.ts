@@ -426,6 +426,85 @@ describe('combat', () => {
   })
 })
 
+
+describe('match history', () => {
+  it('records a structured event alongside an attack\'s log line', () => {
+    const state = started({ forceFirst: 'foe' })
+    const next = reduce(state, { type: 'END_TURN' })
+
+    const you = next.players.you.active!
+    you.cardId = 'the-altar-fire'
+    you.damage = 0
+    you.energy = Array(3).fill(figureCard(you).type)
+    const foe = next.players.foe.active!
+    foe.cardId = 'the-nephilim'
+    foe.damage = 0
+
+    const after = reduce(next, { type: 'ATTACK', attackIndex: 0 })
+    const attackEntry = after.log.find((e) => e.event?.kind === 'attack')
+    expect(attackEntry?.event).toMatchObject({
+      kind: 'attack',
+      cardId: 'the-altar-fire',
+      uid: you.uid,
+      otherCardId: 'the-nephilim',
+      missed: false,
+    })
+    expect(attackEntry?.event?.damage).toBeGreaterThan(0)
+  })
+
+  it('orders a knockout\'s own entry after the attack that caused it', () => {
+    const state = started({ forceFirst: 'foe' })
+    const next = reduce(state, { type: 'END_TURN' })
+
+    const you = next.players.you.active!
+    you.cardId = 'the-altar-fire'
+    you.damage = 0
+    you.energy = Array(3).fill(figureCard(you).type)
+    const foe = next.players.foe.active!
+    foe.cardId = 'esau'
+    // One hit from the kill: the weakness bonus alone finishes it.
+    foe.damage = figureCard(foe).hp - 1
+
+    const after = reduce(next, { type: 'ATTACK', attackIndex: 0 })
+    const kinds = after.log.map((e) => e.event?.kind).filter(Boolean)
+    const attackIndex = kinds.indexOf('attack')
+    const knockoutIndex = kinds.indexOf('knockout')
+    expect(attackIndex).toBeGreaterThanOrEqual(0)
+    expect(knockoutIndex).toBeGreaterThan(attackIndex)
+  })
+
+  it('records what energy type was attached and to which Figure', () => {
+    let state = started({ forceFirst: 'you' })
+    const active = state.players.you.active!
+    state.players.you.altar = 'light'
+
+    state = reduce(state, { type: 'ATTACH', uid: active.uid })
+    const entry = state.log.find((e) => e.event?.kind === 'attach')
+    expect(entry?.event).toMatchObject({ kind: 'attach', uid: active.uid, energyType: 'light' })
+  })
+
+  it('records what an ascension climbed from and to', () => {
+    let state = started({ forceFirst: 'you' })
+    state = reduce(state, { type: 'END_TURN' })
+    state = reduce(state, { type: 'END_TURN' })
+
+    const active = state.players.you.active!
+    active.cardId = 'abram'
+    active.enteredOnTurn = 1
+    state.players.you.hand.push('abraham')
+    const hand = state.players.you.hand.indexOf('abraham')
+
+    const after = reduce(state, { type: 'ASCEND', hand, uid: active.uid })
+    const entry = after.log.find((e) => e.event?.kind === 'ascend')
+    expect(entry?.event).toMatchObject({
+      kind: 'ascend',
+      cardId: 'abraham',
+      otherCardId: 'abram',
+      uid: active.uid,
+    })
+  })
+})
+
 /* -------------------------------------------------------------- knockouts */
 
 describe('knockouts and points', () => {

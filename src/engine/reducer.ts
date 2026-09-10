@@ -20,7 +20,13 @@ import {
   retreatCost,
 } from './state'
 import type { Action } from './actions'
-import { OPPONENT, type FigureInPlay, type MatchState, type PlayerId } from './types'
+import {
+  OPPONENT,
+  type FigureInPlay,
+  type MatchEvent,
+  type MatchState,
+  type PlayerId,
+} from './types'
 
 /**
  * The rules.
@@ -63,8 +69,8 @@ function withRng<T>(state: MatchState, fn: (rng: Rng) => T): T {
 const isEnded = (s: MatchState) => s.phase === 'ended'
 const isPromoting = (s: MatchState) => s.phase === 'promote'
 
-function log(state: MatchState, player: PlayerId, text: string) {
-  state.log.push({ turn: state.turn, player, text })
+function log(state: MatchState, player: PlayerId, text: string, event?: MatchEvent) {
+  state.log.push({ turn: state.turn, player, text, event })
 }
 
 const name = (cardId: string) => requireCard(cardId).name
@@ -148,9 +154,14 @@ function knockOut(state: MatchState, owner: PlayerId, figure: FigureInPlay, deny
       state,
       attacker,
       `${card.name} is knocked out. ${points} point${points > 1 ? 's' : ''}.`,
+      { kind: 'knockout', cardId: card.id, points },
     )
   } else {
-    log(state, attacker, `${card.name} is knocked out, but no points are taken.`)
+    log(state, attacker, `${card.name} is knocked out, but no points are taken.`, {
+      kind: 'knockout',
+      cardId: card.id,
+      points: 0,
+    })
   }
 
   checkPoints(state, attacker)
@@ -330,7 +341,19 @@ export function reduce(input: MatchState, action: Action): MatchState {
         player.bench[i] = makeFigure(cardId, state.turn)
       })
 
-      log(state, action.player, `${name(activeCardId)} takes the Active spot.`)
+      log(state, action.player, `${name(activeCardId)} takes the Active spot.`, {
+        kind: 'play',
+        cardId: activeCardId,
+        uid: player.active.uid,
+      })
+      benchCardIds.forEach((cardId, i) => {
+        const figure = player.bench[i]
+        log(state, action.player, `${name(cardId)} joins the Bench.`, {
+          kind: 'play',
+          cardId,
+          uid: figure?.uid,
+        })
+      })
 
       if (state.players.you.active && state.players.foe.active) {
         state.phase = 'main'
@@ -419,8 +442,13 @@ export function reduce(input: MatchState, action: Action): MatchState {
       if (player.bench[action.slot]) throw new IllegalAction('That Bench slot is taken')
 
       player.hand.splice(action.hand, 1)
-      player.bench[action.slot] = makeFigure(cardId, state.turn)
-      log(state, me, `${card.name} joins the Bench.`)
+      const figure = makeFigure(cardId, state.turn)
+      player.bench[action.slot] = figure
+      log(state, me, `${card.name} joins the Bench.`, {
+        kind: 'play',
+        cardId,
+        uid: figure.uid,
+      })
       return state
     }
 
@@ -433,10 +461,16 @@ export function reduce(input: MatchState, action: Action): MatchState {
       const figure = figuresInPlay(player).find((f) => f.uid === action.uid)
       if (!figure) throw new IllegalAction('That Figure is not yours or not in play')
 
-      figure.energy.push(player.altar)
+      const energyType = player.altar
+      figure.energy.push(energyType)
       player.altar = null
       player.attachedThisTurn += 1
-      log(state, me, `Energy is attached to ${name(figure.cardId)}.`)
+      log(state, me, `Energy is attached to ${name(figure.cardId)}.`, {
+        kind: 'attach',
+        cardId: figure.cardId,
+        uid: figure.uid,
+        energyType,
+      })
       return state
     }
 
@@ -462,12 +496,18 @@ export function reduce(input: MatchState, action: Action): MatchState {
       }
 
       player.hand.splice(action.hand, 1)
+      const fromCardId = figure.cardId
       figure.beneath.push(figure.cardId)
       figure.cardId = cardId
       // Ascension is a fresh start: damage and energy carry, conditions do not.
       figure.statuses = []
       player.ascendedThisTurn.push(figure.uid)
-      log(state, me, `${card.name} ascends.`)
+      log(state, me, `${card.name} ascends.`, {
+        kind: 'ascend',
+        cardId,
+        uid: figure.uid,
+        otherCardId: fromCardId,
+      })
       return state
     }
 
@@ -487,7 +527,7 @@ export function reduce(input: MatchState, action: Action): MatchState {
       player.covenantsThisTurn += 1
       player.discard.push(cardId)
 
-      log(state, me, `${card.name}.`)
+      log(state, me, `${card.name}.`, { kind: 'covenant', cardId })
       applyEffect(state, me, card.effect, action.targetUid)
       return state
     }
@@ -500,7 +540,7 @@ export function reduce(input: MatchState, action: Action): MatchState {
       if (card.kind !== 'relic') throw new IllegalAction(`${card.name} is not a Relic`)
 
       player.hand.splice(action.hand, 1)
-      log(state, me, `${card.name}.`)
+      log(state, me, `${card.name}.`, { kind: 'relic', cardId })
 
       // Attaching Relics stay with the Figure; the rest resolve and discard.
       const attaches = card.effect.startsWith('attach-')
@@ -533,7 +573,12 @@ export function reduce(input: MatchState, action: Action): MatchState {
       }
 
       player.miraclesThisTurn.push(figure.uid)
-      log(state, me, `${requireCard(figure.cardId).name}: ${miracle.name}.`)
+      log(state, me, `${requireCard(figure.cardId).name}: ${miracle.name}.`, {
+        kind: 'miracle',
+        cardId: figure.cardId,
+        uid: figure.uid,
+        label: miracle.name,
+      })
       // `attacker` is the effects file's name for "the Figure this is
       // happening from", not a claim that anything is being attacked — it is
       // what lets a self-targeting miracle (a shield, an extra energy) land
@@ -565,7 +610,12 @@ export function reduce(input: MatchState, action: Action): MatchState {
       player.bench[action.benchIndex] = active
       player.active = incoming
       player.retreatsThisTurn += 1
-      log(state, me, `${name(active.cardId)} retreats; ${name(incoming.cardId)} steps up.`)
+      log(state, me, `${name(active.cardId)} retreats; ${name(incoming.cardId)} steps up.`, {
+        kind: 'retreat',
+        cardId: incoming.cardId,
+        uid: incoming.uid,
+        otherCardId: active.cardId,
+      })
       return state
     }
 
@@ -589,7 +639,12 @@ export function reduce(input: MatchState, action: Action): MatchState {
       if (hasStatus(attacker, 'blinded')) {
         const hit = withRng(state, (rng) => rng.chance(0.5))
         if (!hit) {
-          log(state, me, 'Blinded — the attack misses.')
+          log(state, me, 'Blinded — the attack misses.', {
+            kind: 'attack',
+            cardId: attacker.cardId,
+            uid: attacker.uid,
+            missed: true,
+          })
           state.lastAttack = {
             id: state.log.length,
             by: me,
@@ -635,6 +690,13 @@ export function reduce(input: MatchState, action: Action): MatchState {
       // got through — a shield, Guarded or armor can all shrink this well
       // below `finalDamage`, and a shield stops it outright.
       const damageBefore = defender?.damage ?? 0
+      // Where the outcome row belongs in the log — before whatever
+      // `damageFigure` is about to append (a shield fizzling, an Enduring
+      // save, a knockout) so the timeline reads "hits for N" *then* "is
+      // knocked out", the order the exchange actually happened in, rather
+      // than the knockout's own entry landing first just because
+      // `damageFigure` resolves and logs it before this line runs.
+      const outcomeAt = state.log.length
 
       if (defender && finalDamage > 0 && foe.active) {
         damageFigure(state, OPPONENT[me], foe.active, finalDamage, {
@@ -642,20 +704,48 @@ export function reduce(input: MatchState, action: Action): MatchState {
         })
       }
 
+      const dealtDamage = defender ? defender.damage - damageBefore : 0
+      const wasKnockedOut = defender ? isKnockedOut(defender) : false
+
       state.lastAttack = {
         id: state.log.length,
         by: me,
         attackerCardId: attacker.cardId,
         targetCardId: defender?.cardId,
         type: card.type,
-        damage: defender ? defender.damage - damageBefore : 0,
+        damage: dealtDamage,
         weakness,
         // `defender` is the reference captured before the hit, so its own
         // `.damage` still reads correctly even once knocked out and moved to
         // discard — `isKnockedOut` already accounts for Enduring saving it.
-        knockedOut: defender ? isKnockedOut(defender) : false,
+        knockedOut: wasKnockedOut,
         missed: false,
       }
+      // One structured row per attack, carrying the full outcome — the
+      // breakdown screen's play-by-play and its per-Figure damage stats both
+      // read this rather than `lastAttack`, which only ever holds the most
+      // recent one. The text mirrors what `lastAttack` already means, not the
+      // earlier "uses X" line above: this is what happened, not what was
+      // declared. Spliced in at `outcomeAt` rather than pushed, for the
+      // ordering reasoning above.
+      state.log.splice(outcomeAt, 0, {
+        turn: state.turn,
+        player: me,
+        text: defender
+          ? `${card.name} hits ${name(defender.cardId)} for ${dealtDamage}.`
+          : `${card.name} finds nothing to strike.`,
+        event: {
+          kind: 'attack',
+          cardId: attacker.cardId,
+          uid: attacker.uid,
+          otherCardId: defender?.cardId,
+          energyType: card.type,
+          damage: dealtDamage,
+          weakness,
+          knockedOut: wasKnockedOut,
+          missed: false,
+        },
+      })
 
       if (isEnded(state)) return state
       if (isPromoting(state)) return state

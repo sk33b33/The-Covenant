@@ -33,6 +33,7 @@ import {
   type AttackFxTrigger,
 } from './battle/AttackFx'
 import { AttackSortie, type AttackSortieTrigger } from './battle/AttackSortie'
+import { MatchResult } from './battle/MatchResult'
 import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -1616,7 +1617,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
       {/*
         No `AnimatePresence` here. `state.phase` is one-way — a match that
-        reaches 'ended' never leaves it, so Result never needs an exit
+        reaches 'ended' never leaves it, so MatchResult never needs an exit
         transition of its own; the only way it ever disappears is the whole
         Battle screen unmounting when the player navigates away, which is a
         transition the *App-level* route AnimatePresence already owns.
@@ -1625,11 +1626,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         signal looked exactly like the kind of thing that could confuse an
         ancestor AnimatePresence waiting on the whole subtree. Removing it
         alone did not fix the bug (see App.tsx for what actually did — its
-        `mode="wait"`), but it still is not doing anything useful: Result
+        `mode="wait"`), but it still is not doing anything useful: MatchResult
         gets nothing from carrying an exit animation it can structurally
         never run, so there is no reason to put it back.
       */}
-      {resultReady && <Result state={state} onExit={onExit} />}
+      {resultReady && <MatchResult state={state} onExit={onExit} />}
     </div>
   )
 }
@@ -2679,81 +2680,6 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
         </motion.div>
       </div>
     </motion.div>
-  )
-}
-
-function Result({ state, onExit }: { state: MatchState; onExit: () => void }) {
-  const won = state.winner === 'you'
-
-  const reason =
-    state.endReason === 'points'
-      ? `${RULES.POINTS_TO_WIN} points taken`
-      : state.endReason === 'deckout'
-        ? 'A deck ran out'
-        : state.endReason === 'no-figures'
-          ? 'No Figures left to send out'
-          : state.endReason === 'timeout'
-            ? 'Time ran out'
-            : 'Conceded'
-
-  return (
-    <motion.div
-      className="fixed inset-0 z-[80] grid place-items-center px-8"
-      style={{ background: 'rgba(8,6,3,.9)' }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-    >
-      <motion.div
-        className="text-center w-full max-w-[320px]"
-        initial={{ scale: 0.9, y: 14 }}
-        animate={{ scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-      >
-        <h1
-          className="font-display font-bold tracking-wide"
-          style={{
-            fontSize: 44,
-            background: won
-              ? 'var(--gold-leaf)'
-              : 'linear-gradient(160deg,#9c8d75,#6b5d47)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
-          }}
-        >
-          {won ? 'VICTORY' : 'DEFEAT'}
-        </h1>
-
-        <p className="text-sm mt-2" style={{ color: 'rgba(240,220,188,.7)' }}>
-          {reason}
-        </p>
-
-        <div className="flex items-center justify-center gap-6 mt-6">
-          <Score label="You" value={state.players.you.points} highlight={won} />
-          <Score label="Opponent" value={state.players.foe.points} highlight={!won} />
-        </div>
-
-        <Button variant="gold" block className="mt-8" onClick={onExit}>
-          Continue
-        </Button>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-function Score({ label, value, highlight }: { label: string; value: number; highlight: boolean }) {
-  return (
-    <div className="text-center">
-      <div
-        className="font-numeric font-bold"
-        style={{ fontSize: 34, color: highlight ? 'var(--gold-bright)' : 'rgba(240,220,188,.45)' }}
-      >
-        {value}
-      </div>
-      <div className="text-xs" style={{ color: 'rgba(240,220,188,.5)' }}>
-        {label}
-      </div>
-    </div>
   )
 }
 

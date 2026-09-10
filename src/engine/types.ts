@@ -138,6 +138,56 @@ export interface LogEntry {
   player: PlayerId
   /** Human-readable, shown in the battle log. */
   text: string
+  /**
+   * Structured detail for the post-match breakdown screen, alongside the
+   * prose above rather than replacing it — the same one-entry-per-happening
+   * cadence this file already keeps, just with enough shape for a screen to
+   * build a timeline, a stat line and a "cards used" strip from it instead
+   * of only ever printing it.
+   *
+   * Optional: a hand-off banner, a shield fizzling, the closing "X wins" line
+   * are all real log entries with nothing under them worth charting.
+   */
+  event?: MatchEvent
+}
+
+export interface MatchEvent {
+  kind:
+    | 'play'
+    | 'ascend'
+    | 'attach'
+    | 'retreat'
+    | 'covenant'
+    | 'relic'
+    | 'miracle'
+    | 'attack'
+    | 'knockout'
+  /** The card the event is centred on — the Figure played, the attacker, the
+   *  Figure knocked out, whatever a screen would put a thumbnail of. */
+  cardId: string
+  /** The attacking Figure's own identity, for `attack` — a Figure's cardId
+   *  changes on ascension, but its uid doesn't, so this is what lets damage
+   *  dealt before and after an ascension still be credited to one Figure. */
+  uid?: string
+  /** A second card the event involves, where there is one: what an
+   *  ascension climbed from, who a retreating Figure hands off to, what an
+   *  attack landed on. */
+  otherCardId?: string
+  /** The energy type attached, for `attach`. */
+  energyType?: EnergyType
+  /** Damage actually applied, for `attack` — after shields, Guarded and
+   *  armor, the same figure `AttackEvent.damage` reports. */
+  damage?: number
+  weakness?: boolean
+  knockedOut?: boolean
+  /** A Blinded Figure's coin-flip miss. */
+  missed?: boolean
+  /** Points earned, for `knockout` — 0 when a deny-points effect withheld
+   *  them. */
+  points?: number
+  /** Overrides the card name as the row's headline — a miracle is the
+   *  ability that was called, not merely a fact about the card that has one. */
+  label?: string
 }
 
 /**
