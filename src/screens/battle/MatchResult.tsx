@@ -10,6 +10,7 @@ import { miracleFor } from '@/game/miracles'
 import { buildBreakdown, pickMvp, type PlayerStats } from '@/engine/summary'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { cx } from '@/lib/cx'
+import type { Target, TargetAndTransition, Transition } from 'framer-motion'
 import type { LogEntry, MatchEvent, MatchState, PlayerId } from '@/engine/types'
 import type { EnergyType } from '@/game/types'
 
@@ -37,13 +38,105 @@ export function MatchResult({ state, onExit }: { state: MatchState; onExit: () =
 
 /* ------------------------------------------------------------------ reveal */
 
-const WINDUP_S = 0.55
-const HOLD_S = 1.5
-const EXIT_S = 0.45
+const FLY_IN_S = 0.62
+const POSE_S = 2.3
+const FLY_OUT_S = 0.5
+const FLIGHT_S = FLY_IN_S + POSE_S + FLY_OUT_S
+
+/** Marks along the one clock every part of the flight shares, in seconds.
+ *  Every keyframe list below is expressed against these rather than against
+ *  its own local timing, so the turn cannot drift out of step with the
+ *  travel — the reveal has to land while the card is centred, not before it
+ *  arrives or after it has started leaving. */
+const ARRIVE_S = FLY_IN_S
+const DRIFT_S = FLY_IN_S + POSE_S * 0.62
+const FACE_ON_S = FLY_IN_S + POSE_S * 0.72
+const SETTLE_S = FLY_IN_S + POSE_S
+
+/** Seconds → the 0-1 position framer's `times` wants. */
+const at = (seconds: number) => seconds / FLIGHT_S
+
 /** How long after the card has cleared the screen the banner takes to slam
  *  in — the two must not overlap, or the letters read as fighting the card
  *  for the same space it just occupied. */
-const BANNER_DELAY_S = WINDUP_S + HOLD_S + EXIT_S + 0.1
+const BANNER_DELAY_S = FLIGHT_S + 0.1
+
+/**
+ * The travel: in from off the right, centre, out to the left.
+ *
+ * The off-screen start has to be written twice, and the two must agree.
+ * `animate` being a keyframe list means framer plays from `keyframes[0]` and
+ * takes no animation start value from `initial` — but `initial` is still what
+ * gets painted on the mount frame before any of that runs. Give only the
+ * keyframe and the card flashes centred and face-on for one frame; give only
+ * `initial` and the flight never leaves the middle of the screen at all.
+ */
+const FLIGHT_START: Target = { x: '128vw', y: 0, scale: 0.72, rotate: -17 }
+
+const FLIGHT: TargetAndTransition = {
+  x: ['128vw', '0vw', '0vw', '-138vw'],
+  y: [0, 0, -14, -5, 24],
+  scale: [0.72, 1.12, 1.17, 0.82],
+  rotate: [-17, -5, 2, -19],
+}
+
+const FLIGHT_TRANSITION: Transition = {
+  x: {
+    duration: FLIGHT_S,
+    times: [0, at(ARRIVE_S), at(SETTLE_S), 1],
+    ease: ['circOut', 'linear', 'easeIn'],
+  },
+  scale: {
+    duration: FLIGHT_S,
+    times: [0, at(ARRIVE_S), at(SETTLE_S), 1],
+    ease: ['circOut', 'easeInOut', 'easeIn'],
+  },
+  rotate: {
+    duration: FLIGHT_S,
+    times: [0, at(ARRIVE_S), at(SETTLE_S), 1],
+    ease: ['circOut', 'easeInOut', 'easeIn'],
+  },
+  // The pose is never dead still: the card keeps drifting up and easing back
+  // down through the whole beat it holds centre, so the slow-motion reads as
+  // a held breath rather than a paused video.
+  y: {
+    duration: FLIGHT_S,
+    times: [0, at(ARRIVE_S), at(DRIFT_S), at(SETTLE_S), 1],
+    ease: ['linear', 'easeInOut', 'easeInOut', 'easeIn'],
+  },
+}
+
+/**
+ * The turn, on the same clock as the travel above.
+ *
+ * The card arrives steeply angled and stays that way for the whole approach —
+ * at 60° the face is a glimpse, not a read — and only unwinds once it is
+ * centred, swinging a little past flat before settling square. `brightness`
+ * rides the same keyframes because a rotation with no change in light reads
+ * as a flat image being skewed rather than a card being turned.
+ */
+const TURN_START: Target = { rotateY: 68, filter: 'brightness(0.42)' }
+
+const TURN: TargetAndTransition = {
+  rotateY: [68, 60, -7, 0, -58],
+  filter: [
+    'brightness(0.42)',
+    'brightness(0.48)',
+    'brightness(1.03)',
+    'brightness(1)',
+    'brightness(0.5)',
+  ],
+}
+
+const TURN_TRANSITION: Transition = {
+  duration: FLIGHT_S,
+  times: [0, at(ARRIVE_S), at(FACE_ON_S), at(SETTLE_S), 1],
+  // Linear through the reveal itself on purpose: an eased turn covers most
+  // of its arc in a rush through the middle, which is the one thing a
+  // slow-motion beat must not do. Constant angular rate is what reads as
+  // slow motion; the settle either side of it carries the easing instead.
+  ease: ['linear', 'linear', 'easeOut', 'easeIn'],
+}
 
 function Reveal({
   state,
@@ -70,13 +163,15 @@ function Reveal({
     return () => clearTimeout(timer)
   }, [reduceMotion])
 
-  const flightTransition = reduceMotion
-    ? { duration: 0.01 }
-    : {
-        duration: WINDUP_S + HOLD_S + EXIT_S,
-        times: [0, WINDUP_S / (WINDUP_S + HOLD_S + EXIT_S), (WINDUP_S + HOLD_S) / (WINDUP_S + HOLD_S + EXIT_S), 1],
-        ease: ['circOut', 'linear', 'easeIn'],
-      }
+  // Annotated up here rather than ternaried inline on the props: framer's
+  // `initial`/`animate` types are wide enough that a conditional handed
+  // straight to the attribute widens past what tsc will represent.
+  const flightFrom: Target = reduceMotion ? { scale: 1.12 } : FLIGHT_START
+  const flightTo: TargetAndTransition = reduceMotion ? { scale: 1.12 } : FLIGHT
+  const flightWhen: Transition = reduceMotion ? { duration: 0 } : FLIGHT_TRANSITION
+  const turnFrom: Target = reduceMotion ? {} : TURN_START
+  const turnTo: TargetAndTransition = reduceMotion ? {} : TURN
+  const turnWhen: Transition = reduceMotion ? { duration: 0 } : TURN_TRANSITION
 
   return (
     <button
@@ -93,34 +188,30 @@ function Reveal({
         transition={{ duration: 0.4 }}
       />
 
-      {/* The card itself: flies in oversized from off-screen, holds centred
-          through a slow beat with its own light sweep, then clears out to
-          one side before the banner takes the stage. `x`/`scale`/`rotate`
-          share one timeline so the whole flight reads as one gesture rather
-          than three separate animations that happen to run together. */}
-      <motion.div
-        className="absolute left-1/2 top-[38%] w-[62vw] max-w-[280px]"
-        style={{ aspectRatio: '63 / 88', marginLeft: '-31vw', marginTop: '-44vw' }}
-        initial={{ x: reduceMotion ? 0 : '120vw', scale: reduceMotion ? 1.3 : 0.7, rotate: 8, opacity: 1 }}
-        animate={{
-          x: reduceMotion ? 0 : [0, 0, '-130vw'],
-          scale: reduceMotion ? 1.3 : [1.18, 1.18, 0.8],
-          rotate: reduceMotion ? 0 : [0, 0, -10],
-        }}
-        transition={flightTransition}
-      >
-        {/* The slow-mo beat's own tell: a light band crossing the face on a
-            slower, independent clock, so the card reads as being turned
-            toward the light rather than merely sitting still on screen. */}
+      {/* The card itself: in from off the right at a steep angle, unwinding
+          to face-on through a slow beat dead centre, then away to the left.
+          Travel and turn are split across two elements so each carries its
+          own perspective origin — the 3D turn then reads the same wherever
+          the card happens to be along its flight, instead of shearing as it
+          gets further from the middle of a screen-wide perspective box. */}
+      <div className="absolute inset-0 grid place-items-center">
         <motion.div
-          className="relative w-full h-full"
-          animate={reduceMotion ? undefined : { rotateY: [0, 10, -6, 0] }}
-          transition={{ duration: HOLD_S, delay: WINDUP_S, ease: 'easeInOut' }}
-          style={{ transformStyle: 'preserve-3d' }}
+          className="w-[62vw] max-w-[280px]"
+          style={{ aspectRatio: '63 / 88', perspective: 800 }}
+          initial={flightFrom}
+          animate={flightTo}
+          transition={flightWhen}
         >
-          <Card card={card} style={{ boxShadow: '0 30px 70px rgba(0,0,0,.65)' }} />
+          <motion.div
+            className="relative w-full h-full"
+            initial={turnFrom}
+            animate={turnTo}
+            transition={turnWhen}
+          >
+            <Card card={card} style={{ boxShadow: '0 30px 70px rgba(0,0,0,.65)' }} />
+          </motion.div>
         </motion.div>
-      </motion.div>
+      </div>
 
       {showBanner && (
         <motion.div
