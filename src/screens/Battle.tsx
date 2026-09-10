@@ -79,11 +79,17 @@ const HOLD_TO_FAN_MS = 130
  *  `.cov-hand-glow` in that file were, for reasons never pinned down,
  *  silently dropped from the stylesheet the browser actually loaded. */
 const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> = {
+  // Twice the luminosity of the other two: alpha pushed to its ceiling
+  // (doubling .55/.3/.75 and clamping at the opaque max is what "double" means
+  // once a channel is already past half) and the blur radius itself doubled
+  // to keep growing where alpha alone has nowhere left to go.
   use: {
-    ['--cov-hand-glow-dim-ring' as string]: 'rgba(229,192,140,.55)',
-    ['--cov-hand-glow-dim-blur' as string]: 'rgba(229,192,140,.3)',
+    ['--cov-hand-glow-dim-ring' as string]: 'rgba(229,192,140,1)',
+    ['--cov-hand-glow-dim-blur' as string]: 'rgba(229,192,140,.6)',
     ['--cov-hand-glow-bright-ring' as string]: 'var(--gold-bright)',
-    ['--cov-hand-glow-bright-blur' as string]: 'rgba(229,192,140,.75)',
+    ['--cov-hand-glow-bright-blur' as string]: 'rgba(229,192,140,1)',
+    ['--cov-hand-glow-dim-blur-size' as string]: '12px',
+    ['--cov-hand-glow-bright-blur-size' as string]: '32px',
   } as React.CSSProperties,
   ascend: {
     ['--cov-hand-glow-dim-ring' as string]: 'rgba(240,240,245,.55)',

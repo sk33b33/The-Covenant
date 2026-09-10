@@ -457,12 +457,12 @@
     100% {
       box-shadow:
         0 0 0 1.5px var(--cov-hand-glow-dim-ring),
-        0 0 6px var(--cov-hand-glow-dim-blur);
+        0 0 var(--cov-hand-glow-dim-blur-size, 6px) var(--cov-hand-glow-dim-blur);
     }
     50% {
       box-shadow:
         0 0 0 2px var(--cov-hand-glow-bright-ring),
-        0 0 16px var(--cov-hand-glow-bright-blur);
+        0 0 var(--cov-hand-glow-bright-blur-size, 16px) var(--cov-hand-glow-bright-blur);
     }
   }
 
