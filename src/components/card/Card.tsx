@@ -8,6 +8,7 @@ import {
   type Card as CardData,
   type FigureCard,
 } from '@/game/types'
+import { miracleFor } from '@/game/miracles'
 import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 import './card.css'
@@ -55,6 +56,8 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
 
   // Non-figures have no energy type of their own; they take the frame's gold.
   const type = figure?.type ?? 'light'
+  // Only Anointed Figures carry one; everything else gets null here.
+  const miracle = miracleFor(card.id)
 
   const nameClass =
     card.name.length > 20
@@ -68,6 +71,7 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
       className={cx(
         'cov-card',
         anointed && 'cov-card--anointed',
+        miracle && 'cov-card--miracle',
         holo && 'cov-card--holo',
         compact && 'cov-card--compact',
         inPlay && 'cov-card--in-play',
@@ -134,18 +138,26 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
           {/* Narrowed on `card` rather than the `figure` alias, so TypeScript
               can see that the other branch is a Covenant or Relic with prose. */}
           {isFigure(card) ? (
-            card.attacks.map((atk) => (
-              <div className="cov-card__attack" key={atk.name}>
-                <span className="cov-card__attack-cost">
-                  <EnergyCost cost={atk.cost} size={14} />
-                </span>
-                <span className="cov-card__attack-main">
-                  <span className="cov-card__attack-name">{atk.name}</span>
-                  {atk.text && <span className="cov-card__attack-text">{atk.text}</span>}
-                </span>
-                {atk.damage > 0 && <span className="cov-card__attack-damage">{atk.damage}</span>}
-              </div>
-            ))
+            <>
+              {miracle && (
+                <div className="cov-card__miracle">
+                  <span className="cov-card__miracle-badge">Miracle</span>
+                  <span className="cov-card__miracle-text">{miracle.text}</span>
+                </div>
+              )}
+              {card.attacks.map((atk) => (
+                <div className="cov-card__attack" key={atk.name}>
+                  <span className="cov-card__attack-cost">
+                    <EnergyCost cost={atk.cost} size={14} />
+                  </span>
+                  <span className="cov-card__attack-main">
+                    <span className="cov-card__attack-name">{atk.name}</span>
+                    {atk.text && <span className="cov-card__attack-text">{atk.text}</span>}
+                  </span>
+                  {atk.damage > 0 && <span className="cov-card__attack-damage">{atk.damage}</span>}
+                </div>
+              ))}
+            </>
           ) : (
             <>
               <p className="cov-card__rules">{card.text}</p>

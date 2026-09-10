@@ -1,4 +1,5 @@
 import { requireCard } from '@/data/cards'
+import { miracleFor } from '@/game/miracles'
 import { RULES } from '@/game/config'
 import { isFigure } from '@/game/types'
 import {
@@ -74,6 +75,16 @@ export function legalActions(state: MatchState): Action[] {
       actions.push({ type: 'ASCEND', hand, uid: figure.uid })
     }
   })
+
+  /* Miracles. Only Anointed Figures carry one, and only while standing on
+     the board — `figuresInPlay` is Active plus every occupied Bench slot, so
+     the "must be in a slot" rule is the enumeration itself rather than a
+     separate check. One per Figure per turn, like an ascension. */
+  for (const figure of figuresInPlay(player)) {
+    if (!miracleFor(figure.cardId)) continue
+    if (player.miraclesThisTurn.includes(figure.uid)) continue
+    actions.push({ type: 'MIRACLE', uid: figure.uid })
+  }
 
   /* Covenants and Relics. */
   const covenantAllowed =

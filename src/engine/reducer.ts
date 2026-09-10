@@ -1,4 +1,5 @@
 import { requireCard } from '@/data/cards'
+import { miracleFor } from '@/game/miracles'
 import { RULES } from '@/game/config'
 import { createRng, type Rng } from '@/game/rng'
 import { WEAKNESS, isFigure, pointsFor } from '@/game/types'
@@ -220,6 +221,7 @@ function beginTurn(state: MatchState) {
   player.retreatsThisTurn = 0
   player.attackedThisTurn = false
   player.ascendedThisTurn = []
+  player.miraclesThisTurn = []
   player.extraCovenant = false
 
   // Statuses lapse by turn number, not at the end of the owner's turn, so a
@@ -512,6 +514,31 @@ export function reduce(input: MatchState, action: Action): MatchState {
         player.discard.push(cardId)
         applyEffect(state, me, card.effect, action.targetUid)
       }
+      return state
+    }
+
+    case 'MIRACLE': {
+      const figure = figuresInPlay(player).find((f) => f.uid === action.uid)
+      if (!figure) throw new IllegalAction('That Figure is not in play')
+
+      // The board is the whole requirement. A miracle belongs to a Figure
+      // standing on the mat — Active or Bench, it makes no difference — and
+      // `figuresInPlay` is exactly that set, so a card still in hand, in the
+      // deck or in the discard pile can never reach here.
+      const miracle = miracleFor(figure.cardId)
+      if (!miracle) throw new IllegalAction('That Figure has no miracle')
+
+      if (player.miraclesThisTurn.includes(figure.uid)) {
+        throw new IllegalAction('That Figure has already called its miracle this turn')
+      }
+
+      player.miraclesThisTurn.push(figure.uid)
+      log(state, me, `${requireCard(figure.cardId).name}: ${miracle.name}.`)
+      // `attacker` is the effects file's name for "the Figure this is
+      // happening from", not a claim that anything is being attacked — it is
+      // what lets a self-targeting miracle (a shield, an extra energy) land
+      // on the Figure that called it rather than on whoever is Active.
+      applyEffect(state, me, miracle.effect, figure.uid, { attacker: figure })
       return state
     }
 

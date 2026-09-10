@@ -28,6 +28,9 @@ export type Action =
   /** Swap the Active Figure with a benched one, paying its retreat cost. */
   | { type: 'RETREAT'; benchIndex: number }
   | { type: 'ATTACK'; attackIndex: number }
+  /** Call a Figure's miracle. Only Anointed Figures carry one, and only
+   *  while they are actually standing on the board. */
+  | { type: 'MIRACLE'; uid: string }
   | { type: 'END_TURN' }
   /** Move a benched Figure into an empty Active spot after a knockout. */
   | { type: 'PROMOTE'; benchIndex: number }

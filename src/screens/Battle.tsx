@@ -16,6 +16,7 @@ import { Button } from '@/components/ui'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
+import { miracleFor } from '@/game/miracles'
 import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { ENERGY_LABEL, isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
@@ -589,6 +590,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const byUid = new Map<string, Action[]>()
     const attacks: Action[] = []
     const retreats: Action[] = []
+    /** Uids whose miracle is callable right now — the engine's own answer,
+     *  so a menu can never offer one the reducer would refuse. */
+    const miracles = new Set<string>()
 
     for (const action of legal) {
       switch (action.type) {
@@ -613,12 +617,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         case 'RETREAT':
           retreats.push(action)
           break
+        case 'MIRACLE':
+          miracles.add(action.uid)
+          break
         default:
           break
       }
     }
 
-    return { byHand, byUid, attacks, retreats }
+    return { byHand, byUid, attacks, retreats, miracles }
   }, [legal])
 
   /* --------------------------------------------------------------- setup */
@@ -720,6 +727,28 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     })
   }
 
+  /**
+   * The one miracle option a Figure offers, or nothing if it carries none.
+   *
+   * Shared by the Active and the Bench so a miracle reads and behaves the
+   * same wherever it is called from — the only thing a slot changes is what
+   * else is on the list beside it.
+   */
+  const miracleOption = (figure: FigureInPlay): SheetOption | null => {
+    const miracle = miracleFor(figure.cardId)
+    if (!miracle) return null
+
+    const callable = actionsFor.miracles.has(figure.uid)
+    return {
+      id: `miracle-${figure.uid}`,
+      label: miracle.name,
+      detail: miracle.text,
+      disabled: !callable,
+      reason: myTurn ? 'Already called this turn' : 'Not your turn',
+      onSelect: () => dispatch({ type: 'MIRACLE', uid: figure.uid }),
+    }
+  }
+
   const openActive = () => {
     const active = you.active
     if (!active || !myTurn) return
@@ -768,8 +797,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // the move without a second gesture. Everything else on the mat is a
     // hold-to-inspect, and the sheet stays for lists that are about a choice
     // rather than about one card.
+    // The miracle leads. It is the rarest thing this Figure can do and the
+    // only one that is not an attack, so it should not be found by scrolling
+    // past two attacks to reach it.
+    const miracle = miracleOption(active)
+
     peek(card, {
-      actions: [...attackOptions, ...retreatOptions],
+      actions: [...(miracle ? [miracle] : []), ...attackOptions, ...retreatOptions],
       actionsNote: `${Math.max(0, card.hp - active.damage)} of ${card.hp} HP · ${active.energy.length} energy`,
     })
   }
@@ -780,12 +814,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
     const card = figureCard(figure)
 
-    // No sheet, and (for now) no actions: nothing in the card pool has an
-    // ability usable from the bench yet, so there is nothing to list beneath
-    // it. The tap still lifts the card into the viewer for its tilt and its
-    // live HP/energy — the same reason a bench Figure exists to look at, even
-    // before it has something to press a second gesture to do.
+    // A miracle is the one thing a Figure can do from the Bench — attacking
+    // and retreating both belong to the Active spot — so it is the whole of
+    // the list here rather than the first entry on it. A benched Figure
+    // without one still opens: the tap lifts the card into the viewer for
+    // its tilt and its live HP/energy, which is reason enough to look at a
+    // Bench Figure even when there is nothing to press.
+    const miracle = miracleOption(figure)
+
     peek(card, {
+      actions: miracle ? [miracle] : [],
       actionsNote: `${Math.max(0, card.hp - figure.damage)} of ${card.hp} HP · ${figure.energy.length} energy`,
     })
   }

@@ -395,6 +395,74 @@
   overflow: hidden;
 }
 
+/* A miracle needs a taller rules box than two attacks alone do, and the box
+ * is a fixed height because everything on this card is placed against the
+ * supplied art. It grows *upward* into the artwork rather than downward:
+ * the bottom edge is where the footer's Weak/Retreat row begins, and that
+ * row is the one thing on the face that must not move. Same bottom (124.5cqw),
+ * more room above it. */
+.cov-card--miracle .cov-card__body {
+  top: 69.5cqw;
+  height: 55cqw;
+}
+
+/* The orb straddles the art/text seam, and the seam just moved: without this
+ * it stays where the old one was and lands squarely on the badge, covering
+ * the middle of the word. Same 12cqw the body's top edge travelled, so the
+ * orb goes on sitting exactly where it always did relative to the box below
+ * it — which is also what the body's own top padding is sized to clear.
+ * Declared above the compact rule further down, which needs to keep winning
+ * for a compact card whose body is not rendered at all. */
+.cov-card--miracle .cov-card__orb {
+  top: 58.6cqw;
+}
+
+/*
+ * The miracle a special (Anointed) character carries, printed above its first
+ * attack — the one thing on the card that is not a way of hitting something.
+ *
+ * Off-white plate, dark brown lettering, and a red glow that traces the
+ * border the whole way round rather than pooling at a corner: a spread ring
+ * hard against the edge, and a soft bloom just outside it. Steady, not
+ * pulsing — every other red on this board means damage taken, and a beating
+ * one would read as an alarm rather than as a mark of standing.
+ */
+.cov-card__miracle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Wider than the glow reaches. The bloom below is 2.2cqw of blur on top of
+   * a 0.32cqw ring, so anything closer than about 2.6cqw sits inside the red
+   * and stops reading as black text on the card. This is that, plus room. */
+  gap: 3.4cqw;
+}
+
+.cov-card__miracle-badge {
+  padding: 0.9cqw 3.6cqw;
+  border-radius: 1.5cqw;
+  background: #f4efe4;
+  color: #3a2a12;
+  font-family: var(--font-display);
+  font-size: 4.2cqw;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1.15;
+  white-space: nowrap;
+  border: 0.3cqw solid rgba(198, 58, 48, 0.95);
+  box-shadow:
+    0 0 0 0.32cqw rgba(210, 68, 58, 0.55),
+    0 0 2.2cqw rgba(214, 68, 58, 0.85);
+}
+
+.cov-card__miracle-text {
+  font-family: var(--font-body);
+  font-size: 3.3cqw;
+  line-height: 1.24;
+  color: #0b0803;
+  text-align: center;
+}
+
 .cov-card__attack {
   display: flex;
   align-items: center;

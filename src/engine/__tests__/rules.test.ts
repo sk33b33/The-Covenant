@@ -5,6 +5,8 @@ import { requireCard } from '@/data/cards'
 import { isFigure } from '@/game/types'
 import { IllegalAction, reduce } from '../reducer'
 import { legalActions, setupOptions } from '../legal'
+import { effectIsImplemented } from '../effects'
+import { ALL_MIRACLES, miracleFor } from '@/game/miracles'
 import { createMatch, figureCard, resetUids, type MatchSetup } from '../state'
 import type { Action } from '../actions'
 import type { MatchState, PlayerId } from '../types'
@@ -694,5 +696,93 @@ describe('concede and timeout', () => {
     const after = reduce(state, { type: 'TIMEOUT', player: 'you' })
     expect(after.winner).toBe('foe')
     expect(after.endReason).toBe('timeout')
+  })
+})
+
+describe('miracles', () => {
+  /** Melchizedek is Anointed, so it carries a miracle; abram is not. */
+  const anointed = 'melchizedek'
+
+  it('lets a Figure standing in a slot call its miracle, once per turn', () => {
+    let state = started({ forceFirst: 'you' })
+    const active = state.players.you.active!
+    active.cardId = anointed
+    // Rigged low so the heal this miracle may roll has something to restore,
+    // and so any of the seven possible rolls still leaves the board legal.
+    active.damage = 40
+
+    const miracle = miracleFor(anointed)!
+    expect(miracle).toBeTruthy()
+
+    const after = reduce(state, { type: 'MIRACLE', uid: active.uid })
+    expect(after.players.you.miraclesThisTurn).toContain(active.uid)
+    expect(after.log.some((entry) => entry.text.includes(miracle.name))).toBe(true)
+
+    // A second call in the same turn is refused.
+    expect(() => reduce(after, { type: 'MIRACLE', uid: active.uid })).toThrow(
+      /already called its miracle this turn/,
+    )
+
+    // And it comes back on your next turn.
+    state = reduce(reduce(after, { type: 'END_TURN' }), { type: 'END_TURN' })
+    expect(state.players.you.miraclesThisTurn).toEqual([])
+    expect(() => reduce(state, { type: 'MIRACLE', uid: active.uid })).not.toThrow()
+  })
+
+  it('refuses a miracle from a Figure that is not on the board', () => {
+    const state = started({ forceFirst: 'you' })
+    // A uid that belongs to nothing in play — the shape a card still sitting
+    // in hand or in the deck would have, since neither is ever given one.
+    expect(() => reduce(state, { type: 'MIRACLE', uid: 'not-in-play' })).toThrow(
+      /not in play/,
+    )
+  })
+
+  it('refuses a miracle from a Figure that has none', () => {
+    const state = started({ forceFirst: 'you' })
+    const active = state.players.you.active!
+    active.cardId = 'abram'
+    expect(miracleFor('abram')).toBeNull()
+    expect(() => reduce(state, { type: 'MIRACLE', uid: active.uid })).toThrow(/has no miracle/)
+  })
+
+  it('offers a miracle only for Anointed Figures actually in play', () => {
+    const state = started({ forceFirst: 'you' })
+    const active = state.players.you.active!
+    const bench = state.players.you.bench.find((f) => f !== null)!
+
+    active.cardId = anointed
+    bench.cardId = 'abram'
+
+    const uids = legalActions(state)
+      .filter((a) => a.type === 'MIRACLE')
+      .map((a) => (a as { uid: string }).uid)
+
+    // The Anointed Active is offered; the plain benched Figure is not, and
+    // neither is anything outside `figuresInPlay` at all.
+    expect(uids).toContain(active.uid)
+    expect(uids).not.toContain(bench.uid)
+
+    // A benched Anointed Figure *is* offered — a slot is a slot.
+    bench.cardId = anointed
+    const withBench = legalActions(state)
+      .filter((a) => a.type === 'MIRACLE')
+      .map((a) => (a as { uid: string }).uid)
+    expect(withBench).toContain(bench.uid)
+
+    // Spent ones drop back out of the list.
+    const after = reduce(state, { type: 'MIRACLE', uid: active.uid })
+    const left = legalActions(after)
+      .filter((a) => a.type === 'MIRACLE')
+      .map((a) => (a as { uid: string }).uid)
+    expect(left).not.toContain(active.uid)
+  })
+
+  it('names an effect the engine actually implements, for every miracle', () => {
+    // A miracle naming an unimplemented effect would resolve to a log line
+    // and nothing else — a move that looks real and does nothing.
+    for (const miracle of ALL_MIRACLES) {
+      expect(effectIsImplemented(miracle.effect), miracle.name).toBe(true)
+    }
   })
 })

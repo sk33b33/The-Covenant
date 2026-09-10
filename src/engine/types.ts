@@ -108,6 +108,14 @@ export interface PlayerState {
    * freshly entered Figure is blocked from ascending by that same rule.
    */
   ascendedThisTurn: string[]
+
+  /**
+   * Uids that have already called a miracle this turn. Same shape and same
+   * reasoning as `ascendedThisTurn` above: one per Figure per turn, so a
+   * miracle is a move you spend rather than a button you can hold down —
+   * without a limit, healing to full is free and endless within one turn.
+   */
+  miraclesThisTurn: string[]
   /** Set by Babel: this player may not play Covenants on their next turn. */
   covenantsLocked: boolean
   /** Set by The Signet Ring: one Covenant this turn is free of the limit. */
