@@ -12,7 +12,7 @@ import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { cx } from '@/lib/cx'
 import type { Target, TargetAndTransition, Transition } from 'framer-motion'
 import type { LogEntry, MatchEvent, MatchState, PlayerId } from '@/engine/types'
-import type { EnergyType } from '@/game/types'
+import type { Card as CardData, EnergyType } from '@/game/types'
 
 /**
  * What a finished match hands off to, in place of the bare "Won 3-0" text
@@ -155,23 +155,36 @@ function Reveal({
   // Any tap skips straight to the breakdown, whatever phase this is in — a
   // flourish nobody asked to watch twice should never be the thing standing
   // between a player and the match they actually want to read about.
-  const [showBanner, setShowBanner] = useState(reduceMotion)
+  const [showBanner, setShowBanner] = useState(false)
 
   useEffect(() => {
-    if (reduceMotion) return
     const timer = setTimeout(() => setShowBanner(true), BANNER_DELAY_S * 1000)
     return () => clearTimeout(timer)
-  }, [reduceMotion])
+  }, [])
 
-  // Annotated up here rather than ternaried inline on the props: framer's
-  // `initial`/`animate` types are wide enough that a conditional handed
-  // straight to the attribute widens past what tsc will represent.
-  const flightFrom: Target = reduceMotion ? { scale: 1.12 } : FLIGHT_START
-  const flightTo: TargetAndTransition = reduceMotion ? { scale: 1.12 } : FLIGHT
-  const flightWhen: Transition = reduceMotion ? { duration: 0 } : FLIGHT_TRANSITION
-  const turnFrom: Target = reduceMotion ? {} : TURN_START
-  const turnTo: TargetAndTransition = reduceMotion ? {} : TURN
-  const turnWhen: Transition = reduceMotion ? { duration: 0 } : TURN_TRANSITION
+  // Without motion the card cannot clear the screen before the banner
+  // arrives, so the two would occupy the same centre and the words would
+  // land across the card face. This lays them out in a column instead —
+  // the same information, stacked, rather than the animated version with
+  // its animation removed and its overlap left behind.
+  if (reduceMotion) {
+    return (
+      <button
+        type="button"
+        className="fixed inset-0 z-[80] overflow-hidden"
+        style={{ background: 'rgba(8,6,3,0.94)' }}
+        onClick={onAdvance}
+        aria-label="Skip to match breakdown"
+      >
+        <div className="h-full flex flex-col items-center justify-center gap-6 px-8">
+          <div className="w-[38vw] max-w-[160px]" style={{ aspectRatio: '63 / 88' }}>
+            <Card card={card} style={{ boxShadow: '0 20px 50px rgba(0,0,0,.6)' }} />
+          </div>
+          <Banner won={won} card={card} isYours={isYours} state={state} still />
+        </div>
+      </button>
+    )
+  }
 
   return (
     <button
@@ -198,15 +211,15 @@ function Reveal({
         <motion.div
           className="w-[62vw] max-w-[280px]"
           style={{ aspectRatio: '63 / 88', perspective: 800 }}
-          initial={flightFrom}
-          animate={flightTo}
-          transition={flightWhen}
+          initial={FLIGHT_START}
+          animate={FLIGHT}
+          transition={FLIGHT_TRANSITION}
         >
           <motion.div
             className="relative w-full h-full"
-            initial={turnFrom}
-            animate={turnTo}
-            transition={turnWhen}
+            initial={TURN_START}
+            animate={TURN}
+            transition={TURN_TRANSITION}
           >
             <Card card={card} style={{ boxShadow: '0 30px 70px rgba(0,0,0,.65)' }} />
           </motion.div>
@@ -220,39 +233,61 @@ function Reveal({
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25 }}
         >
-          <div className="text-center">
-            <motion.h1
-              className="font-display font-bold tracking-wide"
-              style={{
-                fontSize: 46,
-                background: won ? 'var(--gold-leaf)' : 'linear-gradient(160deg,#9c8d75,#6b5d47)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
-              }}
-              initial={{ scale: 1.6, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 340, damping: 20 }}
-            >
-              {won ? 'VICTORY' : 'DEFEAT'}
-            </motion.h1>
-
-            <p className="text-sm mt-1" style={{ color: 'rgba(240,220,188,.7)' }}>
-              {isYours ? `${card.name} carried the match.` : `${card.name} carried it against you.`}
-            </p>
-
-            <div className="flex items-center justify-center gap-6 mt-6">
-              <Score label="You" value={state.players.you.points} highlight={won} />
-              <Score label="Opponent" value={state.players.foe.points} highlight={!won} />
-            </div>
-
-            <p className="text-xs mt-8 animate-pulse" style={{ color: 'rgba(240,220,188,.45)' }}>
-              Tap anywhere to continue
-            </p>
-          </div>
+          <Banner won={won} card={card} isYours={isYours} state={state} />
         </motion.div>
       )}
     </button>
+  )
+}
+
+function Banner({
+  won,
+  card,
+  isYours,
+  state,
+  still,
+}: {
+  won: boolean
+  card: CardData
+  isYours: boolean
+  state: MatchState
+  /** Drops the headline's slam-in, for the reduced-motion layout. */
+  still?: boolean
+}) {
+  return (
+    <div className="text-center">
+      <motion.h1
+        className="font-display font-bold tracking-wide"
+        style={{
+          fontSize: 46,
+          background: won ? 'var(--gold-leaf)' : 'linear-gradient(160deg,#9c8d75,#6b5d47)',
+          WebkitBackgroundClip: 'text',
+          backgroundClip: 'text',
+          color: 'transparent',
+        }}
+        initial={still ? undefined : { scale: 1.6, opacity: 0 }}
+        animate={still ? undefined : { scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 340, damping: 20 }}
+      >
+        {won ? 'VICTORY' : 'DEFEAT'}
+      </motion.h1>
+
+      <p className="text-sm mt-1" style={{ color: 'rgba(240,220,188,.7)' }}>
+        {isYours ? `${card.name} carried the match.` : `${card.name} carried it against you.`}
+      </p>
+
+      <div className="flex items-center justify-center gap-6 mt-6">
+        <Score label="You" value={state.players.you.points} highlight={won} />
+        <Score label="Opponent" value={state.players.foe.points} highlight={!won} />
+      </div>
+
+      <p
+        className={cx('text-xs mt-8', !still && 'animate-pulse')}
+        style={{ color: 'rgba(240,220,188,.45)' }}
+      >
+        Tap anywhere to continue
+      </p>
+    </div>
   )
 }
 
