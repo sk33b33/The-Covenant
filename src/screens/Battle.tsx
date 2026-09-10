@@ -110,11 +110,15 @@ const VIABILITY_GLOW: Record<'use' | 'ascend' | 'ability', React.CSSProperties> 
  *  edge — see the render site for the measurement this is based on. */
 const YOU_ROW_LIFT = 139.3
 
-/** A small nudge of the opponent's Active/Bench row toward the halfway
- *  line, the mirror of YOU_ROW_LIFT but far more modest — their side
- *  already sat close to the ring, so this only needs to close the last bit
- *  of the gap rather than cross into it. */
-const FOE_ROW_LIFT = 20
+/** How far the opponent's Active/Bench row is pushed toward the halfway
+ *  line — far enough that Active's bottom edge lands level with the bottom
+ *  edge of their own points chip (measured gap: 61.7px), the mirror of how
+ *  YOU_ROW_LIFT levels your own Active with your deck. Bench reads off this
+ *  same constant (`FOE_ROW_LIFT - BENCH_CLEARANCE`), so it's carried down by
+ *  the identical amount and keeps its existing gap to Active — and stays on
+ *  the same side of it, above rather than below, exactly as documented on
+ *  BENCH_CLEARANCE just below. */
+const FOE_ROW_LIFT = 81.7
 
 /**
  * Extra air between a Bench row and its own Active, on top of the flex gap.
