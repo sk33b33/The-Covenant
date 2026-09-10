@@ -2096,11 +2096,23 @@ function OpponentHand({ count }: { count: number }) {
   if (count === 0) return null
 
   const mid = (count - 1) / 2
+  // Angles are scale-free, so the lean is the one thing that does *not*
+  // double with the rest: the same rotation on a card twice the size is the
+  // same fan, twice the size. Spread and arc depth are distances and do.
   const rotateStep = count > 1 ? Math.min(9, Math.max(2, 26 / count)) : 0
-  const spanStep = count > 1 ? Math.min(16, Math.max(8, 56 / count)) : 0
-  const width = 30
+  const spanStep = count > 1 ? Math.min(32, Math.max(16, 112 / count)) : 0
+  const width = 60
 
   return (
+    // The reserved height stays what it was while the cards themselves
+    // doubled, so it no longer bounds them — deliberately. The cards are
+    // absolutely positioned and only ever overflowed this box anyway, but
+    // this board is a `justify-center` column: growing this child by the
+    // ~42px the taller cards actually occupy would re-centre the whole
+    // column and carry every row under it up by half of that, which is
+    // exactly the alignment (their Active level with their points chip)
+    // that was just measured into place. The cards spill down into the
+    // clearance that already sits between this hand and their Bench.
     <div className="relative shrink-0 pointer-events-none" style={{ height: 34, width: '100%' }}>
       {Array.from({ length: count }, (_, index) => {
         const offset = index - mid
@@ -2117,7 +2129,7 @@ function OpponentHand({ count }: { count: number }) {
               // (`rotate: offset * step`, `y: offset² * k`, pivoting at the
               // bottom): pivoting at the top with the signs flipped is the
               // same fan turned to face the other way down the table.
-              transform: `translateY(${-offset * offset * 1.1}px) rotate(${-offset * rotateStep}deg)`,
+              transform: `translateY(${-offset * offset * 2.2}px) rotate(${-offset * rotateStep}deg)`,
               transformOrigin: 'top center',
               zIndex: count - index,
               boxShadow: '0 2px 8px rgba(0,0,0,.5)',
