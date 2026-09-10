@@ -1,4 +1,5 @@
 import { requireCard } from '@/data/cards'
+import { miracleFor } from '@/game/miracles'
 import { RULES } from '@/game/config'
 import { createRng, type Rng } from '@/game/rng'
 import { WEAKNESS, isFigure } from '@/game/types'
@@ -119,6 +120,33 @@ function score(state: MatchState, me: PlayerId, action: Action): number {
         return 210
       }
       return 150
+    }
+
+    case 'MIRACLE': {
+      const figure = figuresInPlay(player).find((f) => f.uid === action.uid)
+      const miracle = figure ? miracleFor(figure.cardId) : null
+      if (!figure || !miracle) return 0
+
+      // Scored the same way Covenants and Relics are just above, and for the
+      // same reason: what a miracle is worth is entirely what its effect
+      // would do right now. It costs no card and no energy — only the one
+      // call that Figure gets this turn — so the question is never "can I
+      // afford this", only "would this land on anything".
+      const effect = miracle.effect
+
+      if (effect.startsWith('heal')) {
+        // `heal-all-30` reaches the whole board; the rest only ever mend the
+        // Active, so a damaged Bench does not make one worth calling.
+        const mended = effect === 'heal-all-30' ? figuresInPlay(player) : [player.active]
+        return mended.some((f) => f && f.damage > 0) ? 240 : 15
+      }
+
+      // Both of these need somewhere to put the Figure they find.
+      if (effect === 'revive-basic' || effect === 'search-basic-to-bench') {
+        return player.bench.some((slot) => slot === null) ? 230 : 15
+      }
+
+      return 200
     }
 
     case 'RETREAT': {

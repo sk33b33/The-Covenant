@@ -6,6 +6,8 @@ import { isFigure } from '@/game/types'
 import { IllegalAction, reduce } from '../reducer'
 import { legalActions, setupOptions } from '../legal'
 import { effectIsImplemented } from '../effects'
+import { DIFFICULTY, chooseAction } from '../ai'
+import { createRng } from '@/game/rng'
 import { ALL_MIRACLES, miracleFor } from '@/game/miracles'
 import { createMatch, figureCard, resetUids, type MatchSetup } from '../state'
 import type { Action } from '../actions'
@@ -785,4 +787,31 @@ describe('miracles', () => {
       expect(effectIsImplemented(miracle.effect), miracle.name).toBe(true)
     }
   })
+
+  it('is reached for by the AI, rather than left on the board', () => {
+    // The AI scores every legal action and takes the best; an action it has
+    // no case for scores 0, which is below END_TURN's 1 — so "the AI uses
+    // miracles" is precisely the claim that a useful one out-scores ending
+    // the turn. Set up a board where calling it is plainly the right move:
+    // a damaged Anointed Active, no energy to attack with, nothing in hand.
+    let state = started({ forceFirst: 'foe' })
+    const foe = state.players.foe
+    const active = foe.active!
+    active.cardId = anointed
+    active.damage = 60
+    active.energy = []
+    foe.hand = []
+    foe.altar = null
+
+    const rng = createRng(7)
+    // `hard` rather than the default, so the deliberate-mistake roll cannot
+    // pick something else and make this flap.
+    const chosen = chooseAction(state, 'foe', DIFFICULTY.hard, rng)
+    expect(chosen?.type).toBe('MIRACLE')
+
+    // And it actually resolves when the AI takes it.
+    state = reduce(state, chosen!)
+    expect(state.players.foe.miraclesThisTurn).toContain(active.uid)
+  })
 })
+

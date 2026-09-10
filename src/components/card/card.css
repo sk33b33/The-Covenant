@@ -430,7 +430,10 @@
 .cov-card__miracle {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  /* Held to the left rather than centred. The type orb sits dead centre on
+   * the seam directly above this block, and a centred plate lined up under
+   * it read as one stacked object with the orb crowding its top edge. */
+  align-items: flex-start;
   /* Wider than the glow reaches. The bloom below is 2.2cqw of blur on top of
    * a 0.32cqw ring, so anything closer than about 2.6cqw sits inside the red
    * and stops reading as black text on the card. This is that, plus room. */
@@ -440,8 +443,13 @@
 .cov-card__miracle-badge {
   padding: 0.9cqw 3.6cqw;
   border-radius: 1.5cqw;
-  background: #f4efe4;
-  color: #3a2a12;
+  /* The game's own dark brown and its light brown, rather than a plate in a
+   * colour the rest of the game never uses. Literals, not the theme tokens
+   * they are taken from: every colour on this card face is fixed, because
+   * the card is a printed object that should not change when the app's
+   * theme does. */
+  background: #241c11;
+  color: #e5c08c;
   font-family: var(--font-display);
   font-size: 4.2cqw;
   font-weight: 700;
@@ -460,7 +468,9 @@
   font-size: 3.3cqw;
   line-height: 1.24;
   color: #0b0803;
-  text-align: center;
+  /* Reads from the same left edge the plate now starts at, so the two are
+   * one block rather than a left-hung plate over centred prose. */
+  text-align: left;
 }
 
 .cov-card__attack {
