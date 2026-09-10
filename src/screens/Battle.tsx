@@ -302,9 +302,28 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     foe: null,
   })
 
-  /** A Figure a fatal blow has taken off the board, held on the mat until
-   *  the strike that felled it has finished playing. */
-  const [dying, setDying] = useState<{ side: PlayerId; figure: FigureInPlay } | null>(null)
+  /**
+   * The defender, as it stood *before* the blow, held on the mat for as long
+   * as the strike takes to play.
+   *
+   * The engine resolves an attack in one call — damage, knockout and turn
+   * hand-off all land together — but showing one takes well over a second.
+   * Without this the bar drained the instant the attack was dispatched, so
+   * the HP was already gone by the time the projectile set off toward it,
+   * and the blow arrived at a Figure that had visibly taken it already.
+   * Holding the pre-hit Figure here and swapping in the real damage at the
+   * moment of contact is what puts the drain on the blow that caused it.
+   *
+   * A fatal blow is the same idea taken to its end: the engine has cleared
+   * that Figure out of its slot, and this is what goes on drawing it there
+   * until the strike is done.
+   */
+  const [held, setHeld] = useState<{ side: PlayerId; figure: FigureInPlay } | null>(null)
+
+  /** What a slot should draw right now — the held Figure while a strike is
+   *  playing over it, otherwise whatever the engine says is standing there. */
+  const shownActive = (side: PlayerId): FigureInPlay | null =>
+    (held?.side === side ? held.figure : null) ?? state.players[side].active
 
   /**
    * The last real type either side's Altar actually held, kept across the
@@ -355,14 +374,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // fixed compass direction.
     const lungeDir = ev.by === 'you' ? -1 : 1
 
-    // The engine has already cleared a felled Figure out of its slot. Put
-    // the one that was standing there back on the mat, exactly as it stood,
-    // for as long as the strike takes.
-    if (ev.knockedOut) {
-      const victimSide: PlayerId = ev.by === 'you' ? 'foe' : 'you'
-      const victim = prevActives.current[victimSide]
-      if (victim) setDying({ side: victimSide, figure: victim })
-    }
+    // Put the defender back as it stood before the hit, whatever the hit
+    // did. This used to run only for a knockout, which is why a routine hit
+    // drained its bar the moment the attack was dispatched — a full second
+    // before the strike that caused it arrived.
+    const victimSide: PlayerId = ev.by === 'you' ? 'foe' : 'you'
+    const victim = prevActives.current[victimSide]
+    // The damage to show once contact is made: a knockout empties the bar,
+    // and anything else takes whatever the engine actually settled on.
+    const damageOnContact = ev.knockedOut
+      ? victim && figureCard(victim).hp
+      : state.players[victimSide].active?.damage
+    if (victim) setHeld({ side: victimSide, figure: victim })
 
     // A bigger recoil than a routine card game needs, deliberately — this
     // effect is meant to read as amplified, not restrained.
@@ -410,7 +433,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         // The held Figure's HP drains at the moment of contact rather than
         // when the engine resolved the hit, so the bar empties on the blow
         // that emptied it instead of before the blow arrives.
-        setDying((d) => (d ? { ...d, figure: { ...d.figure, damage: figureCard(d.figure).hp } } : d))
+        if (damageOnContact !== undefined && damageOnContact !== null) {
+          setHeld((h) => (h ? { ...h, figure: { ...h.figure, damage: damageOnContact } } : h))
+        }
 
         // A knockout gets a little extra than just a harder shake: a beat of
         // recoil-scale on the card itself, so the "finishing blow" reads as
@@ -527,7 +552,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
    *  hand-off it was holding up, if any. */
   const releaseAttackFx = () => {
     setAttackFx(null)
-    setDying(null)
+    setHeld(null)
     fxInFlight.current = false
     if (pendingCue.current) {
       setTurnCue(pendingCue.current)
@@ -805,6 +830,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     peek(card, {
       actions: [...(miracle ? [miracle] : []), ...attackOptions, ...retreatOptions],
       actionsNote: `${Math.max(0, card.hp - active.damage)} of ${card.hp} HP · ${active.energy.length} energy`,
+    })
+  }
+
+  /**
+   * The opponent's Figures open too, and open read-only.
+   *
+   * Their board is as much a thing you have to read as your own — what is
+   * standing there, how hurt it is, what it can hit you with next turn — and
+   * squinting at a card an inch tall is not reading it. There are no actions
+   * beneath it because there are none to have: nothing you can do is done to
+   * their Figure from here.
+   */
+  const openFoe = (figure: FigureInPlay) => {
+    const card = figureCard(figure)
+    peek(card, {
+      actionsNote: `${Math.max(0, card.hp - figure.damage)} of ${card.hp} HP · ${figure.energy.length} energy`,
     })
   }
 
@@ -1088,6 +1129,31 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setActionOpen(false)
   }
 
+  // Conceding hands the match over for good, so it asks first. The question
+  // goes through the same sheet every other list of choices on this screen
+  // uses, rather than a confirm dialog this app has nowhere else.
+  const canConcede = state.phase !== 'ended'
+
+  /** Whether the round button has anything at all behind it. */
+  const hasAction = Boolean(actionLabel) || canSimulate || canConcede
+  const askConcede = () => {
+    setActionOpen(false)
+    setSheet({
+      title: 'Concede the match?',
+      subtitle: 'Your opponent takes the win. This cannot be undone.',
+      options: [
+        {
+          id: 'concede-yes',
+          label: 'Yes, concede',
+          onSelect: () => dispatch({ type: 'CONCEDE', player: 'you' }),
+        },
+        // Closing the sheet is all "no" has to do — `ActionSheet` runs
+        // `onChosen` after any pick, and that is what dismisses it.
+        { id: 'concede-no', label: 'No, keep playing', onSelect: () => {} },
+      ],
+    })
+  }
+
   /* ------------------------------------------------------------- render */
 
   // What each slot shows in place of its empty outline, if anything: a
@@ -1169,19 +1235,29 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           style={{ transform: `translateY(${FOE_ROW_LIFT - BENCH_CLEARANCE}px)` }}
         >
           {foe.bench.map((figure, i) => (
-            <BoardFigure key={i} figure={figure} width={BENCH_W} emptyLabel="" />
+            <BoardFigure
+              key={i}
+              figure={figure}
+              width={BENCH_W}
+              emptyLabel=""
+              onClick={figure ? () => openFoe(figure) : undefined}
+              noPeek={Boolean(figure)}
+            />
           ))}
         </div>
         <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
           {/* Emptied while their card is out of it, exactly as yours is. */}
           <motion.div animate={foeFigureFx} style={{ opacity: sortie?.side === 'foe' ? 0 : 1 }}>
-            {/* `dying` only ever fills a slot the engine has already
-                emptied, and only until the strike ends — a real Figure
-                stepping up mid-effect wins over it. */}
+            {/* `shownActive` draws the pre-hit Figure while a strike plays
+                over this slot, so the bar drains on contact rather than on
+                dispatch — and goes on drawing a felled one until the strike
+                that felled it has finished. */}
             <BoardFigure
-              figure={foe.active ?? (dying?.side === 'foe' ? dying.figure : null)}
+              figure={shownActive('foe')}
               width={ACTIVE_W}
               emptyLabel="Active"
+              onClick={foe.active ? () => openFoe(foe.active!) : undefined}
+              noPeek={Boolean(foe.active)}
             />
           </motion.div>
         </div>
@@ -1213,8 +1289,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             one: it moves the paint position without taking space out of
             the flex column's own measurement, so nothing above or below
             this row has to re-flow to make room for it. */}
+        {/* `pointer-events-none`, with the one interactive thing in here
+            turning them back on for itself. This row is full-width and comes
+            *after* their Active in the DOM, so its own empty middle — which
+            has nothing in it, the clock being at one edge and the piles at
+            the other — was painting over the top half of their Active card
+            and swallowing every tap aimed at it. Nothing noticed while that
+            card had no tap to swallow. Your own row has never had the
+            problem: it is declared before your Active, not after. */}
         <div
-          className="w-full flex items-start justify-between gap-2 px-0.5"
+          className="w-full flex items-start justify-between gap-2 px-0.5 pointer-events-none"
           style={{ transform: 'translateY(-22px)' }}
         >
           {/* Centred on each other rather than flushed to the row's outer
@@ -1229,7 +1313,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             <TurnStatus label="Opponent" active={foeTurn} seconds={clocks.turn} />
           </div>
 
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-1 pointer-events-auto">
             <DiscardPile cardIds={foe.discard} onOpen={() => setViewingDiscard('foe')} />
             <PileCount count={foe.deck.length} />
           </div>
@@ -1302,7 +1386,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             }}
           >
             <BoardFigure
-              figure={you.active ?? (dying?.side === 'you' ? dying.figure : null)}
+              figure={shownActive('you')}
               width={ACTIVE_W}
               emptyLabel="Active"
               onClick={you.active && myTurn ? openActive : undefined}
@@ -1390,7 +1474,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               spread near the tray's edges. */}
           <div className="absolute right-0 bottom-0 flex flex-col items-center gap-1.5 shrink-0">
             <AnimatePresence>
-              {actionOpen && (actionLabel || canSimulate) && (
+              {actionOpen && hasAction && (
                 <motion.div
                   className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-2 whitespace-nowrap"
                   initial={{ opacity: 0, y: 6, scale: 0.92 }}
@@ -1402,6 +1486,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                       less common choice of the two, and shouldn't sit where
                       a thumb reaching for "Start Match"/"End Turn" would
                       land on it by accident. */}
+                  {/* Above Simulate, which is itself above the primary
+                      action: the further a choice is from a thumb resting on
+                      the button that opened this, the harder it is to pick by
+                      accident — and conceding is the one here that cannot be
+                      taken back. */}
+                  {canConcede && (
+                    <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={askConcede}>
+                      Concede
+                    </Button>
+                  )}
                   {canSimulate && (
                     <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={runSimulate}>
                       Simulate Match
@@ -1433,19 +1527,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
             <button
               onClick={() => setActionOpen((v) => !v)}
-              disabled={!actionLabel && !canSimulate}
+              disabled={!hasAction}
               className="rounded-pill w-9 h-9 grid place-items-center"
               style={{
-                background: actionLabel || canSimulate ? 'var(--surface-raised)' : 'var(--bg-sunk)',
-                opacity: actionLabel || canSimulate ? 1 : 0.5,
+                background: hasAction ? 'var(--surface-raised)' : 'var(--bg-sunk)',
+                opacity: hasAction ? 1 : 0.5,
               }}
-              aria-label={actionLabel ?? (canSimulate ? 'Simulate Match' : 'No action available')}
+              aria-label={
+                actionLabel ?? (canSimulate ? 'Simulate Match' : canConcede ? 'Concede' : 'No action available')
+              }
               aria-expanded={actionOpen}
             >
-              <CheckIcon
-                size={16}
-                className={actionLabel || canSimulate ? 'text-[var(--gold-bright)]' : 'text-ink-faint'}
-              />
+              <CheckIcon size={16} className={hasAction ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
             </button>
 
             {/* The Altar itself. `AltarSocket` is the shared, passive
