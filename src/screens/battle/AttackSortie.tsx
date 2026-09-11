@@ -42,31 +42,51 @@ export interface AttackSortieTrigger {
  *  lifting off the mat. */
 const HOLD_S = 0.18
 
-/** The four legs of the pass: out of the slot, in to the centre, back out
- *  the far side, home. Two legs each side of the apex rather than one, so
- *  the card curves through the middle instead of running to a point and
- *  reversing off it. */
-const CLIMB_S = 0.34
-const REACH_S = 0.3
-const DEPART_S = 0.3
-const HOME_S = 0.34
-const FLIGHT_S = CLIMB_S + REACH_S + DEPART_S + HOME_S
+const FLIGHT_S = 1.25
+
+/**
+ * How many points the path below is sampled at.
+ *
+ * The flight is a curve, but framer walks keyframes in straight lines and
+ * eases each span separately. Describing it as a handful of waypoints meant
+ * both of the things that made it read as machinery rather than motion: the
+ * path had corners at every waypoint, and an `easeInOut` on each span braked
+ * the card to a stop at all of them and started it again. Sampling densely
+ * and interpolating linearly removes both — the chords are far too short to
+ * see, and there is no per-span easing left to brake against. At this count
+ * each span covers under two frames of a 60Hz flight.
+ */
+const SAMPLES = 48
+
+/**
+ * Where along its path the card is at a given point in time, 0-1.
+ *
+ * All of the velocity shaping lives here, in where the samples are taken,
+ * rather than in the easing between them. Smoothstep leaves and arrives at a
+ * standstill and is quickest across the middle, so the card accelerates out
+ * of its slot, carries through the apex, and settles back rather than
+ * stopping dead four times on the way.
+ */
+const glide = (t: number) => t * t * (3 - 2 * t)
 
 /** How much larger the card is at the apex than it sits — enough to read as
  *  carried right past the viewer, well short of the expanded viewer's own
  *  full size, which this is deliberately not. */
 const PEAK_SCALE = 1.45
 
-/** Where the two outer keyframes sit along the pass, as a fraction of the
- *  whole. Height and size share it: at 42% of the way to the centre the card
- *  is 42% of the way to its full size, which is what ties the growth to
- *  nearness rather than letting it happen on the way up and then hold. */
-const MID = 0.42
-
 /** How far the arc bulges to either side of the straight line in, before the
  *  viewport's own edges are allowed to cut it shorter. Enough to read as a
  *  curve; much more and the pass stops being about the centre. */
 const MAX_SWING = 58
+
+/** Degrees the card rolls into each side of the arc, level over the middle. */
+const BANK = 7
+
+/** The shadow at the apex — no offset, no blur and no opacity at either end,
+ *  since the card is sitting on the mat there. */
+const SHADOW_Y = 19
+const SHADOW_BLUR = 26
+const SHADOW_ALPHA = 0.66
 
 /** Radius the element's sigils orbit at, as a multiple of the flying card's
  *  own half-width — outside its edges at the scale it flies at. */
@@ -155,61 +175,67 @@ export function AttackSortie({
     const room = Math.min(centreX, window.innerWidth - centreX) - flownHalfWidth - 12
     const swing = Math.max(0, Math.min(MAX_SWING, room))
 
-    // The two outer keyframes: partway in, bulged to one side on the way up
-    // and the other on the way down. Same fraction of the journey, opposite
-    // sides of it, which is what makes the pass one curve through the middle
-    // instead of an out-and-back along its own path.
-    const midX = drift * MID
-    const midY = rise * MID
-    const midScale = 1 + (PEAK_SCALE - 1) * MID
-
-    const transition: Transition = {
-      duration: FLIGHT_S,
-      delay: HOLD_S,
-      times: [
-        0,
-        CLIMB_S / FLIGHT_S,
-        (CLIMB_S + REACH_S) / FLIGHT_S,
-        (CLIMB_S + REACH_S + DEPART_S) / FLIGHT_S,
-        1,
-      ],
-      // One easing per leg: off the mat, in to the centre, out the far side,
-      // then home — the last of them `easeIn` so the card falls into its slot
-      // rather than settling onto it, and the middle pair `easeInOut` so the
-      // pass slows through the apex where the card is largest.
-      ease: ['easeOut', 'easeInOut', 'easeInOut', 'easeIn'],
-    }
-
-    return {
-      halfWidth: flownHalfWidth,
-      card: {
-        x: [0, midX - swing, drift, midX + swing, 0],
-        y: [0, midY, rise, midY, 0],
-        // Full size only at the apex. Growth is tied to how near the middle
-        // the card is, so it reads as coming toward the viewer on the way in
-        // and going away again on the way out, rather than stepping up to a
-        // held size the moment it leaves the mat.
-        scale: [1, midScale, PEAK_SCALE, midScale, 1],
-        // Rolls into the bulge each way and comes level over the centre, so
-        // the travel reads as banked through a curve rather than slid along
-        // a line.
-        rotate: [0, -7, 0, 7, 0],
+    // The whole flight as one ellipse, read at `SAMPLES` points.
+    //
+    // `climb` rises from nothing at the slot to one at the middle of the
+    // screen and back. Height, size and shadow all ride it, which is what
+    // keeps the card largest exactly where it is highest and returns all
+    // three to rest together.
+    //
+    // `cross` is the same cycle a quarter turn ahead, carrying the card out
+    // to the left on the way up and the right on the way down. The quarter
+    // turn is the whole point: in quadrature the two trace an ellipse, and a
+    // card going round one never reverses along either axis, so its speed
+    // stays near constant the whole way round. Matched phases instead —
+    // `sin(pi u)` against `sin(2 pi u)` — draw an S whose horizontal travel
+    // stops dead at each bulge to turn around, and that full stop twice a
+    // flight is what read as machinery rather than motion.
+    const path = Array.from({ length: SAMPLES }, (_, i) => {
+      const u = glide(i / (SAMPLES - 1))
+      const climb = (1 - Math.cos(2 * Math.PI * u)) / 2
+      const cross = Math.sin(2 * Math.PI * u)
+      return {
+        x: drift * climb - swing * cross,
+        y: rise * climb,
+        scale: 1 + (PEAK_SCALE - 1) * climb,
+        rotate: -BANK * cross,
         // Cast beneath the card and deepest where it is highest and largest.
         // Height off a surface is read from its shadow before anything else,
         // and this is what separates a card carried over the mat from one
         // merely scaled up in place.
-        filter: [
-          'drop-shadow(0 0px 0px rgba(0,0,0,0))',
-          'drop-shadow(0 11px 15px rgba(0,0,0,.52))',
-          'drop-shadow(0 19px 26px rgba(0,0,0,.66))',
-          'drop-shadow(0 11px 15px rgba(0,0,0,.52))',
-          'drop-shadow(0 0px 0px rgba(0,0,0,0))',
-        ],
+        shadow: `drop-shadow(0 ${(SHADOW_Y * climb).toFixed(1)}px ${(
+          SHADOW_BLUR * climb
+        ).toFixed(1)}px rgba(0,0,0,${(SHADOW_ALPHA * climb).toFixed(3)}))`,
+      }
+    })
+
+    // No `times` and no per-span easing: the samples are already spaced in
+    // time by `glide`, so framer only has to join them evenly and straight.
+    const transition: Transition = { duration: FLIGHT_S, delay: HOLD_S, ease: 'linear' }
+
+    return {
+      halfWidth: flownHalfWidth,
+      card: {
+        x: path.map((p) => p.x),
+        y: path.map((p) => p.y),
+        scale: path.map((p) => p.scale),
+        rotate: path.map((p) => p.rotate),
+        filter: path.map((p) => p.shadow),
         transition,
       },
-      // Lit for the flight and gone by the landing — every layer around the
-      // card rides the same five stops as the path, so nothing outlives it.
-      glow: { opacity: [0, 1, 1, 1, 0], transition } satisfies Glow,
+      // Lit for the flight and gone by the landing. Its own handful of stops
+      // rather than the path's thirty-two: the layers around the card only
+      // fade up and down, and sampling that as densely as the flight would
+      // be thirty extra numbers saying nothing.
+      glow: {
+        opacity: [0, 1, 1, 0],
+        transition: {
+          duration: FLIGHT_S,
+          delay: HOLD_S,
+          times: [0, 0.16, 0.84, 1],
+          ease: 'easeInOut',
+        },
+      } satisfies Glow,
     }
     // The trigger is replaced wholesale per sortie, so its id identifies it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
