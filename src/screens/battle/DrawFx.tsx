@@ -62,10 +62,15 @@ const DROP_S = 0.22
 const OWN_TOTAL_S = FLY_S + HOLD_S + DROP_S
 const FOE_TOTAL_S = FLY_S + DROP_S
 
-/** How much larger the card gets at the top of its arc — enough to read as
- *  lifted and, for your own draw, worth pausing on; well short of the
- *  sortie's own peak, since this never leaves the corner of the screen. */
-const PEAK_SCALE = 1.5
+/** How much larger the opponent's card gets at the top of its arc — enough
+ *  to read as lifted, well short of the sortie's own peak, since this never
+ *  leaves the corner of the screen. */
+const FOE_PEAK_SCALE = 1.5
+
+/** Your own draw holds at the top of its arc rather than just passing
+ *  through it, so it gets to be bigger there — this is the one moment the
+ *  card is actually meant to be read, not merely seen in motion. */
+const REVEAL_PEAK_SCALE = 1.9
 
 /** How far the arc lifts toward the middle of the screen, in px — a modest
  *  rise rather than the sortie's sweep: pile and hand sit close together on
@@ -128,7 +133,7 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
 
     const at = (cx: number, cy: number, scale: number) => ({ x: cx - fromCX, y: cy - fromCY, scale })
     const start = at(fromCX, fromCY, 1)
-    const peak = at(peakX, peakY, PEAK_SCALE)
+    const peak = at(peakX, peakY, reveal ? REVEAL_PEAK_SCALE : FOE_PEAK_SCALE)
     const end = at(toCX, toCY, endScale)
 
     const total = reveal ? OWN_TOTAL_S : FOE_TOTAL_S
