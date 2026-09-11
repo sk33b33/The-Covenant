@@ -33,6 +33,7 @@ import {
   type AttackFxTrigger,
 } from './battle/AttackFx'
 import { AttackSortie, type AttackSortieTrigger } from './battle/AttackSortie'
+import { DrawFx, type DrawFxTrigger } from './battle/DrawFx'
 import { MatchResult } from './battle/MatchResult'
 import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
@@ -194,6 +195,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // The attacking card's flight, which runs *before* the attack it belongs to
   // is dispatched — see `launchSortie`.
   const [sortie, setSortie] = useState<AttackSortieTrigger | null>(null)
+  // The most recent batch of draws, flying from pile to hand — see the
+  // log-diffing effect below for how this gets filled in.
+  const [drawFx, setDrawFx] = useState<DrawFxTrigger | null>(null)
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -201,7 +205,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // without this the two run over each other in both directions: the AI's
   // first move arriving under its own turn card, or its next move arriving
   // on top of the attack you just watched it make.
-  const presenting = attackFx !== null || turnCue !== null || sortie !== null
+  const presenting = attackFx !== null || turnCue !== null || sortie !== null || drawFx !== null
 
   // Filled in below, once `dispatch` exists to build it out of.
   const stageAttack = useRef<((side: PlayerId, action: Action) => boolean) | undefined>(undefined)
@@ -464,6 +468,51 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   useEffect(() => {
     prevActives.current = { you: you.active, foe: foe.active }
   })
+
+  /* -------------------------------------------------------------- draws */
+
+  // How much of `state.log` has already been read for draws — captured once
+  // at mount, not zero, so a match resumed mid-way through doesn't replay
+  // its entire history as a flourish the instant this screen opens.
+  const seenLogLen = useRef(state.log.length)
+  const drawFxId = useRef(0)
+
+  useEffect(() => {
+    const prevLen = seenLogLen.current
+    seenLogLen.current = state.log.length
+    // Shorter than before means a new match replaced this one, not growth —
+    // nothing to animate either way.
+    if (state.log.length <= prevLen) return
+
+    const added = state.log.slice(prevLen).filter((entry) => entry.event?.kind === 'draw')
+    if (added.length === 0) return
+
+    const piles = { you: youPileRef.current, foe: foePileRef.current }
+    const hands = { you: youHandRef.current, foe: foeHandRef.current }
+
+    const draws = added.flatMap((entry) => {
+      const fromEl = piles[entry.player]
+      const toEl = hands[entry.player]
+      // Nothing rendered yet to fly between — a rare timing edge (the very
+      // first paint) rather than something worth a fallback for, same as
+      // the attack effect above.
+      if (!fromEl || !toEl || !entry.event) return []
+      return [
+        {
+          cardId: entry.event.cardId,
+          side: entry.player,
+          fromRect: fromEl.getBoundingClientRect(),
+          toRect: toEl.getBoundingClientRect(),
+        },
+      ]
+    })
+    if (draws.length === 0) return
+
+    setDrawFx({ id: ++drawFxId.current, draws })
+    // Re-fires only when the log actually grows — see the length guard
+    // above for why that alone is enough to gate a fresh batch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.log.length])
 
   /* ------------------------------------------------------- turn hand-off */
 
@@ -882,6 +931,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // way setup's drag-and-drop needs yours (hence no foe equivalent of the
   // padded/hit-test helpers just below).
   const foeActiveSlotRef = useRef<HTMLDivElement>(null)
+  // Deck pile and hand tray anchors for the draw flight — see the
+  // log-diffing effect below, which is the only thing that reads these.
+  const youPileRef = useRef<HTMLDivElement>(null)
+  const foePileRef = useRef<HTMLDivElement>(null)
+  const youHandRef = useRef<HTMLDivElement>(null)
+  const foeHandRef = useRef<HTMLDivElement>(null)
 
   // A drop target padded a few px beyond its own box, so a drop that lands
   // just outside a slot's visible edge — an easy miss on a small touchscreen
@@ -1224,7 +1279,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           paddingBottom: `calc(${HAND_TRAY_CALC} / 2)`,
         }}
       >
-        <OpponentHand count={foe.hand.length} />
+        <div ref={foeHandRef} className="w-full">
+          <OpponentHand count={foe.hand.length} />
+        </div>
 
         {/* Nudged down via `transform`, same reasoning as YOU_ROW_LIFT below:
             a margin here would shrink this row's own share of the centred
@@ -1316,7 +1373,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
           <div className="flex flex-col items-center gap-1 pointer-events-auto">
             <DiscardPile cardIds={foe.discard} onOpen={() => setViewingDiscard('foe')} />
-            <PileCount count={foe.deck.length} />
+            <div ref={foePileRef}>
+              <PileCount count={foe.deck.length} />
+            </div>
           </div>
         </div>
 
@@ -1334,7 +1393,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             with" (level with) the deck it stands opposite. */}
         <div className="w-full flex items-start justify-between gap-2 px-0.5">
           <div className="flex flex-col items-center gap-1">
-            <PileCount count={you.deck.length} />
+            <div ref={youPileRef}>
+              <PileCount count={you.deck.length} />
+            </div>
             <DiscardPile cardIds={you.discard} onOpen={() => setViewingDiscard('you')} />
           </div>
 
@@ -1445,7 +1506,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               constant, structural left-of-centre offset, worse the wider the
               Altar's column got. Positioning it as its own absolute layer
               spanning the tray means that 50% is always 50% of the screen. */}
-          <div className="absolute inset-x-0 bottom-0">
+          <div ref={youHandRef} className="absolute inset-x-0 bottom-0">
             <PlayerHand
               hand={you.hand}
               setupActive={setupActive}
@@ -1576,6 +1637,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       </AnimatePresence>
 
       <AttackSortie trigger={sortie} onDone={landSortie} />
+
+      <DrawFx trigger={drawFx} onDone={() => setDrawFx(null)} />
 
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
