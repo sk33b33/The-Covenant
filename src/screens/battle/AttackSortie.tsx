@@ -13,8 +13,9 @@ import { Head, elementTheme, type ElementTheme } from './AttackFx'
  * slot, and the whole strike was something that happened *from* the card
  * rather than something the card did. This is the missing beat before that.
  * The Figure lifts clear of the mat, its element materialising around it,
- * carries itself across the arena left to right for the board to see, then
- * drops back into its slot — and the blow lands on that landing.
+ * sweeps in a curve through the middle of the screen — largest as it passes,
+ * where the mat draws its clash ring — and comes back down into its slot, and
+ * the blow lands on that landing.
  *
  * Nothing here touches the engine. The attack is dispatched by `onDone`, so
  * the board is untouched for the whole flight: no damage, no knockout, no
@@ -41,20 +42,31 @@ export interface AttackSortieTrigger {
  *  lifting off the mat. */
 const HOLD_S = 0.18
 
-const LIFT_S = 0.3
-const DRIFT_S = 0.26
-const SWEEP_S = 0.46
-const DROP_S = 0.36
-const FLIGHT_S = LIFT_S + DRIFT_S + SWEEP_S + DROP_S
+/** The four legs of the pass: out of the slot, in to the centre, back out
+ *  the far side, home. Two legs each side of the apex rather than one, so
+ *  the card curves through the middle instead of running to a point and
+ *  reversing off it. */
+const CLIMB_S = 0.34
+const REACH_S = 0.3
+const DEPART_S = 0.3
+const HOME_S = 0.34
+const FLIGHT_S = CLIMB_S + REACH_S + DEPART_S + HOME_S
 
-/** How much larger the card rides than it sits — enough to read as lifted
- *  toward the viewer, well short of the expanded viewer's own full size,
- *  which this is deliberately not. */
-const SHOW_SCALE = 1.32
+/** How much larger the card is at the apex than it sits — enough to read as
+ *  carried right past the viewer, well short of the expanded viewer's own
+ *  full size, which this is deliberately not. */
+const PEAK_SCALE = 1.45
 
-/** The furthest the card will travel to either side, before the viewport's
- *  own edges are allowed to cut it shorter. */
-const MAX_REACH = 112
+/** Where the two outer keyframes sit along the pass, as a fraction of the
+ *  whole. Height and size share it: at 42% of the way to the centre the card
+ *  is 42% of the way to its full size, which is what ties the growth to
+ *  nearness rather than letting it happen on the way up and then hold. */
+const MID = 0.42
+
+/** How far the arc bulges to either side of the straight line in, before the
+ *  viewport's own edges are allowed to cut it shorter. Enough to read as a
+ *  curve; much more and the pass stops being about the centre. */
+const MAX_SWING = 58
 
 /** Radius the element's sigils orbit at, as a multiple of the flying card's
  *  own half-width — outside its edges at the scale it flies at. */
@@ -67,8 +79,8 @@ const ORBIT = 1.5
  * ring — but "the middle of the screen" is not a distance, and both Actives
  * now sit close to it (they were each moved to line up with the deck and the
  * points chip). Measured on a 390×844 viewport your card had only 79px to
- * travel, and since it grows by a third on the way up, most of that read as
- * the card getting bigger rather than leaving the mat; on a shorter viewport
+ * travel, and since it grows by nearly half on the way in, most of that read
+ * as the card getting bigger rather than leaving the mat; on a shorter viewport
  * the gap closes further and the lift disappears entirely. So the target is a
  * floor, not a destination: the card always clears its slot by most of its own
  * height, and only flies further when the arena is actually further away.
@@ -120,7 +132,7 @@ export function AttackSortie({
 
     const centreX = slotRect.left + slotRect.width / 2
     const centreY = slotRect.top + slotRect.height / 2
-    const flownHalfWidth = (slotRect.width * SHOW_SCALE) / 2
+    const flownHalfWidth = (slotRect.width * PEAK_SCALE) / 2
 
     // Toward the middle of the screen, where the mat draws its own halfway
     // line and clash ring — but never less than MIN_LIFT, and always away
@@ -132,45 +144,65 @@ export function AttackSortie({
     const toArena = Math.abs(window.innerHeight / 2 - centreY)
     const rise = away * Math.max(slotRect.height * MIN_LIFT, toArena)
 
-    // Whichever side has less room decides the reach, so the pass stays
+    // Both Actives sit on the mat's own centreline, so this is usually near
+    // zero — but it is what actually puts the apex on the middle of the
+    // screen rather than merely above the slot, and it costs nothing when
+    // the slot is already centred.
+    const drift = window.innerWidth / 2 - centreX
+
+    // Whichever side has less room decides the bulge, so the arc stays
     // symmetric and the card never leaves the screen on a narrow one.
     const room = Math.min(centreX, window.innerWidth - centreX) - flownHalfWidth - 12
-    const reach = Math.max(0, Math.min(MAX_REACH, room))
+    const swing = Math.max(0, Math.min(MAX_SWING, room))
+
+    // The two outer keyframes: partway in, bulged to one side on the way up
+    // and the other on the way down. Same fraction of the journey, opposite
+    // sides of it, which is what makes the pass one curve through the middle
+    // instead of an out-and-back along its own path.
+    const midX = drift * MID
+    const midY = rise * MID
+    const midScale = 1 + (PEAK_SCALE - 1) * MID
 
     const transition: Transition = {
       duration: FLIGHT_S,
       delay: HOLD_S,
       times: [
         0,
-        LIFT_S / FLIGHT_S,
-        (LIFT_S + DRIFT_S) / FLIGHT_S,
-        (LIFT_S + DRIFT_S + SWEEP_S) / FLIGHT_S,
+        CLIMB_S / FLIGHT_S,
+        (CLIMB_S + REACH_S) / FLIGHT_S,
+        (CLIMB_S + REACH_S + DEPART_S) / FLIGHT_S,
         1,
       ],
-      // One easing per leg: off the mat, into the pass, across, then down —
-      // the last of them `easeIn` so the card falls into its slot rather than
-      // settling onto it.
+      // One easing per leg: off the mat, in to the centre, out the far side,
+      // then home — the last of them `easeIn` so the card falls into its slot
+      // rather than settling onto it, and the middle pair `easeInOut` so the
+      // pass slows through the apex where the card is largest.
       ease: ['easeOut', 'easeInOut', 'easeInOut', 'easeIn'],
     }
 
     return {
       halfWidth: flownHalfWidth,
       card: {
-        x: [0, 0, -reach, reach, 0],
-        y: [0, rise, rise, rise, 0],
-        scale: [1, SHOW_SCALE, SHOW_SCALE, SHOW_SCALE, 1],
-        // Banks into each leg of the pass and comes level for the drop, so
-        // the travel reads as carried rather than slid.
-        rotate: [0, 0, -6, 6, 0],
-        // Cast beneath the card and deepening as it climbs. Height off a
-        // surface is read from its shadow before anything else, and this is
-        // what separates a card that has risen off the mat from one that has
-        // merely been scaled up in place.
+        x: [0, midX - swing, drift, midX + swing, 0],
+        y: [0, midY, rise, midY, 0],
+        // Full size only at the apex. Growth is tied to how near the middle
+        // the card is, so it reads as coming toward the viewer on the way in
+        // and going away again on the way out, rather than stepping up to a
+        // held size the moment it leaves the mat.
+        scale: [1, midScale, PEAK_SCALE, midScale, 1],
+        // Rolls into the bulge each way and comes level over the centre, so
+        // the travel reads as banked through a curve rather than slid along
+        // a line.
+        rotate: [0, -7, 0, 7, 0],
+        // Cast beneath the card and deepest where it is highest and largest.
+        // Height off a surface is read from its shadow before anything else,
+        // and this is what separates a card carried over the mat from one
+        // merely scaled up in place.
         filter: [
           'drop-shadow(0 0px 0px rgba(0,0,0,0))',
-          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
-          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
-          'drop-shadow(0 14px 18px rgba(0,0,0,.62))',
+          'drop-shadow(0 11px 15px rgba(0,0,0,.52))',
+          'drop-shadow(0 19px 26px rgba(0,0,0,.66))',
+          'drop-shadow(0 11px 15px rgba(0,0,0,.52))',
           'drop-shadow(0 0px 0px rgba(0,0,0,0))',
         ],
         transition,
