@@ -59,13 +59,15 @@ const FLIGHT_S = 1.25
 const SAMPLES = 48
 
 /**
- * Where along its path the card is at a given point in time, 0-1.
+ * How far along its path the card is at a given point in time, 0-1.
  *
  * All of the velocity shaping lives here, in where the samples are taken,
  * rather than in the easing between them. Smoothstep leaves and arrives at a
  * standstill and is quickest across the middle, so the card accelerates out
  * of its slot, carries through the apex, and settles back rather than
- * stopping dead four times on the way.
+ * stopping dead four times on the way. It reads as a fraction of the path's
+ * length, not of its angle, which is what makes this the whole speed profile
+ * rather than one input to it.
  */
 const glide = (t: number) => t * t * (3 - 2 * t)
 
@@ -75,9 +77,11 @@ const glide = (t: number) => t * t * (3 - 2 * t)
 const PEAK_SCALE = 1.45
 
 /** How far the arc bulges to either side of the straight line in, before the
- *  viewport's own edges are allowed to cut it shorter. Enough to read as a
- *  curve; much more and the pass stops being about the centre. */
-const MAX_SWING = 58
+ *  viewport's own edges are allowed to cut it shorter. Because the path is
+ *  sampled by distance rather than by angle, widening this costs nothing in
+ *  smoothness — only room, which the viewport check below still has the last
+ *  word on. */
+const MAX_SWING = 82
 
 /** Degrees the card rolls into each side of the arc, level over the middle. */
 const BANK = 7
@@ -175,7 +179,7 @@ export function AttackSortie({
     const room = Math.min(centreX, window.innerWidth - centreX) - flownHalfWidth - 12
     const swing = Math.max(0, Math.min(MAX_SWING, room))
 
-    // The whole flight as one ellipse, read at `SAMPLES` points.
+    // The flight as one ellipse, `u` being how far round it the card is.
     //
     // `climb` rises from nothing at the slot to one at the middle of the
     // screen and back. Height, size and shadow all ride it, which is what
@@ -185,27 +189,62 @@ export function AttackSortie({
     // `cross` is the same cycle a quarter turn ahead, carrying the card out
     // to the left on the way up and the right on the way down. The quarter
     // turn is the whole point: in quadrature the two trace an ellipse, and a
-    // card going round one never reverses along either axis, so its speed
-    // stays near constant the whole way round. Matched phases instead —
-    // `sin(pi u)` against `sin(2 pi u)` — draw an S whose horizontal travel
-    // stops dead at each bulge to turn around, and that full stop twice a
-    // flight is what read as machinery rather than motion.
-    const path = Array.from({ length: SAMPLES }, (_, i) => {
-      const u = glide(i / (SAMPLES - 1))
+    // card going round one never reverses along either axis. Matched phases
+    // instead — `sin(pi u)` against `sin(2 pi u)` — draw an S whose
+    // horizontal travel stops dead at each bulge to turn around, and that
+    // full stop twice a flight read as machinery rather than motion.
+    const at = (u: number) => {
       const climb = (1 - Math.cos(2 * Math.PI * u)) / 2
       const cross = Math.sin(2 * Math.PI * u)
+      return { x: drift * climb - swing * cross, y: rise * climb, climb, cross }
+    }
+
+    // Equal steps *round* an ellipse are not equal steps *along* it, and the
+    // wider the arc gets relative to its height the less alike they are: a
+    // step near the top covers more ground than one at the side, so the card
+    // hurries across the middle and dawdles at the edges. Walking the ellipse
+    // once here to total up its length lets the flight be sampled by distance
+    // instead of by angle below, which holds the pace even at any width —
+    // and so leaves how wide the arc is a free choice rather than one traded
+    // against how smoothly it flies.
+    const WALK = 256
+    const marks = new Float64Array(WALK + 1)
+    let last = at(0)
+    for (let i = 1; i <= WALK; i++) {
+      const here = at(i / WALK)
+      marks[i] = marks[i - 1]! + Math.hypot(here.x - last.x, here.y - last.y)
+      last = here
+    }
+    const lap = marks[WALK]!
+
+    /** How far round the ellipse a given distance along it falls. */
+    const round = (distance: number) => {
+      let lo = 1
+      let hi = WALK
+      while (lo < hi) {
+        const probe = (lo + hi) >> 1
+        if (marks[probe]! < distance) lo = probe + 1
+        else hi = probe
+      }
+      const span = marks[lo]! - marks[lo - 1]!
+      const into = span > 0 ? (distance - marks[lo - 1]!) / span : 0
+      return (lo - 1 + into) / WALK
+    }
+
+    const path = Array.from({ length: SAMPLES }, (_, i) => {
+      const p = at(round(glide(i / (SAMPLES - 1)) * lap))
       return {
-        x: drift * climb - swing * cross,
-        y: rise * climb,
-        scale: 1 + (PEAK_SCALE - 1) * climb,
-        rotate: -BANK * cross,
+        x: p.x,
+        y: p.y,
+        scale: 1 + (PEAK_SCALE - 1) * p.climb,
+        rotate: -BANK * p.cross,
         // Cast beneath the card and deepest where it is highest and largest.
         // Height off a surface is read from its shadow before anything else,
         // and this is what separates a card carried over the mat from one
         // merely scaled up in place.
-        shadow: `drop-shadow(0 ${(SHADOW_Y * climb).toFixed(1)}px ${(
-          SHADOW_BLUR * climb
-        ).toFixed(1)}px rgba(0,0,0,${(SHADOW_ALPHA * climb).toFixed(3)}))`,
+        shadow: `drop-shadow(0 ${(SHADOW_Y * p.climb).toFixed(1)}px ${(
+          SHADOW_BLUR * p.climb
+        ).toFixed(1)}px rgba(0,0,0,${(SHADOW_ALPHA * p.climb).toFixed(3)}))`,
       }
     })
 
