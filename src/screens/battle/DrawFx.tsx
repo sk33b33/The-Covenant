@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { motion, type Transition } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { CardBack } from '@/art/CardBack'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
@@ -75,6 +75,14 @@ const RISE = 46
 
 const SHADOW = '0 10px 20px rgba(0,0,0,.55)'
 
+/** How much of the flight the card stays fully opaque for, as a fraction of
+ *  its own total duration — it fades only in the sliver left after this,
+ *  right as it hands off to the real card already sitting in the fan.
+ *  Spreading the fade across the whole final leg (as a plain two-stop
+ *  opacity curve would) reads as the card itself going translucent while
+ *  still clearly in flight, rather than a clean vanish at the handoff. */
+const FADE_FROM = 0.82
+
 export function DrawFx({ trigger, onDone }: { trigger: DrawFxTrigger | null; onDone: () => void }) {
   const id = trigger?.id
 
@@ -126,34 +134,39 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
     const total = reveal ? OWN_TOTAL_S : FOE_TOTAL_S
     const flyAt = FLY_S / total
 
+    // Opacity rides its own independent time stops rather than the shared
+    // ones above — it needs to hold at 1 for most of the flight and only
+    // fall in the last sliver of it, which is a different shape from the
+    // motion's own keyframes regardless of how many of those there are.
+    const fadeOpacity = { duration: total, delay, ease: 'easeIn', times: [0, FADE_FROM, 1] }
+
     if (!reveal) {
-      const transition: Transition = { duration: total, delay, ease: 'easeOut', times: [0, flyAt, 1] }
       return {
         card: {
           x: [start.x, peak.x, end.x],
           y: [start.y, peak.y, end.y],
           scale: [start.scale, peak.scale, end.scale],
           opacity: [1, 1, 0],
-          transition,
+          transition: {
+            default: { duration: total, delay, ease: 'easeOut', times: [0, flyAt, 1] },
+            opacity: fadeOpacity,
+          },
         },
         flip: null,
       }
     }
 
     const holdAt = (FLY_S + HOLD_S) / total
-    const transition: Transition = {
-      duration: total,
-      delay,
-      ease: 'easeOut',
-      times: [0, flyAt, holdAt, 1],
-    }
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x],
         y: [start.y, peak.y, peak.y, end.y],
         scale: [start.scale, peak.scale, peak.scale, end.scale],
-        opacity: [1, 1, 1, 0],
-        transition,
+        opacity: [1, 1, 0],
+        transition: {
+          default: { duration: total, delay, ease: 'easeOut', times: [0, flyAt, holdAt, 1] },
+          opacity: fadeOpacity,
+        },
       },
       flip: {
         rotateY: [0, 0, 180, 180],
