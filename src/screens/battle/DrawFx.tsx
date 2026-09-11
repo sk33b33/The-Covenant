@@ -16,18 +16,17 @@ import type { PlayerId } from '@/engine/types'
  * impact plays over a hit the engine has already resolved, rather than a
  * flight the real update waits on.
  *
- * The flight itself is the sortie's sibling in spirit — a quick, physical lift
- * off the pile with a bit of arc and a shadow, not the sortie's own wide sweep
- * through the middle of the board. Draws happen far more often than attacks
- * (every turn, plus every draw/dig/search effect), so this has to read in a
- * fraction of the time: no orbiting sigils, no elemental theming, one motion
- * value driving position and one driving the reveal.
- *
- * Your own draw enlarges at the top of its arc and turns face-up before
- * dropping into your hand — you're meant to see what you drew. The
- * opponent's card takes the same flight, at the same pace, but never turns:
- * it goes straight from the pile into their hand still face-down, which is
- * what keeps a hidden hand hidden.
+ * The flight itself is the sortie's sibling in spirit — a physical lift with a
+ * shadow and no orbiting sigils or elemental theming, one motion value
+ * driving position and one driving the reveal — but only your own draw
+ * shares the sortie's destination too: it flies all the way to the true
+ * centre of the screen and holds there, face-up, long enough to actually be
+ * read, before dropping into your hand. The opponent's is the restrained
+ * one — a short lift off their pile and straight into their hand, still
+ * face-down the whole way, which is what keeps a hidden hand hidden. Both
+ * happen far more often than an attack does (every turn, plus every
+ * draw/dig/search effect), which is why only yours pays the sortie's own
+ * price in screen time.
  */
 
 export interface DrawFxTrigger {
@@ -53,14 +52,24 @@ export interface DrawFxCard {
  *  blur or two identical flights landing on top of each other. */
 const STAGGER_S = 0.11
 
-const FLY_S = 0.32
-/** Face-up only: how long the card holds at the top of its arc, turned, once
- *  the flight itself has arrived — the beat that actually shows you the card. */
-const HOLD_S = 0.26
-const DROP_S = 0.22
+/** The opponent's flight — never centred, never held, just a lift off the
+ *  pile and straight into their hand. */
+const FOE_FLY_S = 0.32
+const FOE_DROP_S = 0.22
+const FOE_TOTAL_S = FOE_FLY_S + FOE_DROP_S
 
-const OWN_TOTAL_S = FLY_S + HOLD_S + DROP_S
-const FOE_TOTAL_S = FLY_S + DROP_S
+// Your own trip is longer than the opponent's in every leg, not just the
+// hold: the peak it flies to and holds at is the true centre of the screen
+// now (see `peakX`/`peakY` below) rather than a point just above the pile,
+// so both getting there and coming back cover real distance.
+const REVEAL_FLY_S = 0.4
+/** How long the card holds at the centre of the screen, turned face-up —
+ *  the beat that actually shows you the card, long enough to actually read
+ *  it rather than glimpse it. */
+const REVEAL_HOLD_S = 0.65
+const REVEAL_DROP_S = 0.35
+
+const OWN_TOTAL_S = REVEAL_FLY_S + REVEAL_HOLD_S + REVEAL_DROP_S
 
 /** How much larger the opponent's card gets at the top of its arc — enough
  *  to read as lifted, well short of the sortie's own peak, since this never
@@ -121,13 +130,17 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
     const toCX = toRect.left + toRect.width / 2
     const toCY = toRect.top + toRect.height / 2
 
-    // Your pile sits below your hand's own row, close by, and the opponent's
-    // mirrors that above theirs — so the lift is toward the middle of the
-    // screen for both, same as the sortie's own "away from your own edge"
-    // rule, just over a much shorter hop.
+    // The opponent's card only ever lifts a little way off the pile, toward
+    // the middle of the screen, the same as the sortie's own "away from your
+    // own edge" rule — just over a much shorter hop, since it is never meant
+    // to be looked at closely. Yours is the opposite: it flies all the way
+    // to the true centre of the screen and holds there, the one place on the
+    // mat that isn't fighting the pile, the hand or a board Figure for your
+    // eye — the same reasoning the sortie's own clash uses, just at rest
+    // instead of at the peak of a sweep.
     const liftDir = side === 'you' ? -1 : 1
-    const peakX = fromCX + (toCX - fromCX) * 0.5
-    const peakY = fromCY + (toCY - fromCY) * 0.35 + liftDir * RISE
+    const peakX = reveal ? window.innerWidth / 2 : fromCX + (toCX - fromCX) * 0.5
+    const peakY = reveal ? window.innerHeight / 2 : fromCY + (toCY - fromCY) * 0.35 + liftDir * RISE
 
     const endScale = toRect.width / fromRect.width
 
@@ -137,7 +150,6 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
     const end = at(toCX, toCY, endScale)
 
     const total = reveal ? OWN_TOTAL_S : FOE_TOTAL_S
-    const flyAt = FLY_S / total
 
     // Opacity rides its own independent time stops rather than the shared
     // ones above — it needs to hold at 1 for most of the flight and only
@@ -146,6 +158,7 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
     const fadeOpacity = { duration: total, delay, ease: 'easeIn', times: [0, FADE_FROM, 1] }
 
     if (!reveal) {
+      const flyAt = FOE_FLY_S / total
       return {
         card: {
           x: [start.x, peak.x, end.x],
@@ -161,7 +174,8 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
       }
     }
 
-    const holdAt = (FLY_S + HOLD_S) / total
+    const flyAt = REVEAL_FLY_S / total
+    const holdAt = (REVEAL_FLY_S + REVEAL_HOLD_S) / total
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x],
