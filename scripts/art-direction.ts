@@ -106,6 +106,16 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A single vast tree at the centre of the frame, trunk fluted like a column, twelve kinds of fruit hanging together on the same branches, leaves catching light like beaten metal. Roots drink from a clear river at its base. Nothing else competes for attention.',
   },
+  job: {
+    shape: 'portrait',
+    scene:
+      'A man seated on a heap of ashes outside a ruined homestead, potsherd in one hand for scraping sores, robe torn and head shaved in mourning. Three distant figures wait at the edge of the frame, not yet approaching. His face holds grief without collapse.',
+  },
+  hannah: {
+    shape: 'portrait',
+    scene:
+      'A woman kneeling alone at the entrance of a hillside shrine at dusk, lips moving without sound, hands pressed together, an empty small tunic folded over one arm. No child yet in the frame — only the shape of a prayer being made.',
+  },
 
   /* ---------------------------------------------------------------- Earth */
 
@@ -164,6 +174,16 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'An unfinished stepped tower of fired brick and black bitumen rising into low cloud, ramps and scaffolding crawling with tiny figures, baskets and hods abandoned mid-course. Ambitious, ugly, enormous. The top disappears rather than arrives.',
   },
+  rebekah: {
+    shape: 'portrait',
+    scene:
+      'A young woman at a stone well at evening, water jar braced on one shoulder and a second jar tipped mid-pour into a stone trough for waiting camels. Veil loose, sleeve pushed back, an unhesitating look toward a stranger just arrived at the edge of frame.',
+  },
+  rachel: {
+    shape: 'portrait',
+    scene:
+      "A shepherdess at a well among grazing flocks, crook in hand, hair windblown under a plain headscarf. She is watching someone roll a heavy stone from the well's mouth on her behalf, expression caught between surprise and recognition.",
+  },
 
   /* ---------------------------------------------------------------- Water */
 
@@ -217,6 +237,16 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A full rainbow standing over a drowned valley where the water has just begun to fall, its arc set in clearing storm cloud like a war bow hung up and unstrung. Wet mud, the first green, an altar of rough stones smoking on high ground.',
   },
+  miriam: {
+    shape: 'portrait',
+    scene:
+      'A woman on a sandy shore leading a line of dancing women, tambourine raised overhead mid-strike, hem soaked from the sea. Behind her the water has just gone still after standing in walls; ahead, wreckage rides the tideline.',
+  },
+  'the-red-sea': {
+    shape: 'scene',
+    scene:
+      'Two sheer cliffs of dark green seawater standing apart on either side of a wide corridor of wet, rutted seabed, spray still hanging in the air above the walls, fish visible suspended inside the water itself. No shore in the frame — only the corridor.',
+  },
 
   /* ----------------------------------------------------------------- Fire */
 
@@ -254,6 +284,26 @@ export const ART_DIRECTION: Record<string, Direction> = {
     shape: 'scene',
     scene:
       'Fire falling from above onto a laden altar and taking the whole offering at once — wood, stone and water in the trench going up together in a white-hot column. Onlookers thrown flat at the edges of frame.',
+  },
+  elijah: {
+    shape: 'portrait',
+    scene:
+      'A gaunt, wind-scoured prophet in a rough hair mantle standing on open ground as a chariot of fire and horses of fire descend around him in a whirlwind of flame and dust. His mantle is already slipping from one shoulder, about to fall.',
+  },
+  'nadab-and-abihu': {
+    shape: 'scene',
+    scene:
+      'Two priests in linen robes at a smoking altar, censers just lifted, engulfed from above in a sudden sheet of white fire that leaves the altar itself untouched. Their sandals and censers survive on the ground; nothing else does.',
+  },
+  'the-refiners-fire': {
+    shape: 'object',
+    scene:
+      'A small clay crucible glowing white over coals, molten silver pooled inside it catching a perfect, motionless reflection of the metalworker leaning close above — watching for the instant the surface clears, lit like a museum piece against total dark.',
+  },
+  phinehas: {
+    shape: 'portrait',
+    scene:
+      'A young priest standing at the entrance of a striped tent with a bronze-tipped spear levelled and still smoking at its point, chest heaving, camp fires and startled onlookers blurred in the background behind him. Zeal rather than anger in the set of his jaw.',
   },
 
   /* --------------------------------------------------------------- Spirit */
@@ -298,6 +348,21 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A stone stair rising from a bare hillside straight into a gate of light standing open in the sky, its steps worn as though long used. A stone pillow and a poured oil jar at the base. The gate is the brightest thing in the frame.',
   },
+  gabriel: {
+    shape: 'portrait',
+    scene:
+      'A tall, still figure in plain pale robes standing just inside a low doorway, wings folded close rather than spread, hands open and empty at his sides. No halo, no ornament — only an unnatural stillness and a straight, unblinking gaze.',
+  },
+  'the-four-living-creatures': {
+    shape: 'creature',
+    scene:
+      'Four winged beings ranked close together around a wheel of burning coals, each turned to show a different face — man, lion, ox, eagle — where the others overlap behind it. Eyes set into the rims of the wheels beneath them. Overwhelming, orderly, not grotesque.',
+  },
+  'balaams-donkey': {
+    shape: 'creature',
+    scene:
+      'A grey pack-donkey on a narrow terraced path between two vineyard walls, forelegs braced and haunches down, ears flat, refusing to go another step. Its rider is thrown forward against its neck. The path ahead is empty as far as the eye can tell.',
+  },
 
   /* --------------------------------------------------------------- Shadow */
 
@@ -335,6 +400,21 @@ export const ART_DIRECTION: Record<string, Direction> = {
     shape: 'scene',
     scene:
       'A narrow ravine at dusk with sheer walls closing overhead, the path ahead unreadable, one thin band of sky far above. Shapes at the edges that may or may not be there. Frightening, but a valley you pass through.',
+  },
+  lamech: {
+    shape: 'portrait',
+    scene:
+      'A broad-shouldered man addressing two wives inside a dim tent, a bloodied blade still in one hand and his other arm raised mid-boast, firelight throwing his shadow huge across the tent wall behind him. Pride, not remorse, in the posture.',
+  },
+  goliath: {
+    shape: 'portrait',
+    scene:
+      'A helmeted giant in bronze scale armour standing head and shoulders over the ridgeline of a dry valley, a spear like a weaver\'s beam braced against one shoulder, small figures of two armies frozen far below on either slope. Contemptuous, unhurried.',
+  },
+  'judas-iscariot': {
+    shape: 'portrait',
+    scene:
+      'A man at the edge of firelit torchlight in a garden of old olive trees, coin-purse cinched at his belt, leaning in to kiss a cheek just out of frame. His own face is turned half away from the viewer, already regretting the motion.',
   },
 
   /* ------------------------------------------------------------ Covenants */

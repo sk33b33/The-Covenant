@@ -161,3 +161,38 @@ describe('pull rates', () => {
     expect(missed, 'every reachable card should be obtainable').toEqual([])
   })
 })
+
+describe('completing a set', () => {
+  // The property a player actually cares about: no one pack is a shortcut
+  // past the other two. `poolFor` is private to packs.ts, so this rebuilds
+  // the same pool a pack can draw from directly off its own exclusives list,
+  // the way `openPack` does — a change to that logic would have to break
+  // this test too, not just quietly reopen the shortcut.
+  function poolIdsFor(packId: string): Set<string> {
+    const pack = ALL_PACKS.find((p) => p.id === packId)!
+    const otherExclusives = new Set(
+      ALL_PACKS.filter((p) => p.set === pack.set && p.id !== pack.id).flatMap((p) => p.exclusives),
+    )
+    return new Set(CARDS.filter((c) => c.set === pack.set && !otherExclusives.has(c.id)).map((c) => c.id))
+  }
+
+  for (const set of new Set(ALL_PACKS.map((p) => p.set))) {
+    it(`needs every pack in ${set} to complete the set`, () => {
+      const packs = ALL_PACKS.filter((p) => p.set === set)
+      const whole = new Set(CARDS.filter((c) => c.set === set).map((c) => c.id))
+
+      // No single pack's pool is the whole set — there is always at least
+      // one card locked behind one of the others.
+      for (const pack of packs) {
+        const pool = poolIdsFor(pack.id)
+        const missing = [...whole].filter((id) => !pool.has(id))
+        expect(missing.length, `${pack.id} alone should not cover ${set}`).toBeGreaterThan(0)
+      }
+
+      // But the three pools together leave nothing unreachable.
+      const union = new Set(packs.flatMap((p) => [...poolIdsFor(p.id)]))
+      const orphaned = [...whole].filter((id) => !union.has(id))
+      expect(orphaned, 'every card should be reachable from some pack').toEqual([])
+    })
+  }
+})
