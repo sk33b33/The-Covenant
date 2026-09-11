@@ -13,11 +13,13 @@ import {
 } from '@/art/icons'
 import { Badge, Button, Chip, Panel, Progress } from '@/components/ui'
 import { GENESIS } from '@/data/sets'
+import { CHAPTERS } from '@/data/story/genesis'
 import { ECONOMY } from '@/game/config'
 import { formatCountdown, resolveSlots } from '@/game/packTimer'
 import { useEconomy } from '@/store/economy'
 import { useNav } from '@/store/nav'
 import { levelProgress, useProfile } from '@/store/profile'
+import { useStory } from '@/store/story'
 import { useNow } from '@/hooks/useNow'
 import { cx } from '@/lib/cx'
 
@@ -45,6 +47,16 @@ export function Home() {
   const slots = resolveSlots(economy, now)
   const packs = GENESIS.packs
   const [active, setActive] = useState(1)
+
+  // Named for whichever chapter the player actually has left to finish, not
+  // hardcoded to the first one — that string was still "Genesis" the moment
+  // a second chapter unlocked. Falls back to the last unlocked chapter once
+  // everything in reach is cleared.
+  const cleared = useStory((s) => s.cleared)
+  const unlockedChapters = CHAPTERS.filter((c) => !c.locked)
+  const currentChapter =
+    unlockedChapters.find((c) => c.encounters.some((e) => !cleared.includes(e.id))) ??
+    unlockedChapters[unlockedChapters.length - 1]
 
   return (
     <div className="scroll-y h-full">
@@ -151,7 +163,7 @@ export function Home() {
           <Tile
             icon={<ScrollIcon size={30} />}
             label="Story"
-            sub="Genesis"
+            sub={currentChapter?.name ?? 'Genesis'}
             tint="var(--energy-light)"
             onClick={() => go({ name: 'story-map' })}
           />

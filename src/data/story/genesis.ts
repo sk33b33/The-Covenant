@@ -4,17 +4,25 @@ import type { EnergyType } from '@/game/types'
 import type { PlayerId } from '@/engine/types'
 
 /**
- * Chapter One: Genesis.
+ * Story mode, chapter by chapter.
  *
- * Five encounters, in order, each with a hand-built opposing deck rather than a
- * generated one — a scripted opponent is the only place in the game where the
- * deck is part of the writing. The Serpent plays disruption because that is
- * what the Serpent does; the Deluge plays a single overwhelming Anointed
- * because the flood is not a fair fight.
+ * Every chapter's five encounters, in order, each with a hand-built opposing
+ * deck rather than a generated one — a scripted opponent is the only place in
+ * the game where the deck is part of the writing. The Serpent plays
+ * disruption because that is what the Serpent does; the Deluge plays a single
+ * overwhelming Anointed because the flood is not a fair fight; the Darkness
+ * over Egypt plays nothing but Shadow because that is the one thing it has.
  *
  * Difficulty climbs through the AI's `mistakeRate` rather than by handing the
- * opponent extra resources. The first encounter is meant to be won with a
- * starter deck; the last is meant to take a real one.
+ * opponent extra resources, the same curve repeated once per chapter: the
+ * first encounter is meant to be won with a starter deck, the last is meant
+ * to take a real one. Card power climbs alongside it within each chapter —
+ * commons and uncommons early, rares and the odd Anointed by the close — so
+ * the mistake rate is not carrying the whole difficulty curve by itself.
+ *
+ * This file is still named for the first chapter it shipped with, `genesis`,
+ * rather than for what it holds now — worth knowing if `exodus` and its
+ * successors ever earn a file of their own.
  */
 
 export interface Encounter {
@@ -190,6 +198,142 @@ const TRIAL_DECK = {
   energy: ['light', 'spirit'] as EnergyType[],
 }
 
+/* -------------------------------------------------------------- Exodus decks */
+
+const PHARAOH_DECK = {
+  cards: [
+    // Nimrod stands in for Pharaoh's own might — no Pharaoh card exists, and
+    // "a mighty one" is exactly what the part calls for.
+    'nimrod',
+    'nimrod',
+    'the-outer-darkness',
+    'the-outer-darkness',
+    'the-shadow-of-death',
+    'the-shadow-of-death',
+    'the-curse',
+    'the-curse',
+    'esau',
+    'esau',
+    'laban',
+    'terah',
+    'lot',
+    'babel',
+    'the-scattering',
+    'the-famine',
+    'the-staff',
+    'the-staff',
+    'the-well-of-beersheba',
+    'the-well-of-beersheba',
+  ],
+  energy: ['earth', 'shadow'] as EnergyType[],
+}
+
+// Mono-Shadow on purpose: a darkness that can be felt has nothing else in it.
+const DARKNESS_DECK = {
+  cards: [
+    'the-outer-darkness',
+    'the-outer-darkness',
+    'the-shadow-of-death',
+    'the-shadow-of-death',
+    'the-curse',
+    'the-curse',
+    'the-tempter',
+    'the-tempter',
+    'the-nephilim',
+    'the-nephilim',
+    'babel',
+    'babel',
+    'lamech',
+    'lamech',
+    'the-famine',
+    'the-scattering',
+    'the-staff',
+    'the-staff',
+    'the-well-of-beersheba',
+    'the-well-of-beersheba',
+  ],
+  energy: ['shadow'] as EnergyType[],
+}
+
+// Mono-Water too: nothing on either side of the corridor but sea.
+const RED_SEA_DECK = {
+  cards: [
+    'the-red-sea',
+    'the-red-sea',
+    'miriam',
+    'miriam',
+    'leviathan',
+    'leviathan',
+    'the-firmament',
+    'the-firmament',
+    'the-dove',
+    'the-dove',
+    'the-raven',
+    'the-raven',
+    'shem',
+    'japheth',
+    'ham',
+    'the-well-of-beersheba',
+    'the-well-of-beersheba',
+    'the-censer',
+    'the-ark',
+    'the-sabbath',
+  ],
+  energy: ['water'] as EnergyType[],
+}
+
+const GOLDEN_CALF_DECK = {
+  cards: [
+    'nadab-and-abihu',
+    'nadab-and-abihu',
+    'the-serpents-curse',
+    'the-serpents-curse',
+    'the-altar-fire',
+    'the-altar-fire',
+    'babel',
+    'babel',
+    'the-outer-darkness',
+    'the-outer-darkness',
+    'the-tempter',
+    'the-curse',
+    'the-curse',
+    'the-scattering',
+    'the-famine',
+    'the-staff',
+    'the-staff',
+    'the-well-of-beersheba',
+    'the-well-of-beersheba',
+    'the-signet-ring',
+  ],
+  energy: ['fire', 'shadow'] as EnergyType[],
+}
+
+const GLORY_DECK = {
+  cards: [
+    'archangel-michael',
+    'archangel-michael',
+    'the-cherubim',
+    'the-cherubim',
+    'the-angel-of-the-lord',
+    'the-angel-of-the-lord',
+    'the-three-visitors',
+    'the-three-visitors',
+    'gabriel',
+    'gabriel',
+    'the-breath-of-life',
+    'the-breath-of-life',
+    'the-ladder-host',
+    'enoch',
+    'the-binding',
+    'the-binding',
+    'jacobs-blessing',
+    'the-sabbath',
+    'the-ark',
+    'the-signet-ring',
+  ],
+  energy: ['light', 'spirit'] as EnergyType[],
+}
+
 /* ------------------------------------------------------------- encounters */
 
 const GENESIS_ENCOUNTERS: Encounter[] = [
@@ -306,6 +450,122 @@ const GENESIS_ENCOUNTERS: Encounter[] = [
   },
 ]
 
+const EXODUS_ENCOUNTERS: Encounter[] = [
+  {
+    id: 'bricks-without-straw',
+    chapter: 'exodus',
+    index: 1,
+    title: 'Bricks Without Straw',
+    opponent: 'Pharaoh',
+    verse: 'Exodus 5:7',
+    theme: 'earth',
+    intro: [
+      'The quota has not changed. The straw has stopped coming.',
+      'A taskmaster stands over the brickfield, counting.',
+      '"Who is the Lord, that I should listen to his voice?"',
+    ],
+    victory: [
+      'The bricks stack unevenly, but they stack. The count is made, somehow.',
+      'A voice in the brickfields says a word no one there has heard before: freedom.',
+    ],
+    defeat: 'The quota stands. Gather the stubble yourselves and go on.',
+    difficulty: DIFFICULTY.gentle,
+    deck: PHARAOH_DECK,
+    reward: { cardId: 'nimrod', talents: 140 },
+  },
+  {
+    id: 'plague-of-darkness',
+    chapter: 'exodus',
+    index: 2,
+    title: 'The Plague of Darkness',
+    opponent: 'The Darkness over Egypt',
+    verse: 'Exodus 10:22',
+    theme: 'shadow',
+    intro: [
+      'Moses stretches his hand toward the sky, and the sky answers.',
+      'A darkness that can be felt settles over the land, three days deep.',
+      'No one rises from where they are. No one can see their brother.',
+    ],
+    victory: [
+      'Light finds a seam in it and does not stop finding one.',
+      'In Goshen, where the Israelites are, there is light where they live.',
+    ],
+    defeat: 'The dark holds. Wait for a light that does not come from you.',
+    difficulty: DIFFICULTY.gentle,
+    deck: DARKNESS_DECK,
+    reward: { cardId: 'lamech', talents: 170, grace: 2 },
+  },
+  {
+    id: 'the-red-sea',
+    chapter: 'exodus',
+    index: 3,
+    title: 'The Red Sea',
+    opponent: 'The Red Sea',
+    verse: 'Exodus 14:21',
+    theme: 'water',
+    intro: [
+      'The sea in front, chariots behind, and nowhere that is not water or Egypt.',
+      '"Stand firm, and see the salvation of the Lord."',
+      'A wind out of the east begins, and does not stop all night.',
+    ],
+    victory: [
+      'A wall on the right hand and a wall on the left, and dry ground between them.',
+      'By morning the sea is only a sea again, and it has taken the horses and the riders.',
+    ],
+    defeat: 'The water holds its shape a moment longer than you needed it to.',
+    difficulty: DIFFICULTY.steady,
+    deck: RED_SEA_DECK,
+    reward: { cardId: 'miriam', talents: 210, grace: 2 },
+  },
+  {
+    id: 'the-golden-calf',
+    chapter: 'exodus',
+    index: 4,
+    title: 'The Golden Calf',
+    opponent: 'The Golden Calf',
+    verse: 'Exodus 32:4',
+    theme: 'fire',
+    intro: [
+      'Forty days is a long time to wait for a voice you cannot see.',
+      'The gold comes off in earrings, and goes into the fire, and comes out an answer.',
+      '"These are your gods, O Israel."',
+    ],
+    victory: [
+      'The calf is ground to powder and scattered on the water. The camp drinks it down.',
+      'Moses comes down the mountain, and the tablets in his hands do not survive what he sees.',
+    ],
+    defeat: 'The dance goes on around the fire. Someone has to come down the mountain.',
+    difficulty: DIFFICULTY.steady,
+    deck: GOLDEN_CALF_DECK,
+    reward: { cardId: 'nadab-and-abihu', talents: 260, grace: 3 },
+  },
+  {
+    id: 'face-to-face',
+    chapter: 'exodus',
+    index: 5,
+    title: 'Face to Face',
+    opponent: 'The Glory of the Lord',
+    verse: 'Exodus 33:11',
+    theme: 'light',
+    intro: [
+      '"Please show me your glory."',
+      '"I will make all my goodness pass before you — but you cannot see my face and live."',
+      'A hand covers him in the cleft of the rock, until the glory has passed by.',
+    ],
+    victory: [
+      'The hand is lifted. What is left is only the back of it, going away — enough, and almost more than a man can carry.',
+      'His face is still shining when he comes down, and he does not know it, and he has to wear a veil so no one has to look away.',
+    ],
+    defeat: 'The rock holds you a moment longer. The glory has not finished passing.',
+    difficulty: DIFFICULTY.hard,
+    deck: GLORY_DECK,
+    // The chapter's own capstone, same as Melchizedek closing Genesis: not a
+    // card from the fight itself, but what the whole chapter was earning
+    // toward. You do not meet Moses until you have walked the road with him.
+    reward: { cardId: 'moses', talents: 380, grace: 6 },
+  },
+]
+
 /* ---------------------------------------------------------------- chapters */
 
 export const CHAPTERS: Chapter[] = [
@@ -321,9 +581,9 @@ export const CHAPTERS: Chapter[] = [
     id: 'exodus',
     name: 'Exodus',
     subtitle: 'Let my people go',
-    locked: true,
+    locked: false,
     theme: 'fire',
-    encounters: [],
+    encounters: EXODUS_ENCOUNTERS,
   },
   {
     id: 'kings',

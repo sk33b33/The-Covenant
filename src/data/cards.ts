@@ -1,7 +1,7 @@
 import type { Card, FigureCard } from '@/game/types'
 
 /**
- * The Genesis set — 90 cards.
+ * The Genesis set — 91 cards.
  *
  * Design notes that the numbers encode:
  *
@@ -1021,6 +1021,36 @@ const figures: FigureCard[] = [
     retreat: 1,
     verse: 'Numbers 25:11',
     attacks: [{ name: 'Turn Away Wrath', cost: ['fire'], damage: 30 }],
+  },
+  {
+    id: 'moses',
+    name: 'Moses',
+    kind: 'figure',
+    set: 'genesis',
+    rarity: 'anointed',
+    anointed: true,
+    type: 'fire',
+    stage: 'basic',
+    hp: 160,
+    retreat: 2,
+    verse: 'Exodus 3:14',
+    flavor: 'And the Lord knew him face to face.',
+    attacks: [
+      {
+        name: 'Let My People Go',
+        cost: ['fire'],
+        damage: 20,
+        text: 'Search your deck for a Basic Figure and put it onto your Bench.',
+        effect: 'search-basic-to-bench',
+      },
+      {
+        name: 'Stood in the Breach',
+        cost: ['fire', 'fire', 'fire'],
+        damage: 150,
+        text: 'This Figure cannot be knocked out next turn.',
+        effect: 'endure',
+      },
+    ],
   },
 
   /* -------------------------------------------------------- Spirit: heaven's host */

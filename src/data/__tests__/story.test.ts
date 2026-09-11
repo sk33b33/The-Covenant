@@ -95,11 +95,12 @@ describe('story structure', () => {
     }
   })
 
-  it('escalates rewards through the chapter', () => {
-    const genesis = CHAPTERS.find((c) => c.id === 'genesis')!
-    const talents = genesis.encounters.map((e) => e.reward.talents)
-    for (let i = 1; i < talents.length; i++) {
-      expect(talents[i]!, `encounter ${i + 1}`).toBeGreaterThan(talents[i - 1]!)
+  it('escalates rewards through each chapter', () => {
+    for (const chapter of CHAPTERS) {
+      const talents = chapter.encounters.map((e) => e.reward.talents)
+      for (let i = 1; i < talents.length; i++) {
+        expect(talents[i]!, `${chapter.id} encounter ${i + 1}`).toBeGreaterThan(talents[i - 1]!)
+      }
     }
   })
 
