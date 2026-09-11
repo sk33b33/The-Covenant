@@ -12,8 +12,8 @@ import type { Card, FigureCard } from '@/game/types'
  *   a trade, 3 for a swing that ends a Figure.
  * - Ascension is either a Calling (God renames the same person) or a Lineage
  *   (the promise passes a generation). Both use `ascendsFrom`.
- * - Five cards have finished artwork; the rest render a typographic placeholder
- *   in the same frame until art is dropped into public/art/cards. See docs/ART.md.
+ * - No card has artwork yet. Every one renders the typographic placeholder in
+ *   the same frame until art is dropped into public/art/cards. See docs/ART.md.
  */
 
 const figures: FigureCard[] = [

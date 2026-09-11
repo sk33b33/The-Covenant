@@ -50,8 +50,11 @@ export type Route =
   | { name: 'battle'; encounterId?: string; deckId?: string; at: number }
   /** Wherever a real screen doesn't exist yet. `icon` picks from a small fixed
    *  set in App.tsx rather than carrying a React node, so a route stays a
-   *  plain, serialisable value like every other one here. */
-  | { name: 'coming-soon'; title: string; icon: ComingSoonIcon }
+   *  plain, serialisable value like every other one here. `note` says what
+   *  this particular screen would do and why it cannot yet — the Social tab
+   *  already names its unbuilt parts that way, and one shared line about "a
+   *  later milestone" told whoever tapped nothing they didn't know. */
+  | { name: 'coming-soon'; title: string; icon: ComingSoonIcon; note: string }
 
 export type ComingSoonIcon = 'mail' | 'gifts'
 

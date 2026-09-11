@@ -239,7 +239,7 @@ function Screen({ route }: { route: Route }) {
           withBack
           icon={COMING_SOON_ICON[route.icon]}
           title={route.title}
-          note="This screen is part of a later milestone."
+          note={route.note}
         />
       )
 

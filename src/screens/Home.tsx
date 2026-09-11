@@ -227,13 +227,32 @@ function Header() {
 
         {/* pr-1 keeps the badge inside the viewport. */}
         <div className="flex gap-1.5 pr-1">
-          <IconButton label="Mail" onClick={() => go({ name: 'coming-soon', title: 'Mail', icon: 'mail' })}>
+          <IconButton
+            label="Mail"
+            onClick={() =>
+              go({
+                name: 'coming-soon',
+                title: 'Mail',
+                icon: 'mail',
+                note: 'Where rewards and news from the game would arrive. Nothing sends mail yet, so there is nothing here to read.',
+              })
+            }
+          >
             <MailIcon size={19} />
           </IconButton>
+          {/* No badge. It is the red unread dot, and there is no gift system
+              behind this to have produced one — a count that can only ever be
+              false is worse than no count. */}
           <IconButton
             label="Gifts"
-            badge
-            onClick={() => go({ name: 'coming-soon', title: 'Gifts', icon: 'gifts' })}
+            onClick={() =>
+              go({
+                name: 'coming-soon',
+                title: 'Gifts',
+                icon: 'gifts',
+                note: 'Where packs and Grace sent by other players would land. Sending anything needs friends and a server, neither of which this build has.',
+              })
+            }
           >
             <GiftIcon size={19} />
           </IconButton>
@@ -255,12 +274,10 @@ function Header() {
 function IconButton({
   children,
   label,
-  badge,
   onClick,
 }: {
   children: React.ReactNode
   label: string
-  badge?: boolean
   onClick?: () => void
 }) {
   return (
@@ -270,7 +287,6 @@ function IconButton({
       aria-label={label}
     >
       {children}
-      {badge && <Badge />}
     </button>
   )
 }
