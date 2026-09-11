@@ -122,7 +122,7 @@ going second buys tempo.
 
 | Phase | What happens |
 | --- | --- |
-| **Draw** | Draw 1. Drawing from an empty deck **loses the match**. |
+| **Draw** | Draw 1. An empty deck simply draws nothing — running out does not lose the match. |
 | **Altar** | Gain 1 energy of a declared type. Skipped for the first player on turn 1. |
 | **Main** | Play Figures to the Bench, attach **⚙ 1** energy, Ascend, play Relics freely, play **⚙ 1** Covenant, retreat **⚙ once** by paying its cost. |
 | **Battle** | Declare one attack from the Active Figure. Apply weakness. Resolve knockouts. |
@@ -150,8 +150,11 @@ then promotes one from their Bench into the Active spot.
 ### Winning
 
 - Reach **⚙ 3 points**.
-- Your opponent must draw from an empty deck.
 - Your opponent has no Figure to promote into the Active spot.
+
+Running out of cards is not a loss. A player with an empty deck stops drawing
+and plays on with what they hold — the match is still decided on points, or on
+the match clock if neither side can close it out.
 
 ---
 

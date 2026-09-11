@@ -117,7 +117,7 @@ describe('a complete match', () => {
 
     // Anything outside the modelled set means a match ended by accident.
     for (const reason of reasons) {
-      expect(['points', 'deckout', 'no-figures']).toContain(reason)
+      expect(['points', 'no-figures']).toContain(reason)
     }
   })
 

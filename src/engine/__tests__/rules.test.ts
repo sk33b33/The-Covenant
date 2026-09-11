@@ -720,15 +720,34 @@ describe('retreat', () => {
 })
 
 describe('deck-out', () => {
-  it('loses the match when a player must draw from an empty deck', () => {
+  it('plays on when a player must draw from an empty deck', () => {
     let state = started({ forceFirst: 'you' })
     state.players.foe.deck = []
+    const held = state.players.foe.hand.length
 
     state = reduce(state, { type: 'END_TURN' })
 
-    expect(state.phase).toBe('ended')
-    expect(state.winner).toBe('you')
-    expect(state.endReason).toBe('deckout')
+    // The turn passes to a player who cannot draw, and that is all it does:
+    // no draw, no loss. The match is won on points, not on running dry.
+    expect(state.current).toBe('foe')
+    expect(state.phase).toBe('main')
+    expect(state.winner).toBeNull()
+    expect(state.players.foe.hand.length).toBe(held)
+  })
+
+  it('still lets an empty-decked player take the points and win', () => {
+    let state = started({ forceFirst: 'you' })
+    state.players.foe.deck = []
+    state.players.foe.points = RULES.POINTS_TO_WIN - 1
+
+    // Round-trip the turn so foe draws on nothing twice over, then hand it
+    // the last point it needs.
+    state = reduce(state, { type: 'END_TURN' })
+    state = reduce(state, { type: 'END_TURN' })
+    expect(state.phase).toBe('main')
+
+    state = reduce(state, { type: 'CONCEDE', player: 'you' })
+    expect(state.winner).toBe('foe')
   })
 })
 

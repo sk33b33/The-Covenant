@@ -205,9 +205,22 @@ export function damageFigure(
   }
 }
 
-/** Draws one card, or loses the match if the deck is empty. A hand already
- *  at RULES.MAX_HAND simply doesn't draw — the card stays in the deck rather
- *  than being drawn only to be discarded straight back out. */
+/**
+ * Draws one card. A hand already at RULES.MAX_HAND simply doesn't draw — the
+ * card stays in the deck rather than being drawn only to be discarded
+ * straight back out — and nor does an empty deck.
+ *
+ * Running out of cards used to hand the match to the opponent on the spot.
+ * It no longer ends anything: a match is won by taking RULES.POINTS_TO_WIN
+ * points, and a player who has stopped drawing is already playing a losing
+ * game without being handed the loss outright. They keep whatever is on the
+ * board and in hand, and can still take the points they need with it.
+ *
+ * Nothing can stall on this. The board still empties — a side with no
+ * Figures left to send out loses by `no-figures` — and the match clock is
+ * still overhead, so a game neither side can close out on points is decided
+ * on points by `timeout` rather than running forever.
+ */
 function draw(state: MatchState, playerId: PlayerId, count = 1) {
   const player = state.players[playerId]
 
@@ -215,10 +228,7 @@ function draw(state: MatchState, playerId: PlayerId, count = 1) {
     if (player.hand.length >= RULES.MAX_HAND) return
 
     const card = player.deck.shift()
-    if (card === undefined) {
-      endMatch(state, OPPONENT[playerId], 'deckout')
-      return
-    }
+    if (card === undefined) return
     player.hand.push(card)
   }
 }
@@ -242,7 +252,6 @@ function beginTurn(state: MatchState) {
   }
 
   draw(state, playerId)
-  if (state.phase === 'ended') return
 
   // The turn-1 handicap: the player who went first gets no energy and cannot
   // attack, trading tempo for the first Ascension on round two. `nextAltar`

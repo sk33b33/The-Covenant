@@ -311,7 +311,6 @@ function Score({ label, value, highlight }: { label: string; value: number; high
 
 const REASON_LABEL: Record<NonNullable<MatchState['endReason']>, string> = {
   points: `${RULES.POINTS_TO_WIN} points taken`,
-  deckout: 'A deck ran out',
   'no-figures': 'No Figures left to send out',
   concede: 'Conceded',
   timeout: 'Time ran out',

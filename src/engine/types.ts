@@ -131,7 +131,7 @@ export type Phase =
   | 'promote'
   | 'ended'
 
-export type EndReason = 'points' | 'deckout' | 'no-figures' | 'concede' | 'timeout'
+export type EndReason = 'points' | 'no-figures' | 'concede' | 'timeout'
 
 export interface LogEntry {
   turn: number
