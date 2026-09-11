@@ -9,7 +9,7 @@ import { effectIsImplemented } from '../effects'
 import { DIFFICULTY, chooseAction } from '../ai'
 import { createRng } from '@/game/rng'
 import { ALL_MIRACLES, miracleFor } from '@/game/miracles'
-import { createMatch, figureCard, resetUids, type MatchSetup } from '../state'
+import { createMatch, figureCard, makeFigure, resetUids, type MatchSetup } from '../state'
 import type { Action } from '../actions'
 import type { MatchState, PlayerId } from '../types'
 
@@ -502,6 +502,107 @@ describe('match history', () => {
       otherCardId: 'abram',
       uid: active.uid,
     })
+  })
+})
+
+describe('draw events', () => {
+  /** Isolates the events a single reduce() call appended, since `started()`
+   *  and even a prior turn already carry their own draw entries in the log. */
+  const newDraws = (before: MatchState, after: MatchState) =>
+    after.log.slice(before.log.length).filter((e) => e.event?.kind === 'draw')
+
+  it('logs the automatic turn-start draw', () => {
+    const state = started({ forceFirst: 'foe' })
+    const topCard = state.players.you.deck[0]
+
+    const after = reduce(state, { type: 'END_TURN' })
+    const draws = newDraws(state, after)
+    expect(draws).toHaveLength(1)
+    expect(draws[0]?.player).toBe('you')
+    expect(draws[0]?.event).toMatchObject({ kind: 'draw', cardId: topCard })
+  })
+
+  it('logs one event per card for a multi-card draw effect', () => {
+    const state = started({ forceFirst: 'you' })
+    const [first, second] = state.players.you.deck
+    state.players.you.hand.push('the-well-of-beersheba')
+    const hand = state.players.you.hand.indexOf('the-well-of-beersheba')
+
+    const after = reduce(state, { type: 'PLAY_COVENANT', hand })
+    const draws = newDraws(state, after)
+    expect(draws).toHaveLength(2)
+    expect(draws.map((e) => e.event?.cardId)).toEqual([first, second])
+  })
+
+  it('logs a draw event when a search effect falls back to hand, not when it reaches the Bench', () => {
+    const state = started({ forceFirst: 'you' })
+    // Fill the Bench so the search has nowhere to place its Figure but hand.
+    state.players.you.bench = state.players.you.bench.map(() => makeFigure('the-altar-fire', state.turn))
+    const basicId = state.players.you.deck.find((id) => {
+      const card = requireCard(id)
+      return isFigure(card) && card.stage === 'basic'
+    })!
+    state.players.you.hand.push('the-call-of-abram')
+    const hand = state.players.you.hand.indexOf('the-call-of-abram')
+
+    const after = reduce(state, { type: 'PLAY_COVENANT', hand })
+    const draws = newDraws(state, after)
+    expect(draws).toHaveLength(1)
+    expect(draws[0]?.event).toMatchObject({ kind: 'draw', cardId: basicId })
+  })
+
+  it('logs no draw event when a search effect is discarded for a full hand', () => {
+    const state = started({ forceFirst: 'you' })
+    state.players.you.bench = state.players.you.bench.map(() => makeFigure('the-altar-fire', state.turn))
+    // Fill to MAX_HAND first, then add the covenant on top — PLAY_COVENANT
+    // removes it from hand before the search runs, so the hand it sees is
+    // exactly at the cap, same as it would be mid-game.
+    while (state.players.you.hand.length < RULES.MAX_HAND) state.players.you.hand.push('the-altar-fire')
+    state.players.you.hand.push('the-call-of-abram')
+    const hand = state.players.you.hand.indexOf('the-call-of-abram')
+
+    const after = reduce(state, { type: 'PLAY_COVENANT', hand })
+    expect(newDraws(state, after)).toHaveLength(0)
+  })
+
+  it('logs a draw event for a dig effect that reaches hand, none when the hand is full', () => {
+    const state = started({ forceFirst: 'you' })
+    state.players.you.hand.push('the-dream-of-pharaoh')
+    const hand = state.players.you.hand.indexOf('the-dream-of-pharaoh')
+    const topCard = state.players.you.deck[0]
+
+    const after = reduce(state, { type: 'PLAY_COVENANT', hand })
+    const draws = newDraws(state, after)
+    expect(draws).toHaveLength(1)
+    expect(draws[0]?.event).toMatchObject({ kind: 'draw', cardId: topCard })
+
+    const full = started({ forceFirst: 'you' })
+    while (full.players.you.hand.length < RULES.MAX_HAND) full.players.you.hand.push('the-altar-fire')
+    full.players.you.hand.push('the-dream-of-pharaoh')
+    const fullHand = full.players.you.hand.indexOf('the-dream-of-pharaoh')
+
+    const afterFull = reduce(full, { type: 'PLAY_COVENANT', hand: fullHand })
+    expect(newDraws(full, afterFull)).toHaveLength(0)
+  })
+
+  it("attributes Laban's opponent-reshuffle draws to the opponent, not the caster", () => {
+    let state = started({ forceFirst: 'foe' })
+    state = reduce(state, { type: 'END_TURN' })
+    const active = state.players.you.active!
+    active.cardId = 'laban'
+    active.energy = ['earth']
+    state.players.foe.hand = ['the-altar-fire', 'the-nephilim', 'esau']
+
+    const after = reduce(state, { type: 'ATTACK', attackIndex: 0 })
+    // An attack ends the turn, so the slice also carries the foe's own next
+    // turn-start draw after this one — cut it off at the attack's own entry,
+    // which the effect (and its draws) always resolves before.
+    const added = after.log.slice(state.log.length)
+    const attackIndex = added.findIndex((e) => e.event?.kind === 'attack')
+    const draws = added.slice(0, attackIndex).filter((e) => e.event?.kind === 'draw')
+    // Reshuffles 3 cards and draws 3 - 1 = 2 back, both credited to the foe.
+    expect(draws).toHaveLength(2)
+    for (const entry of draws) expect(entry.player).toBe('foe')
   })
 })
 

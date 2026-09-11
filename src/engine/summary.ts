@@ -129,7 +129,11 @@ export function buildBreakdown(state: MatchState): MatchBreakdown {
 
   for (const entry of state.log) {
     const event = entry.event
-    if (!event) continue
+    // `draw` carries no "what did this player choose to do" signal — it
+    // happens every turn regardless of either side's play — so it stays out
+    // of the play-by-play and everything counted from it (cards played,
+    // cards used) the same way it stays out of MVP scoring above.
+    if (!event || event.kind === 'draw') continue
     timeline.push(entry)
 
     const mine = stats[entry.player]

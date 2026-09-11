@@ -230,6 +230,12 @@ function draw(state: MatchState, playerId: PlayerId, count = 1) {
     const card = player.deck.shift()
     if (card === undefined) return
     player.hand.push(card)
+    // Every path that actually deals a card — the turn draw, draw-1/draw-2
+    // and everything else that routes through `ctx.draw` — is this one
+    // function, so this is the single place a `draw` event needs logging to
+    // cover all of them. Search and dig effects land in the hand a different
+    // way (see effects.ts) and log their own.
+    log(state, playerId, `${name(card)} is drawn.`, { kind: 'draw', cardId: card })
   }
 }
 
@@ -795,7 +801,10 @@ function applyEffect(
     draw: (count) => draw(state, me, count),
     damage: (owner, figure, amount, opts) => damageFigure(state, owner, figure, amount, opts),
     knockOut: (owner, figure, denyPoints) => knockOut(state, owner, figure, denyPoints),
-    log: (text) => log(state, me, text),
+    // `forPlayer` exists for the one effect (Laban's) that draws into the
+    // *opponent's* hand rather than its own owner's — everywhere else it's
+    // omitted and the entry is attributed to `me`, same as before.
+    log: (text, event, forPlayer) => log(state, forPlayer ?? me, text, event),
     applyStatus,
   }
 

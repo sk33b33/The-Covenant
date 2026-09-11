@@ -162,6 +162,7 @@ export interface MatchEvent {
     | 'miracle'
     | 'attack'
     | 'knockout'
+    | 'draw'
   /** The card the event is centred on — the Figure played, the attacker, the
    *  Figure knocked out, whatever a screen would put a thumbnail of. */
   cardId: string

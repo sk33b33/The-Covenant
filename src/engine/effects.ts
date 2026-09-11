@@ -2,7 +2,14 @@ import { requireCard } from '@/data/cards'
 import type { Rng } from '@/game/rng'
 import { isFigure } from '@/game/types'
 import { addToHand, figureCard, figuresInPlay, hasStatus, removeStatus } from './state'
-import { OPPONENT, type FigureInPlay, type MatchState, type PlayerId, type StatusKind } from './types'
+import {
+  OPPONENT,
+  type FigureInPlay,
+  type MatchEvent,
+  type MatchState,
+  type PlayerId,
+  type StatusKind,
+} from './types'
 
 /**
  * Card effects.
@@ -40,7 +47,9 @@ export interface EffectContext {
     opts?: { pierce?: boolean },
   ) => void
   knockOut: (owner: PlayerId, figure: FigureInPlay, denyPoints?: boolean) => void
-  log: (text: string) => void
+  /** `forPlayer` attributes the entry to someone other than `me` — the one
+   *  case is Laban's, which draws cards into the *opponent's* hand. */
+  log: (text: string, event?: MatchEvent, forPlayer?: PlayerId) => void
   applyStatus: (figure: FigureInPlay, kind: StatusKind, until: number) => void
 }
 
@@ -84,7 +93,10 @@ function search(ctx: EffectContext, predicate: (cardId: string) => boolean, toBe
     const slot = player.bench.findIndex((s) => s === null)
     if (slot === -1) {
       const toHand = addToHand(player, cardId)
-      ctx.log(toHand ? 'The Bench is full, so it goes to hand.' : 'The Bench and hand are both full, so it is discarded.')
+      ctx.log(
+        toHand ? 'The Bench is full, so it goes to hand.' : 'The Bench and hand are both full, so it is discarded.',
+        toHand ? { kind: 'draw', cardId } : undefined,
+      )
       return
     }
     player.bench[slot] = {
@@ -105,7 +117,12 @@ function search(ctx: EffectContext, predicate: (cardId: string) => boolean, toBe
   }
 
   const toHand = addToHand(player, cardId)
-  ctx.log(toHand ? `${requireCard(cardId).name} is found.` : `${requireCard(cardId).name} is found, but the hand is full — it is discarded.`)
+  ctx.log(
+    toHand
+      ? `${requireCard(cardId).name} is found.`
+      : `${requireCard(cardId).name} is found, but the hand is full — it is discarded.`,
+    toHand ? { kind: 'draw', cardId } : undefined,
+  )
 }
 
 const isBasicFigure = (cardId: string) => {
@@ -325,9 +342,18 @@ const EFFECTS: Record<string, Effect> = {
     them.deck.push(...them.hand)
     them.hand = []
     them.deck = ctx.rng((r) => r.shuffle(them.deck))
+    const opponent = OPPONENT[ctx.me]
     for (let i = 0; i < Math.max(0, size - 1); i++) {
       const card = them.deck.shift()
-      if (card) addToHand(them, card)
+      if (!card) continue
+      // Can only ever land in the hand here — the hand was just emptied and
+      // this draws back at most `size - 1` of what it held, always under
+      // RULES.MAX_HAND — but the check is honoured anyway rather than assumed.
+      const toHand = addToHand(them, card)
+      // The card lands in the *opponent's* hand, not `ctx.me`'s — the only
+      // effect in the set where those differ, so the only place `forPlayer`
+      // is needed.
+      if (toHand) ctx.log(`${requireCard(card).name} is drawn.`, { kind: 'draw', cardId: card }, opponent)
     }
   },
   'reveal-hand': (ctx) => {
@@ -407,7 +433,12 @@ function digBest(ctx: EffectContext, depth: number) {
   const rest = player.deck.splice(0, Math.max(0, depth - 1))
   player.deck.push(...rest)
 
-  ctx.log(toHand ? `${requireCard(chosen).name} is taken.` : `${requireCard(chosen).name} is taken, but the hand is full — it is discarded.`)
+  ctx.log(
+    toHand
+      ? `${requireCard(chosen).name} is taken.`
+      : `${requireCard(chosen).name} is taken, but the hand is full — it is discarded.`,
+    toHand ? { kind: 'draw', cardId: chosen } : undefined,
+  )
 }
 
 function reviveFromDiscard(ctx: EffectContext, count: number) {
