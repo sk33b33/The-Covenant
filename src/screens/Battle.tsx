@@ -72,6 +72,29 @@ const HAND_W = 54
  *  this game deals — scaled down along with HAND_W. */
 const HAND_HEIGHT = 90
 
+const HAND_CARD_H = (HAND_W * 88) / 63
+
+/**
+ * Where a drawn card actually lands, for `DrawFx` — a single card-sized rect
+ * near the middle of the hand tray, not the tray's own full bounding box.
+ *
+ * The tray spans the whole width of the screen and is far taller than one
+ * card, so landing on its raw rect put the flight's own endpoint at the
+ * tray's geometric centre: badly off to the side of where a real card
+ * actually sits, and scaled up to the tray's own width in the bargain
+ * (`DrawFx` derives its landing scale from this rect against the pile's).
+ * Real cards are bottom-anchored in your own hand and top-anchored in the
+ * opponent's (see `PlayerHand` and `OpponentHand`), so this lands on
+ * whichever of those edges the fan itself sits against, centred the one
+ * axis the tray actually agrees with the fan on: horizontal.
+ */
+function drawLandingRect(side: PlayerId, trayEl: HTMLDivElement): DOMRect {
+  const tray = trayEl.getBoundingClientRect()
+  const left = tray.left + tray.width / 2 - HAND_W / 2
+  const top = side === 'you' ? tray.bottom - HAND_CARD_H : tray.top
+  return new DOMRect(left, top, HAND_W, HAND_CARD_H)
+}
+
 /*
  * One fan, read from both ends of the table.
  *
@@ -469,7 +492,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     prevActives.current = { you: you.active, foe: foe.active }
   })
 
-  /* -------------------------------------------------------------- draws */
+  /* -------------------------------------------------------- draws + hand-off */
 
   // How much of `state.log` has already been read for draws — captured once
   // at mount, not zero, so a match resumed mid-way through doesn't replay
@@ -477,20 +500,61 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const seenLogLen = useRef(state.log.length)
   const drawFxId = useRef(0)
 
+  // The unit this hand-off sequence is paced on — the same ~420ms "beat"
+  // the result screen already waits one out on (see `resultReady` below).
+  // A strike lands, a beat later the turn banner rises, and — only when
+  // this is the turn-start draw riding along with that same banner — two
+  // further beats after that the drawn card takes flight. A mid-turn
+  // effect's own draw (a Miracle, a Covenant) has no banner to pace
+  // against and is never held back.
+  const BEAT_S = 0.42
+
+  const handoffTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => () => handoffTimers.current.forEach(clearTimeout), [])
+
+  const presentHandoff = (cue: TurnCue | null, draws: DrawFxTrigger['draws']) => {
+    if (cue) {
+      handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
+      if (draws.length) {
+        handoffTimers.current.push(
+          setTimeout(() => setDrawFx({ id: ++drawFxId.current, draws }), (BEAT_S + 2 * BEAT_S) * 1000),
+        )
+      }
+    } else if (draws.length) {
+      setDrawFx({ id: ++drawFxId.current, draws })
+    }
+  }
+
+  // Announced once per hand-off, keyed by turn *and* side so a promotion
+  // dropping back into 'main' on the same turn can't re-announce it. Skipped
+  // while simulating: with both sides on the AI, "Your turn" would be a lie.
+  //
+  // Draws are detected in this same effect, not a separate one: the
+  // automatic turn-start draw and the turn change it rides with land in the
+  // *same* reducer call (an ATTACK ends the attacker's turn in the call it
+  // resolves in, and `beginTurn` draws in the call that starts the next
+  // one), so only a shared effect can tell "this draw is the turn-start
+  // draw, pace it off the banner" apart from "this draw is a mid-turn
+  // effect, let it fly at once." Declared to run after the attack effect
+  // above, and deliberately so: effects run top to bottom within a commit,
+  // so this always sees the `fxInFlight` flag the strike just raised and
+  // holds the whole hand-off back until the blow has landed — otherwise the
+  // opponent's attack plays out underneath a banner already announcing your
+  // turn.
+  const announced = useRef<string | null>(null)
+  const pendingCue = useRef<TurnCue | null>(null)
+  const pendingDraws = useRef<DrawFxTrigger['draws']>([])
+
   useEffect(() => {
     const prevLen = seenLogLen.current
     seenLogLen.current = state.log.length
-    // Shorter than before means a new match replaced this one, not growth —
-    // nothing to animate either way.
-    if (state.log.length <= prevLen) return
-
-    const added = state.log.slice(prevLen).filter((entry) => entry.event?.kind === 'draw')
-    if (added.length === 0) return
+    // Shorter than before means a new match replaced this one, not growth.
+    const added = state.log.length > prevLen ? state.log.slice(prevLen) : []
+    const drawn = added.filter((entry) => entry.event?.kind === 'draw')
 
     const piles = { you: youPileRef.current, foe: foePileRef.current }
     const hands = { you: youHandRef.current, foe: foeHandRef.current }
-
-    const draws = added.flatMap((entry) => {
+    const draws = drawn.flatMap((entry) => {
       const fromEl = piles[entry.player]
       const toEl = hands[entry.player]
       // Nothing rendered yet to fly between — a rare timing edge (the very
@@ -502,43 +566,32 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           cardId: entry.event.cardId,
           side: entry.player,
           fromRect: fromEl.getBoundingClientRect(),
-          toRect: toEl.getBoundingClientRect(),
+          toRect: drawLandingRect(entry.player, toEl),
         },
       ]
     })
-    if (draws.length === 0) return
 
-    setDrawFx({ id: ++drawFxId.current, draws })
-    // Re-fires only when the log actually grows — see the length guard
-    // above for why that alone is enough to gate a fresh batch.
+    let cue: TurnCue | null = null
+    if (coinSettled && !simulating && state.phase === 'main') {
+      const key = `${state.turn}:${state.current}`
+      if (announced.current !== key) {
+        announced.current = key
+        cue = { key, mine: state.current === 'you' }
+      }
+    }
+
+    if (!cue && draws.length === 0) return
+
+    if (fxInFlight.current) {
+      if (cue) pendingCue.current = cue
+      pendingDraws.current = draws
+    } else {
+      presentHandoff(cue, draws)
+    }
+    // Re-fires on every commit that could carry a fresh draw or a fresh
+    // turn — the guards above are what keep it a no-op otherwise.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.log.length])
-
-  /* ------------------------------------------------------- turn hand-off */
-
-  // Announced once per hand-off, keyed by turn *and* side so a promotion
-  // dropping back into 'main' on the same turn can't re-announce it. Skipped
-  // while simulating: with both sides on the AI, "Your turn" would be a lie.
-  //
-  // Declared *after* the attack effect above, and deliberately so: effects
-  // run top to bottom within a commit, and an ATTACK ends the attacker's
-  // turn in the same reducer call it resolves in, so the strike and the
-  // hand-off arrive together. Running second is what lets this see the flag
-  // the strike just raised and hold the card back until the blow has landed
-  // — otherwise the opponent's attack plays out underneath a banner already
-  // announcing your turn.
-  const announced = useRef<string | null>(null)
-  const pendingCue = useRef<TurnCue | null>(null)
-  useEffect(() => {
-    if (!coinSettled || simulating || state.phase !== 'main') return
-    const key = `${state.turn}:${state.current}`
-    if (announced.current === key) return
-    announced.current = key
-
-    const cue: TurnCue = { key, mine: state.current === 'you' }
-    if (fxInFlight.current) pendingCue.current = cue
-    else setTurnCue(cue)
-  }, [coinSettled, simulating, state.phase, state.turn, state.current])
+  }, [state.log.length, coinSettled, simulating, state.phase, state.turn, state.current])
 
   /**
    * Send the attacking card out on its flight, and hold the attack itself
@@ -604,9 +657,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setAttackFx(null)
     setHeld(null)
     fxInFlight.current = false
-    if (pendingCue.current) {
-      setTurnCue(pendingCue.current)
+    if (pendingCue.current || pendingDraws.current.length) {
+      presentHandoff(pendingCue.current, pendingDraws.current)
       pendingCue.current = null
+      pendingDraws.current = []
     }
   }
 

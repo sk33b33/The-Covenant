@@ -36,7 +36,7 @@ export interface DrawFxTrigger {
   draws: DrawFxCard[]
 }
 
-interface DrawFxCard {
+export interface DrawFxCard {
   cardId: string
   /** Whose card this is — decides whether it turns face-up in flight. */
   side: PlayerId
