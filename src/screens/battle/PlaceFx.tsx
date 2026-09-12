@@ -24,7 +24,7 @@ import { requireCard } from '@/data/cards'
  * the arrival" ordering the sortie's own `onDone` is built on. The card
  * itself doesn't vanish outright on contact: it settles with a small
  * squash-and-rebound, like something with real weight meeting the mat, while
- * a ring of gold light breaks from underneath it — and only once that
+ * a burst of gold rays shoots out from underneath it — and only once that
  * settles does the card fade the rest of the way out, handing off to the
  * Figure now actually standing in its place.
  */
@@ -131,7 +131,20 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
         scale: [1, PEAK_SCALE, PEAK_SCALE, endScale, endScale * 0.86, endScale * 1.08, endScale],
         opacity: [1, 1, 1, 1, 1, 1, 0],
         transition: {
-          default: { duration: TOTAL_S, ease: 'easeOut', times: [0, t1, t2, t3, bounce1, bounce2, 1] },
+          // One ease per segment rather than one for the whole path — a
+          // single 'easeOut' across every stop front-loads speed at the
+          // start of *each* segment, which reads as a jolt everywhere a
+          // segment boundary sits on a standstill: the rise leaving a card
+          // at rest, and the drop leaving the held card at rest again.
+          // 'easeInOut' either side of those two standstills is what
+          // actually reads as one continuous motion rather than several
+          // separate ones stitched together. The rebound keeps its own
+          // snap — a real landing doesn't ease into the ground.
+          default: {
+            duration: TOTAL_S,
+            times: [0, t1, t2, t3, bounce1, bounce2, 1],
+            ease: ['easeInOut', 'linear', 'easeInOut', 'easeOut', 'easeInOut', 'easeOut'],
+          },
           // Its own curve: opaque all the way through the rebound, fading
           // only in the sliver left after it settles — the same reasoning
           // the draw reveal's own late fade is built on.
@@ -140,9 +153,12 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
       },
       flip: {
         // Turns face-up on the way to the centre, not on the way down —
-        // by the time it holds there the reveal is already done.
+        // by the time it holds there the reveal is already done. Eased
+        // both ways for the same reason the rise above is: it leaves one
+        // standstill (flat at 0°) and arrives at another (flat at 180°,
+        // held through the hold that follows).
         rotateY: [0, 180, 180],
-        transition: { duration: TOTAL_S, ease: 'easeInOut', times: [0, t1, 1] },
+        transition: { duration: TOTAL_S, times: [0, t1, 1], ease: ['easeInOut', 'linear'] },
       },
     }
     // Recomputed only if the trip itself changes — the rects are measured
@@ -183,43 +199,68 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
   )
 }
 
+/** How many rays break from under the card — enough to read as a burst
+ *  rather than a fan of individual spokes, few enough that each one is
+ *  still a distinct shaft of light rather than a blurred wheel. */
+const RAY_COUNT = 10
+
 /** The gold light breaking from under the card the instant it lands — a
- *  soft radial flash and a ring racing outward from it, timed to start
- *  exactly on contact rather than riding the card's own transition. */
+ *  small core flash and a burst of thin rays shooting outward from it,
+ *  timed to start exactly on contact rather than riding the card's own
+ *  transition. Rays, not a radius: the light is meant to read as shafts
+ *  breaking outward from underneath the card, not a glow spreading evenly
+ *  around it. */
 function GoldBurst({ toRect }: { toRect: DOMRect }) {
   const cx = toRect.left + toRect.width / 2
   const cy = toRect.top + toRect.height / 2
-  const size = toRect.width * 2.6
+  const rayLength = toRect.width * 1.6
+  const rayWidth = toRect.width * 0.05
 
   return (
-    <>
+    <div className="absolute" style={{ left: cx, top: cy, width: 0, height: 0 }}>
+      {/* The core the rays appear to shoot out of — small and quick,
+          nowhere near the spread a radial glow would need, since it's a
+          source for the rays to read from rather than the effect itself. */}
       <motion.div
         className="absolute rounded-full"
         style={{
-          left: cx - size / 2,
-          top: cy - size / 2,
-          width: size,
-          height: size,
-          background: `radial-gradient(circle, ${GOLD} 0%, transparent 68%)`,
-          mixBlendMode: 'screen',
+          left: -toRect.width * 0.16,
+          top: -toRect.width * 0.16,
+          width: toRect.width * 0.32,
+          height: toRect.width * 0.32,
+          background: GOLD,
+          boxShadow: `0 0 ${toRect.width * 0.4}px ${toRect.width * 0.14}px ${GOLD}`,
         }}
-        initial={{ opacity: 0, scale: 0.3 }}
-        animate={{ opacity: [0, 0.85, 0], scale: [0.3, 1, 1.3] }}
-        transition={{ duration: IMPACT_S, delay: TO_LAND_S, ease: 'easeOut' }}
+        initial={{ opacity: 0, scale: 0.2 }}
+        animate={{ opacity: [0, 1, 0], scale: [0.2, 1, 1.2] }}
+        transition={{ duration: IMPACT_S * 0.75, delay: TO_LAND_S, ease: 'easeOut' }}
       />
-      <motion.span
-        className="absolute rounded-full"
-        style={{
-          left: cx - toRect.width / 2,
-          top: cy - toRect.width / 2,
-          width: toRect.width,
-          height: toRect.width,
-          border: `2px solid ${GOLD}`,
-        }}
-        initial={{ opacity: 0, scale: 0.5 }}
-        animate={{ opacity: [0, 0.9, 0], scale: [0.5, 2.2, 3] }}
-        transition={{ duration: IMPACT_S * 1.1, delay: TO_LAND_S, ease: 'easeOut' }}
-      />
-    </>
+
+      {Array.from({ length: RAY_COUNT }, (_, i) => {
+        const angle = (360 / RAY_COUNT) * i
+        // Alternating lengths read as a burst radiating unevenly, the way
+        // real light through a break does, rather than a perfect gear of
+        // identical spokes.
+        const length = rayLength * (i % 2 === 0 ? 1 : 0.62)
+        return (
+          <motion.div
+            key={i}
+            className="absolute"
+            style={{
+              left: -rayWidth / 2,
+              top: -length,
+              width: rayWidth,
+              height: length,
+              background: `linear-gradient(to top, ${GOLD}, transparent)`,
+              transformOrigin: '50% 100%',
+              rotate: angle,
+            }}
+            initial={{ scaleY: 0, opacity: 0 }}
+            animate={{ scaleY: [0, 1, 0.8], opacity: [0, 1, 0] }}
+            transition={{ duration: IMPACT_S, delay: TO_LAND_S, ease: 'easeOut' }}
+          />
+        )
+      })}
+    </div>
   )
 }
