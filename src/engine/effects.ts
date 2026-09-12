@@ -151,12 +151,17 @@ const EFFECTS: Record<string, Effect> = {
     if (discarded) player.discard.push(discarded)
   },
   'coin-draw-2': (ctx) => {
-    if (ctx.rng((r) => r.chance(0.5))) {
-      ctx.log('Heads.')
-      ctx.draw(2)
-    } else {
-      ctx.log('Tails.')
-    }
+    const heads = ctx.rng((r) => r.chance(0.5))
+    // A structured event of its own — shown to the player as an actual
+    // flip rather than resolved silently — separate from the attack's own
+    // row so the UI can tell "a coin decided this" apart from "the attack
+    // itself" even though both come out of the same swing.
+    ctx.log(heads ? 'Heads.' : 'Tails.', {
+      kind: 'coinFlip',
+      cardId: ctx.attacker?.cardId ?? '',
+      heads,
+    })
+    if (heads) ctx.draw(2)
   },
 
   /* -- dig and scry ------------------------------------------------------ */

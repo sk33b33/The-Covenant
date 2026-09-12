@@ -30,12 +30,11 @@ export interface DealFxTrigger {
   cards: DealFxCard[]
 }
 
-/** How far apart, in seconds, consecutive cards leave the pile — brisk
- *  enough that five of them read as "the hand being dealt" rather than
- *  five unrelated draws, unhurried enough that each is still its own
- *  distinct arrival. */
-const STAGGER_S = 0.16
-const FLY_S = 0.36
+/** How far apart, in seconds, consecutive cards leave the pile — unhurried
+ *  enough that each is read as its own distinct arrival rather than five
+ *  cards rushing off the pile at once. */
+const STAGGER_S = 0.3
+const FLY_S = 0.6
 
 /** Each card's own place in the launch order — the rightmost seat (the
  *  highest index) leaves the pile first, working back toward the left, so

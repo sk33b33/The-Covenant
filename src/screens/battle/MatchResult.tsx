@@ -571,12 +571,14 @@ function timelineDetail(event: MatchEvent): string {
         : 'Finds nothing to strike.'
     case 'knockout':
       return event.points ? `${event.points} point${event.points > 1 ? 's' : ''} earned.` : 'No points taken.'
-    // Never actually reaches here: buildBreakdown drops `draw` entries before
-    // the timeline is built (see summary.ts) — a draw happens every turn
-    // regardless of what either side does, so it has none of the "what did
-    // this player choose to do" signal the rest of the play-by-play carries.
-    // The case exists only so this switch stays exhaustive.
+    // Never actually reaches here: buildBreakdown drops `draw` and
+    // `coinFlip` entries before the timeline is built (see summary.ts) —
+    // neither carries the "what did this player choose to do" signal the
+    // rest of the play-by-play does. Both cases exist only so this switch
+    // stays exhaustive.
     case 'draw':
       return 'A card is drawn.'
+    case 'coinFlip':
+      return event.heads ? 'Heads.' : 'Tails.'
   }
 }

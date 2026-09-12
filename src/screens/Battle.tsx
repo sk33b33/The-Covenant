@@ -41,7 +41,7 @@ import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
 import type { Action } from '@/engine/actions'
-import type { FigureInPlay, MatchState, PlayerId } from '@/engine/types'
+import type { FigureInPlay, MatchEvent, MatchState, PlayerId } from '@/engine/types'
 
 /**
  * The battle screen.
@@ -278,6 +278,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // of the same problem is a count to subtract instead.
   const [hiddenDrawIndices, setHiddenDrawIndices] = useState<number[]>([])
   const [hiddenFoeDrawCount, setHiddenFoeDrawCount] = useState(0)
+  // A card's own "Flip a coin" effect, mid-match — see the log-diffing
+  // effect below for how this gets filled in, and `releaseCoinFlipFx` for
+  // what it holds back until the coin itself lands.
+  const [coinFlipFx, setCoinFlipFx] = useState<{ id: number; heads: boolean } | null>(null)
+  // The opponent's own plays and ascensions get the same PlaceFx flourish as
+  // yours — but reactively, since the AI dispatches its own actions and the
+  // board has already changed by the time this screen finds out. The newly
+  // arrived (or newly ascended) Figure is hidden by `uid` — board slots have
+  // no "index in hand" to hide the way a drawn card does — for as long as
+  // `foePlaceFx` is in flight, then revealed the instant it lands, in place
+  // of a `PlaceFx` cue that never had a real placement to hold back. See
+  // `startNextFoePlace`.
+  const [foePlaceFx, setFoePlaceFx] = useState<PlaceFxTrigger | null>(null)
+  const [hiddenFoeFigureUid, setHiddenFoeFigureUid] = useState<string | null>(null)
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -286,7 +300,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // first move arriving under its own turn card, or its next move arriving
   // on top of the attack you just watched it make.
   const presenting =
-    attackFx !== null || turnCue !== null || sortie !== null || drawFx !== null || placeFx !== null
+    attackFx !== null ||
+    turnCue !== null ||
+    sortie !== null ||
+    drawFx !== null ||
+    placeFx !== null ||
+    coinFlipFx !== null ||
+    foePlaceFx !== null
 
   // Filled in below, once `dispatch` exists to build it out of.
   const stageAttack = useRef<((side: PlayerId, action: Action) => boolean) | undefined>(undefined)
@@ -569,13 +589,14 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const seenLogLen = useRef(state.log.length)
   const drawFxId = useRef(0)
 
-  // The unit this hand-off sequence is paced on — the same ~420ms "beat"
-  // the result screen already waits one out on (see `resultReady` below).
-  // A strike lands, a beat later the turn banner rises, and — only when
-  // this is the turn-start draw riding along with that same banner — two
-  // further beats after that the drawn card takes flight. A mid-turn
-  // effect's own draw (a Miracle, a Covenant) has no banner to pace
-  // against and is never held back.
+  // The unit the turn banner's own entrance is paced on — the same ~420ms
+  // "beat" the result screen already waits one out on (see `resultReady`
+  // below). A strike lands, a beat later the turn banner rises — but the
+  // turn-start draw riding along with it no longer waits on the banner at
+  // all: it takes flight the instant the hand-off itself is presented,
+  // same as a mid-turn effect's own draw (a Miracle, a Covenant) always
+  // has. A card is drawn the moment it's drawn; only the announcement of
+  // whose turn it is has a beat of its own to make.
   const BEAT_S = 0.42
 
   const handoffTimers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -583,12 +604,71 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   /** Hides whichever hand indices/count a batch of draws is about to carry,
    *  right as the flight itself is scheduled — so the real cards stay out
-   *  of the fan for exactly as long as `drawFx` is in the air, not from the
-   *  moment the engine actually dealt them (which, for a turn-start draw,
-   *  is several beats earlier — see `presentHandoff` below). */
+   *  of the fan for exactly as long as `drawFx` is in the air. */
   const hideDrawnCards = (youNewIndices: number[], foeDrawCount: number) => {
     if (youNewIndices.length) setHiddenDrawIndices((prev) => [...prev, ...youNewIndices])
     if (foeDrawCount) setHiddenFoeDrawCount((prev) => prev + foeDrawCount)
+  }
+
+  const coinFlipFxId = useRef(0)
+  // A draw riding along with a coin flip (the flip's own "heads" branch)
+  // waits for the coin itself to land before it takes flight — showing
+  // both at once would spoil the result before the coin has actually
+  // shown it. See `releaseCoinFlipFx`.
+  const pendingPostCoinFlip = useRef<{
+    draws: DrawFxTrigger['draws']
+    youNewIndices: number[]
+    foeDrawCount: number
+  } | null>(null)
+
+  const releaseCoinFlipFx = () => {
+    setCoinFlipFx(null)
+    const pending = pendingPostCoinFlip.current
+    pendingPostCoinFlip.current = null
+    if (pending?.draws.length) {
+      hideDrawnCards(pending.youNewIndices, pending.foeDrawCount)
+      setDrawFx({ id: ++drawFxId.current, draws: pending.draws })
+    }
+  }
+
+  const foePlaceFxId = useRef(0)
+  /** Foe plays/ascensions detected while an earlier one is still flying —
+   *  queued rather than dropped, same reasoning as `pendingDraws` above:
+   *  a bench fill can drop more than one Figure in range of a single AI
+   *  turn, and each still deserves its own flight rather than only the
+   *  last one shown. */
+  const foePlaceQueue = useRef<{ uid: string; cardId: string; toEl: HTMLDivElement; isActive: boolean }[]>([])
+  const foePlaceInFlight = useRef(false)
+
+  /** Pulls the next queued foe placement (if any) and sends it flying, or
+   *  clears the in-flight flag once the queue is empty. Called both when a
+   *  fresh one is detected and from `PlaceFx`'s own `onDone` for this
+   *  trigger, so a burst of them plays out one at a time rather than all at
+   *  once. */
+  const startNextFoePlace = () => {
+    const next = foePlaceQueue.current.shift()
+    if (!next) {
+      foePlaceInFlight.current = false
+      return
+    }
+    const fromEl = foeHandRef.current
+    if (!fromEl) {
+      // Nothing rendered yet to fly from — skip this one rather than queue
+      // it forever; the figure is already on the board underneath, just
+      // shown without a flourish, same as any other missing-slot edge case
+      // in this file.
+      startNextFoePlace()
+      return
+    }
+    foePlaceInFlight.current = true
+    setHiddenFoeFigureUid(next.uid)
+    setFoePlaceFx({
+      id: ++foePlaceFxId.current,
+      cardId: next.cardId,
+      fromRect: fromEl.getBoundingClientRect(),
+      toRect: next.toEl.getBoundingClientRect(),
+      isActive: next.isActive,
+    })
   }
 
   const presentHandoff = (
@@ -596,20 +676,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     draws: DrawFxTrigger['draws'],
     youNewIndices: number[],
     foeDrawCount: number,
+    heads: boolean | null,
   ) => {
-    if (cue) {
-      handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
-      if (draws.length) {
-        handoffTimers.current.push(
-          setTimeout(
-            () => {
-              hideDrawnCards(youNewIndices, foeDrawCount)
-              setDrawFx({ id: ++drawFxId.current, draws })
-            },
-            (BEAT_S + 2 * BEAT_S) * 1000,
-          ),
-        )
-      }
+    if (cue) handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
+    if (heads !== null) {
+      pendingPostCoinFlip.current = { draws, youNewIndices, foeDrawCount }
+      setCoinFlipFx({ id: ++coinFlipFxId.current, heads })
     } else if (draws.length) {
       hideDrawnCards(youNewIndices, foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws })
@@ -637,6 +709,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const pendingDraws = useRef<DrawFxTrigger['draws']>([])
   const pendingYouIndices = useRef<number[]>([])
   const pendingFoeCount = useRef(0)
+  const pendingHeads = useRef<boolean | null>(null)
 
   useEffect(() => {
     const prevLen = seenLogLen.current
@@ -644,6 +717,48 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // Shorter than before means a new match replaced this one, not growth.
     const added = state.log.length > prevLen ? state.log.slice(prevLen) : []
     const drawn = added.filter((entry) => entry.event?.kind === 'draw')
+    // At most one card effect can flip a coin in a single commit — a lone
+    // attack's own rider, never a stack of them — so the most recent one
+    // (there is only ever one) is all this needs to carry forward.
+    const coinFlip = added.find((entry) => entry.event?.kind === 'coinFlip')
+    const heads = coinFlip?.event?.heads ?? null
+
+    // The opponent's own plays and ascensions get the same drop flourish as
+    // yours, but only in real play — `turn` is still 0 for every entry the
+    // opening SETUP action logs (it only advances inside `beginTurn`, which
+    // runs after setup's own placements), so this is what tells "the AI just
+    // filled its bench mid-game" apart from "the opening board is being
+    // dealt out," without needing to read `state.phase` (ambiguous mid
+    // transition) or match on log text (setup and mid-game bench entries
+    // read identically). Independent of the `fxInFlight`/hand-off gating
+    // below — a bench fill isn't racing an attack the way a turn-start draw
+    // is — and of the early return just past it, so it still runs on a
+    // commit that carried nothing else worth animating.
+    const foePlaces = added.filter(
+      (entry): entry is typeof entry & { event: MatchEvent & { uid: string } } =>
+        entry.player === 'foe' &&
+        entry.turn >= 1 &&
+        (entry.event?.kind === 'play' || entry.event?.kind === 'ascend') &&
+        Boolean(entry.event.uid),
+    )
+    if (foePlaces.length) {
+      const activeEl = foeActiveSlotRef.current
+      const benchEls = foeBenchSlotRefs.current
+      for (const entry of foePlaces) {
+        const uid = entry.event.uid
+        let toEl: HTMLDivElement | null = null
+        let isActive = false
+        if (foe.active?.uid === uid && activeEl) {
+          toEl = activeEl
+          isActive = true
+        } else {
+          const idx = foe.bench.findIndex((f) => f?.uid === uid)
+          if (idx !== -1 && benchEls[idx]) toEl = benchEls[idx]
+        }
+        if (toEl) foePlaceQueue.current.push({ uid, cardId: entry.event.cardId, toEl, isActive })
+      }
+      if (!foePlaceInFlight.current) startNextFoePlace()
+    }
 
     const piles = { you: youPileRef.current, foe: foePileRef.current }
     const hands = { you: youHandRef.current, foe: foeHandRef.current }
@@ -682,7 +797,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       }
     }
 
-    if (!cue && draws.length === 0) return
+    if (!cue && draws.length === 0 && heads === null) return
 
     if (fxInFlight.current) {
       // Accumulated, not overwritten: a second commit landing while the
@@ -695,8 +810,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       pendingDraws.current = [...pendingDraws.current, ...draws]
       pendingYouIndices.current = [...pendingYouIndices.current, ...youNewIndices]
       pendingFoeCount.current += foeDrawCount
+      if (heads !== null) pendingHeads.current = heads
     } else {
-      presentHandoff(cue, draws, youNewIndices, foeDrawCount)
+      presentHandoff(cue, draws, youNewIndices, foeDrawCount, heads)
     }
     // Re-fires on every commit that could carry a fresh draw or a fresh
     // turn — the guards above are what keep it a no-op otherwise.
@@ -767,12 +883,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setAttackFx(null)
     setHeld(null)
     fxInFlight.current = false
-    if (pendingCue.current || pendingDraws.current.length) {
-      presentHandoff(pendingCue.current, pendingDraws.current, pendingYouIndices.current, pendingFoeCount.current)
+    if (pendingCue.current || pendingDraws.current.length || pendingHeads.current !== null) {
+      presentHandoff(
+        pendingCue.current,
+        pendingDraws.current,
+        pendingYouIndices.current,
+        pendingFoeCount.current,
+        pendingHeads.current,
+      )
       pendingCue.current = null
       pendingDraws.current = []
       pendingYouIndices.current = []
       pendingFoeCount.current = 0
+      pendingHeads.current = null
     }
   }
 
@@ -1092,11 +1215,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // cached, since the mat reflows with the viewport and with orientation.
   const activeSlotRef = useRef<HTMLDivElement>(null)
   const benchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
-  // Read only for its screen position when an attack fires — see the effect
+  // Read only for its screen position when an attack fires, or when the
+  // opponent's own play/ascend needs somewhere to land — see the effects
   // below. Nothing else on this side needs to find its own Active slot the
   // way setup's drag-and-drop needs yours (hence no foe equivalent of the
   // padded/hit-test helpers just below).
   const foeActiveSlotRef = useRef<HTMLDivElement>(null)
+  const foeBenchSlotRefs = useRef<(HTMLDivElement | null)[]>([])
   // Deck pile and hand tray anchors for the draw flight — see the
   // log-diffing effect below, which is the only thing that reads these.
   const youPileRef = useRef<HTMLDivElement>(null)
@@ -1464,6 +1589,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     return null
   }
 
+  // The opponent's Active slot, with the same by-uid hide as their bench
+  // (see `hiddenFoeFigureUid` above) layered on top of the existing
+  // pre-hit/felled hold `shownActive` already does.
+  const rawFoeActive = shownActive('foe')
+  const foeActiveShown = rawFoeActive && rawFoeActive.uid === hiddenFoeFigureUid ? null : rawFoeActive
+
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
       <BattleMat theme={themeType} />
@@ -1523,16 +1654,25 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           className="flex gap-1.5"
           style={{ transform: `translateY(${FOE_ROW_LIFT - BENCH_CLEARANCE}px)` }}
         >
-          {foe.bench.map((figure, i) => (
-            <BoardFigure
-              key={i}
-              figure={figure}
-              width={BENCH_W}
-              emptyLabel=""
-              onClick={figure ? () => openFoe(figure) : undefined}
-              noPeek={Boolean(figure)}
-            />
-          ))}
+          {foe.bench.map((figure, i) => {
+            const shown = figure && figure.uid === hiddenFoeFigureUid ? null : figure
+            return (
+              <div
+                key={i}
+                ref={(el) => {
+                  foeBenchSlotRefs.current[i] = el
+                }}
+              >
+                <BoardFigure
+                  figure={shown}
+                  width={BENCH_W}
+                  emptyLabel=""
+                  onClick={shown ? () => openFoe(shown) : undefined}
+                  noPeek={Boolean(shown)}
+                />
+              </div>
+            )
+          })}
         </div>
         <div ref={foeActiveSlotRef} style={{ transform: `translateY(${FOE_ROW_LIFT}px)` }}>
           {/* Emptied while their card is out of it, exactly as yours is. */}
@@ -1540,13 +1680,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             {/* `shownActive` draws the pre-hit Figure while a strike plays
                 over this slot, so the bar drains on contact rather than on
                 dispatch — and goes on drawing a felled one until the strike
-                that felled it has finished. */}
+                that felled it has finished. A figure just placed or ascended
+                stays hidden a beat longer still, until its own reactive
+                `PlaceFx` flight actually lands on it — see
+                `hiddenFoeFigureUid`. */}
             <BoardFigure
-              figure={shownActive('foe')}
+              figure={foeActiveShown}
               width={ACTIVE_W}
               emptyLabel="Active"
-              onClick={foe.active ? () => openFoe(foe.active!) : undefined}
-              noPeek={Boolean(foe.active)}
+              onClick={foeActiveShown ? () => openFoe(foeActiveShown) : undefined}
+              noPeek={Boolean(foeActiveShown)}
             />
           </motion.div>
         </div>
@@ -1868,6 +2011,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         {!coinSettled && <CoinFlip first={state.first} onDone={settleCoin} />}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {coinFlipFx && (
+          <EffectCoinFlip key={coinFlipFx.id} heads={coinFlipFx.heads} onDone={releaseCoinFlipFx} />
+        )}
+      </AnimatePresence>
+
       <AttackSortie trigger={sortie} onDone={landSortie} />
 
       <DrawFx
@@ -1880,6 +2029,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       />
 
       <PlaceFx trigger={placeFx} onLand={landPlaceFx} onDone={() => setPlaceFx(null)} />
+      {/* The opponent's own version: the placement already happened (the AI
+          dispatches its own actions), so `onLand` only reveals the Figure
+          this flight was standing in for, and `onDone` moves on to whatever
+          else is queued behind it. */}
+      <PlaceFx
+        trigger={foePlaceFx}
+        onLand={() => setHiddenFoeFigureUid(null)}
+        onDone={() => {
+          setFoePlaceFx(null)
+          startNextFoePlace()
+        }}
+      />
 
       <DealFx
         trigger={dealFx}
@@ -2075,11 +2236,12 @@ function PlayerHand({
    *  here the same as a setup pick is, so the flying copy over the board
    *  is the only one on screen while it plays. */
   placingIndex: number | null
-  /** Indices a `drawFx` batch is currently carrying — hidden the same way,
-   *  so a just-drawn card doesn't sit in the fan already while its own
-   *  flourish is still flying it there. */
+  /** Indices a `drawFx` batch is currently carrying — unlike `placingIndex`,
+   *  these stay *in* the fan's own layout (their seat is real) but render as
+   *  a ghost (see `GhostCard`) rather than the real card until the flourish
+   *  actually lands there. */
   hiddenDrawIndices: number[]
-  /** Indices the opening deal hasn't revealed yet — unlike the two above,
+  /** Indices the opening deal hasn't revealed yet — like the one above,
    *  these stay *in* the fan's own layout (so the fan is already its final
    *  five-card shape from the first card on) but render invisible and
    *  unreachable until `DealFx` lands each one. See `HandCard`'s own
@@ -2100,14 +2262,14 @@ function PlayerHand({
   // rather than centred and one card shorter. Ranking within the visible
   // list instead means the fan always closes back up around its own true
   // centre, for any hand size and whichever card was just picked.
+  // A card mid-draw stays *in* this list — unlike `placingIndex` and a
+  // setup pick, which both still close the fan's gap around them. Its seat
+  // is already real (a ghost placeholder sits there, see the render below),
+  // so the fan shouldn't tighten up only to spring back open the instant
+  // the real card lands.
   const visibleIndices = hand
     .map((_, i) => i)
-    .filter(
-      (i) =>
-        i !== placingIndex &&
-        !hiddenDrawIndices.includes(i) &&
-        !(setupPhase && (setupActive === i || setupBench.includes(i))),
-    )
+    .filter((i) => i !== placingIndex && !(setupPhase && (setupActive === i || setupBench.includes(i))))
   const count = visibleIndices.length
   const mid = (count - 1) / 2
   const rotateStep = fanRotateStep(count)
@@ -2370,11 +2532,10 @@ function PlayerHand({
         // as it never having left. Mid-match has no equivalent limbo: a
         // played card leaves `hand` for real, immediately, on dispatch — but
         // a drop's own placement is held back until `PlaceFx` lands (see
-        // `placingIndex`), and a draw's own arrival the same way until
-        // `drawFx` lands (see `hiddenDrawIndices`), so both need hiding a
-        // beat early too.
-        if (index === placingIndex || hiddenDrawIndices.includes(index) || (setupPhase && (pickedActive || pickedBench)))
-          return null
+        // `placingIndex`), so it needs hiding a beat early too. A card mid
+        // -draw stays rendered (see `ghost` below) rather than vanishing.
+        if (index === placingIndex || (setupPhase && (pickedActive || pickedBench))) return null
+        const isGhost = hiddenDrawIndices.includes(index)
         const isBasic = basicsInHand.some((b) => b.index === index)
         // Rank among the visible cards, not the raw hand index — see the
         // comment on `visibleIndices` above.
@@ -2402,6 +2563,7 @@ function PlayerHand({
             controls={handleFor(index)}
             canLift={canLift}
             invisible={dealPendingIndices.includes(index)}
+            ghost={isGhost}
             pose={{
               // The fan itself never moves — only `y` and `scale` change for
               // whichever card is focused, so there's nothing else to
@@ -2451,22 +2613,26 @@ function PlayerHand({
             // gets the same treatment for the same reason: a tap that opened
             // the play sheet mid-simulation could dispatch a real action out
             // from under the AI turn about to land on this same card.
-            onClick={setupPhase || simulating ? undefined : () => onTap(index, isBasic)}
+            onClick={setupPhase || simulating || isGhost ? undefined : () => onTap(index, isBasic)}
             // Only Simulate makes a card inert. Marking non-Basics disabled
             // during setup also blocked every pointer event on them, which is
             // exactly what stopped them being picked up; what a *tap* does is
             // still gated on its own, just above.
-            disabled={simulating}
+            disabled={simulating || isGhost}
           >
-            {/* Every card in hand stays fully visible — the glow above is
-                the only thing that marks a card viable, not how much of the
-                rest of the hand fades out around it. */}
-            <div
-              className={cx('rounded-[8%]', viability && 'cov-hand-glow')}
-              style={viability ? VIABILITY_GLOW[viability] : undefined}
-            >
-              <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
-            </div>
+            {isGhost ? (
+              <GhostCard />
+            ) : (
+              // Every card in hand stays fully visible — the glow above is
+              // the only thing that marks a card viable, not how much of the
+              // rest of the hand fades out around it.
+              <div
+                className={cx('rounded-[8%]', viability && 'cov-hand-glow')}
+                style={viability ? VIABILITY_GLOW[viability] : undefined}
+              >
+                <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
+              </div>
+            )}
           </HandCard>
         )
       })}
@@ -2476,6 +2642,24 @@ function PlayerHand({
 
 /** How the fan settles a card into place, and how it takes one back. */
 const FAN_SPRING = { type: 'spring', stiffness: 500, damping: 30 } as const
+
+/**
+ * The seat a card about to be drawn already holds in the fan — a dashed
+ * outline the same shape as a real card, standing in for it until `DrawFx`
+ * lands and the real face takes its place. A gentle pulse is what tells it
+ * apart from an ordinary empty slot (the Bench's own dashed placeholders,
+ * say): this one has something arriving, not just room for something to.
+ */
+function GhostCard() {
+  return (
+    <motion.div
+      className="absolute inset-0 rounded-[8%]"
+      style={{ border: '1.5px dashed rgba(229,192,140,.35)', background: 'rgba(229,192,140,.04)' }}
+      animate={{ opacity: [0.5, 0.9, 0.5] }}
+      transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+    />
+  )
+}
 
 /**
  * One card in the fan.
@@ -2499,6 +2683,7 @@ function HandCard({
   elementRef,
   disabled,
   invisible,
+  ghost,
   onClick,
   onBrush,
   onUnbrush,
@@ -2519,6 +2704,11 @@ function HandCard({
    *  fan that grows and repositions everyone already in it as each new
    *  card joins. */
   invisible?: boolean
+  /** A card being drawn right now: its seat is real and visible (a dashed
+   *  outline stands in for it — see `GhostCard`), but it isn't the real
+   *  card yet and can't be picked up or tapped until `DrawFx` lands and
+   *  hands the seat back. */
+  ghost?: boolean
   onClick?: (() => void) | undefined
   onBrush: () => void
   onUnbrush: () => void
@@ -2562,7 +2752,7 @@ function HandCard({
       transition={FAN_SPRING}
       onPointerEnter={onBrush}
       onPointerLeave={onUnbrush}
-      drag={canLift && !invisible}
+      drag={canLift && !invisible && !ghost}
       // Never from this card's own pointerdown: the tray reads the gesture
       // first and starts the drag itself, so that riffling sideways through
       // the hand doesn't pull a card out of it. See PlayerHand's own doc.
@@ -2997,14 +3187,16 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
             initial={{ rotateY: 0 }}
-            // A single continuous deceleration across the whole spin — fast
-            // at the tap, steadily slowing, coming to rest right at the end
-            // — rather than two segments stitched together (a constant pace
-            // that only eases off in its last fraction reads as a coin that
-            // suddenly decides to stop, not one that was spinning down the
-            // whole time).
-            animate={{ rotateY: heads ? 1800 : 1980 }}
-            transition={{ duration: COIN_FLIP_S, ease: 'easeOut' }}
+            // Two segments now, not one continuous ease: a superfast, steady
+            // whirl through most of the rotation first — the coin is still
+            // in the air, so there's nothing to read yet — then the last
+            // stretch, saved for the finish, eases all the way down to a
+            // dead stop exactly on the result. A single ease across the
+            // whole spin never got fast enough at the top without also
+            // making the landing feel rushed; splitting the two lets each
+            // have its own pace.
+            animate={{ rotateY: [0, heads ? 1620 : 1782, heads ? 1800 : 1980] }}
+            transition={{ duration: COIN_FLIP_S, times: [0, 0.35, 1], ease: ['linear', 'easeOut'] }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
@@ -3039,6 +3231,70 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
               : 'Your opponent goes first. You receive energy immediately.'}
           </p>
         </motion.div>
+      </div>
+    </motion.div>
+  )
+}
+
+/** How long the mid-match flip spins — a fraction of the match-start one:
+ *  this happens as a rider on a strike that's already played out, not a
+ *  ceremony of its own, so it needs to read fast rather than dramatic. */
+const EFFECT_COIN_FLIP_S = 1.1
+
+/**
+ * The same coin, spun again — this time for a card's own "Flip a coin"
+ * effect mid-match, rather than who goes first. Smaller and quicker than
+ * `CoinFlip`, and it doesn't dim the board to near-black: the result
+ * matters, but it's a rider on an attack that already happened, not a
+ * moment the whole screen needs to stop for.
+ */
+function EffectCoinFlip({ heads, onDone }: { heads: boolean; onDone: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onDone, (EFFECT_COIN_FLIP_S + 0.55) * 1000)
+    return () => clearTimeout(timer)
+  }, [onDone])
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[70] grid place-items-center pointer-events-none"
+      style={{ background: 'rgba(8,6,3,.55)' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div style={{ width: 76, height: 76, perspective: 500, borderRadius: '50%', overflow: 'hidden' }}>
+          <motion.div
+            className="relative w-full h-full"
+            style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+            initial={{ rotateY: 0 }}
+            // Same shape as the match-start spin — superfast first, then a
+            // short, decisive settle — just compressed into a beat instead
+            // of several seconds.
+            animate={{ rotateY: [0, heads ? 1620 : 1782, heads ? 1800 : 1980] }}
+            transition={{ duration: EFFECT_COIN_FLIP_S, times: [0, 0.35, 1], ease: ['linear', 'easeOut'] }}
+          >
+            <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
+              <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+            <div
+              className="absolute inset-0"
+              style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+            >
+              <img src={asset('art/coin-tails.webp')} alt="" className="w-full h-full object-cover" />
+            </div>
+          </motion.div>
+        </div>
+
+        <motion.p
+          className="font-display text-base"
+          style={{ color: 'var(--gold-bright)' }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: EFFECT_COIN_FLIP_S + 0.05 }}
+        >
+          {heads ? 'Heads — draw 2 cards' : 'Tails'}
+        </motion.p>
       </div>
     </motion.div>
   )

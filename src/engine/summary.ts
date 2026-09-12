@@ -132,8 +132,10 @@ export function buildBreakdown(state: MatchState): MatchBreakdown {
     // `draw` carries no "what did this player choose to do" signal — it
     // happens every turn regardless of either side's play — so it stays out
     // of the play-by-play and everything counted from it (cards played,
-    // cards used) the same way it stays out of MVP scoring above.
-    if (!event || event.kind === 'draw') continue
+    // cards used) the same way it stays out of MVP scoring above. `coinFlip`
+    // is a rider on the attack that triggered it, not a choice of its own —
+    // the attack's own row already tells that story.
+    if (!event || event.kind === 'draw' || event.kind === 'coinFlip') continue
     timeline.push(entry)
 
     const mine = stats[entry.player]

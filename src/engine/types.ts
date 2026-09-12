@@ -163,6 +163,7 @@ export interface MatchEvent {
     | 'attack'
     | 'knockout'
     | 'draw'
+    | 'coinFlip'
   /** The card the event is centred on — the Figure played, the attacker, the
    *  Figure knocked out, whatever a screen would put a thumbnail of. */
   cardId: string
@@ -183,6 +184,9 @@ export interface MatchEvent {
   knockedOut?: boolean
   /** A Blinded Figure's coin-flip miss. */
   missed?: boolean
+  /** The result, for `coinFlip` — a card's own "Flip a coin" effect, shown
+   *  to the player rather than resolved silently. */
+  heads?: boolean
   /** Points earned, for `knockout` — 0 when a deny-points effect withheld
    *  them. */
   points?: number
