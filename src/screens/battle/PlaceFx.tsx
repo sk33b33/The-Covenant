@@ -61,18 +61,28 @@ const FADE_S = 0.35
 
 const RISE_MIN_S = 0.3
 const RISE_MAX_S = 0.5
-/** The drop got its own, slower speed and its own, wider bounds: pacing it
- *  off the same 1500px/s the rise uses still read as rushed for the Bench,
- *  which travels much farther from the held centre position than the
- *  Active slot does — a card that size covering that much ground in well
- *  under half a second reads as thrown, not set down. Slower and given more
- *  room to clamp into is what makes a long Bench drop feel like the same
- *  weight of card taking its time, rather than the short Active drop just
- *  padded out. */
+/** The drop's own, slower speed and its own, wider bounds: pacing it off the
+ *  rise's 1500px/s still read as rushed for the Bench, which travels much
+ *  farther from the held centre position than the Active slot does — a card
+ *  that size covering that much ground in well under half a second reads as
+ *  thrown, not set down. Slower still, and with more room to clamp into,
+ *  than the first pass at this: that one still landed near its own floor
+ *  for a typical Bench distance, which is what kept it reading as quick
+ *  regardless of the number on paper. */
 const RISE_PX_PER_S = 1500
-const DROP_PX_PER_S = 950
-const DROP_MIN_S = 0.34
-const DROP_MAX_S = 0.68
+const DROP_PX_PER_S = 500
+const DROP_MIN_S = 0.45
+const DROP_MAX_S = 1.05
+
+/** A single smooth ease shared by every leg of the trip that actually
+ *  covers ground — the rise and the drop. A standard, well-behaved
+ *  easeInOutCubic: both control points sit in x-order (0.65 before 0.86),
+ *  so the curve is strictly monotonic — no crossed control points to fold
+ *  the timing function back on itself and read as a hitch partway through.
+ *  It holds its slowest near both ends a little longer than Framer's own
+ *  `'easeInOut'`, which is what reads as smooth once nothing (no rebound,
+ *  no burst) is left to paper over an otherwise ordinary landing. */
+const EASE_SMOOTH = [0.65, 0, 0.35, 1] as const
 
 /** How much larger the card gets at the centre of the screen — matched to
  *  the draw reveal's own peak, so the two "hero" flourishes this game has
@@ -189,7 +199,7 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
           transition: {
             duration: TOTAL_S,
             times: [0, t1, t1mid, t1f, 1],
-            ease: ['easeInOut', 'easeInOut', 'easeInOut', 'linear'],
+            ease: [EASE_SMOOTH, EASE_SMOOTH, EASE_SMOOTH, 'linear'],
           },
         }
       : {
@@ -199,7 +209,7 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
           // standstill (flat at 0°) and arrives at another (flat at 180°,
           // held through the hold that follows).
           rotateY: [0, 180, 180],
-          transition: { duration: TOTAL_S, times: [0, t1, 1], ease: ['easeInOut', 'linear'] as const },
+          transition: { duration: TOTAL_S, times: [0, t1, 1], ease: [EASE_SMOOTH, 'linear'] as const },
         }
 
     return {
@@ -210,17 +220,18 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
         opacity: [1, 1, 1, 1, 0],
         transition: {
           // One ease per segment rather than one for the whole path — a
-          // single 'easeOut' across every stop front-loads speed at the
-          // start of *each* segment, which reads as a jolt everywhere a
-          // segment boundary sits on a standstill: the rise leaving a card
-          // at rest, and the drop leaving the held card at rest again.
-          // 'easeInOut' either side of those two standstills is what
-          // actually reads as one continuous motion rather than several
-          // separate ones stitched together. It lands and simply fades —
-          // no rebound — so the last segment is the fade alone.
+          // single ease across every stop front-loads speed at the start of
+          // *each* segment, which reads as a jolt everywhere a segment
+          // boundary sits on a standstill: the rise leaving a card at rest,
+          // and the drop leaving the held card at rest again. `EASE_SMOOTH`
+          // either side of those two standstills is what actually reads as
+          // one continuous motion rather than several stitched together —
+          // and, with no rebound left to paper over a hard stop, it's also
+          // what keeps the drop's own landing from reading as abrupt. It
+          // lands and simply fades, so the last segment is the fade alone.
           duration: TOTAL_S,
           times: [0, t1, t2, t3, 1],
-          ease: ['easeInOut', 'linear', 'easeInOut', 'easeOut'],
+          ease: [EASE_SMOOTH, 'linear', EASE_SMOOTH, 'easeOut'],
         },
       },
       flip,
