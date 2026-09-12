@@ -47,11 +47,6 @@ export interface DrawFxCard {
   toRect: DOMRect
 }
 
-/** How far apart, in seconds, two cards in the same batch launch — a
- *  draw-2 reads as two cards leaving in quick succession, not one double-wide
- *  blur or two identical flights landing on top of each other. */
-const STAGGER_S = 0.11
-
 /** The opponent's flight — never centred, never held, just a lift off the
  *  pile and straight into their hand. */
 const FOE_FLY_S = 0.32
@@ -70,6 +65,21 @@ const REVEAL_HOLD_S = 0.65
 const REVEAL_DROP_S = 0.35
 
 const OWN_TOTAL_S = REVEAL_FLY_S + REVEAL_HOLD_S + REVEAL_DROP_S
+
+/** How long the reveal's own double-flip takes to turn and settle — fixed,
+ *  not stretched across however long the hold happens to last, and set to
+ *  the exact pace a placed card's own double-flip already turns at (see
+ *  `PlaceFx`'s `RISE_S + FLIP_EXTRA_S`), so a drawn card's arrival reads as
+ *  the same flourish, not a slower echo of it. Comfortably shorter than
+ *  `REVEAL_FLY_S + REVEAL_HOLD_S`, so the card still settles, already
+ *  turned face-up, before the hold it's read during is over. */
+const FLIP_S = 0.8
+
+/** How long a full batch takes when every card in it draws one at a time —
+ *  each side's own trip, `n` times over, rather than a fixed small stagger
+ *  between overlapping flights: the second card doesn't leave until the
+ *  first has actually landed in the hand. */
+const totalFor = (side: PlayerId) => (side === 'you' ? OWN_TOTAL_S : FOE_TOTAL_S)
 
 /** How much larger the opponent's card gets at the top of its arc — enough
  *  to read as lifted, well short of the sortie's own peak, since this never
@@ -102,8 +112,7 @@ export function DrawFx({ trigger, onDone }: { trigger: DrawFxTrigger | null; onD
 
   useEffect(() => {
     if (id === undefined || !trigger) return
-    const last = trigger.draws.length - 1
-    const total = last * STAGGER_S + (trigger.draws.some((d) => d.side === 'you') ? OWN_TOTAL_S : FOE_TOTAL_S)
+    const total = trigger.draws.reduce((sum, d) => sum + totalFor(d.side), 0)
     const timer = setTimeout(onDone, total * 1000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,11 +120,20 @@ export function DrawFx({ trigger, onDone }: { trigger: DrawFxTrigger | null; onD
 
   if (!trigger) return null
 
+  // One card at a time: the next one's own `delay` is the moment the one
+  // before it actually lands, not a fixed stagger clipped over its still-
+  // ongoing flight — a draw-2 reads as the first card's full reveal, then
+  // the second's, rather than two flights blurred over each other.
+  let start = 0
+  const cards = trigger.draws.map((draw, i) => {
+    const delay = start
+    start += totalFor(draw.side)
+    return <DrawCard key={i} draw={draw} delay={delay} />
+  })
+
   return (
     <div className="cov-draw-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
-      {trigger.draws.map((draw, i) => (
-        <DrawCard key={i} draw={draw} delay={i * STAGGER_S} />
-      ))}
+      {cards}
     </div>
   )
 }
@@ -181,8 +199,12 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
     // reaches the peak, turns away again, then turns face-up a second time
     // to settle on, rather than a single flat turn. A drawn card is read
     // exactly as closely as a played one; it earns the same flourish, not
-    // a lesser version of it.
-    const midAt = (flyAt + holdAt) / 2
+    // a lesser version of it — including the *pace* of it: `flipEndAt` is
+    // pinned to a fixed `FLIP_S`, the same span `PlaceFx`'s own double-flip
+    // takes, rather than `holdAt` (which would stretch it to match however
+    // long this particular hold happens to last).
+    const flipEndAt = FLIP_S / total
+    const flipMidAt = (flyAt + flipEndAt) / 2
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x],
@@ -196,7 +218,7 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
       },
       flip: {
         rotateY: [0, 180, 360, 540, 540],
-        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, midAt, holdAt, 1] },
+        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, flipMidAt, flipEndAt, 1] },
       },
     }
     // Recomputed only if the trip itself changes — the rects are measured

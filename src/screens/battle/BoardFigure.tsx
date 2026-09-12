@@ -60,6 +60,17 @@ interface Props {
    *  without the picked ring, so it doesn't read as more committed than it
    *  is. Unset (or false) once the slot has actually been chosen. */
   previewTentative?: boolean
+  /**
+   * A pulsing dashed placeholder for a slot whose real Figure exists but is
+   * being held back off-screen — the opponent's own newly placed or ascended
+   * Figure, hidden by uid for exactly as long as its own reactive `PlaceFx`
+   * flight is still in the air (see `hiddenFoeFigureUid` in Battle.tsx).
+   * The same "something's arriving" tell the hand's own ghost card already
+   * gives a drawn card before it lands — deliberately withholding *what*,
+   * unlike `previewCardId` (a pick already known, shown face-up), since
+   * there's nothing here yet for the slot itself to have an opinion about.
+   */
+  ghost?: boolean
 }
 
 export function BoardFigure({
@@ -74,6 +85,7 @@ export function BoardFigure({
   className,
   previewCardId,
   previewTentative,
+  ghost,
 }: Props) {
   if (!figure) {
     return (
@@ -82,6 +94,14 @@ export function BoardFigure({
         style={{ width, aspectRatio: '63 / 88' }}
       >
         <SlotOutline label={emptyLabel} />
+        {ghost && (
+          <motion.div
+            className="absolute inset-0 rounded-[8%]"
+            style={{ border: '1.5px dashed rgba(229,192,140,.35)', background: 'rgba(229,192,140,.04)' }}
+            animate={{ opacity: [0.5, 0.9, 0.5] }}
+            transition={{ duration: 1.1, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
         <AnimatePresence>
           {previewCardId && (
             <motion.div

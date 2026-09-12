@@ -1622,7 +1622,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // (see `hiddenFoeFigureUid` above) layered on top of the existing
   // pre-hit/felled hold `shownActive` already does.
   const rawFoeActive = shownActive('foe')
-  const foeActiveShown = rawFoeActive && rawFoeActive.uid === hiddenFoeFigureUid ? null : rawFoeActive
+  const foeActiveGhost = Boolean(rawFoeActive && rawFoeActive.uid === hiddenFoeFigureUid)
+  const foeActiveShown = foeActiveGhost ? null : rawFoeActive
 
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
@@ -1698,6 +1699,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   emptyLabel=""
                   onClick={shown ? () => openFoe(shown) : undefined}
                   noPeek={Boolean(shown)}
+                  ghost={figure !== null && figure.uid === hiddenFoeFigureUid}
                 />
               </div>
             )
@@ -1719,6 +1721,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               emptyLabel="Active"
               onClick={foeActiveShown ? () => openFoe(foeActiveShown) : undefined}
               noPeek={Boolean(foeActiveShown)}
+              ghost={foeActiveGhost}
             />
           </motion.div>
         </div>
