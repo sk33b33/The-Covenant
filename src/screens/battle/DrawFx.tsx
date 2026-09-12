@@ -176,6 +176,13 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
 
     const flyAt = REVEAL_FLY_S / total
     const holdAt = (REVEAL_FLY_S + REVEAL_HOLD_S) / total
+    // The reveal turns twice, not once — the same double-flip a placed
+    // card's own arrival uses (see `PlaceFx`): it turns face-up as it
+    // reaches the peak, turns away again, then turns face-up a second time
+    // to settle on, rather than a single flat turn. A drawn card is read
+    // exactly as closely as a played one; it earns the same flourish, not
+    // a lesser version of it.
+    const midAt = (flyAt + holdAt) / 2
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x],
@@ -188,8 +195,8 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
         },
       },
       flip: {
-        rotateY: [0, 0, 180, 180],
-        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, holdAt, 1] },
+        rotateY: [0, 180, 360, 540, 540],
+        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, midAt, holdAt, 1] },
       },
     }
     // Recomputed only if the trip itself changes — the rects are measured

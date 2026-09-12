@@ -754,20 +754,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const heads = coinFlip?.event?.heads ?? null
 
     // The opponent's own plays and ascensions get the same drop flourish as
-    // yours, but only in real play — `turn` is still 0 for every entry the
-    // opening SETUP action logs (it only advances inside `beginTurn`, which
-    // runs after setup's own placements), so this is what tells "the AI just
-    // filled its bench mid-game" apart from "the opening board is being
-    // dealt out," without needing to read `state.phase` (ambiguous mid
-    // transition) or match on log text (setup and mid-game bench entries
-    // read identically). Independent of the `fxInFlight`/hand-off gating
-    // below — a bench fill isn't racing an attack the way a turn-start draw
-    // is — and of the early return just past it, so it still runs on a
-    // commit that carried nothing else worth animating.
+    // yours — its opening SETUP board included, not just mid-game bench
+    // fills: `useMatch`'s own `foeSetUp` effect doesn't dispatch that action
+    // until `coinSettled && handsRevealed`, so by the time these entries
+    // land here the deal has already finished and the foe's hand is already
+    // sitting in view for a flight to leave from — there's no early-paint
+    // race to dodge the way there was reason to fear. Independent of the
+    // `fxInFlight`/hand-off gating below — a bench fill isn't racing an
+    // attack the way a turn-start draw is — and of the early return just
+    // past it, so it still runs on a commit that carried nothing else worth
+    // animating.
     const foePlaces = added.filter(
       (entry): entry is typeof entry & { event: MatchEvent & { uid: string } } =>
         entry.player === 'foe' &&
-        entry.turn >= 1 &&
         (entry.event?.kind === 'play' || entry.event?.kind === 'ascend') &&
         Boolean(entry.event.uid),
     )

@@ -163,9 +163,23 @@ export function PlaceFx({
     <div className="cov-place-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
       {/* Painted first, so it sits *behind* the card in the same stacking
           context — light breaking out from underneath it, not laid over
-          the top of it. */}
-      <LandingGlow trigger={trigger} />
-      <PlaceCard trigger={trigger} />
+          the top of it.
+
+          Both keyed on the trigger's own id — a solo placement always sees
+          `trigger` pass through `null` between one and the next (this
+          component returns `null` above whenever it is), which unmounts
+          these on its own and makes a fresh mount, and therefore each
+          card's own `initial`, redundant to ask for outright. A *queued*
+          run of them (the opponent's own bench fills, landing one after
+          another off `startNextFoePlace`) never takes that detour: its own
+          `onDone` sets the next trigger in the very same handler that
+          cleared this one, so React batches the two into a single commit
+          and this element is never unmounted at all — without a key tied
+          to the id, the second card in a queued run would inherit the
+          first one's *already-settled* motion values instead of its own
+          `initial`, and play no flip or glow of its own at all. */}
+      <LandingGlow key={`glow-${trigger.id}`} trigger={trigger} />
+      <PlaceCard key={`card-${trigger.id}`} trigger={trigger} />
     </div>
   )
 }
