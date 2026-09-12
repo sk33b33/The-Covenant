@@ -33,6 +33,7 @@ import {
   type AttackFxTrigger,
 } from './battle/AttackFx'
 import { AttackSortie, type AttackSortieTrigger } from './battle/AttackSortie'
+import { DealFx, type DealFxTrigger } from './battle/DealFx'
 import { DrawFx, type DrawFxTrigger } from './battle/DrawFx'
 import { MatchResult } from './battle/MatchResult'
 import { PlaceFx, type PlaceFxTrigger } from './battle/PlaceFx'
@@ -104,6 +105,24 @@ function drawLandingRect(side: PlayerId, trayEl: HTMLDivElement): DOMRect {
  */
 function handCardRectAt(point: { x: number; y: number }): DOMRect {
   return new DOMRect(point.x - HAND_W / 2, point.y - HAND_CARD_H / 2, HAND_W, HAND_CARD_H)
+}
+
+/**
+ * Where hand index `i` of an `count`-card opening hand will actually sit in
+ * the fan, for `DealFx` — the same horizontal spacing `PlayerHand`'s own fan
+ * spreads its cards by (see `fanSpanStep` below), applied to the tray's own
+ * landing spot rather than the single centred one a drawn card lands on, so
+ * each of the five cards flies to its own seat instead of all landing in
+ * the same place. The fan's tiny rotation and arc-height are left out: they
+ * amount to a few degrees and a handful of pixels here, well below what a
+ * flight this quick would ever read, and the real card underneath carries
+ * both the instant it's revealed regardless.
+ */
+function dealCardRect(index: number, count: number, trayEl: HTMLDivElement): DOMRect {
+  const base = drawLandingRect('you', trayEl)
+  const mid = (count - 1) / 2
+  const offset = index - mid
+  return new DOMRect(base.left + offset * fanSpanStep(count), base.top, base.width, base.height)
 }
 
 /*
@@ -232,6 +251,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // False until the kickoff card has had its say — both hands render empty
   // until then, so nobody has anything to place or peek at underneath it.
   const [handsRevealed, setHandsRevealed] = useState(false)
+  // Your own opening hand flying in from the pile, one card at a time — see
+  // `startDeal`.
+  const [dealFx, setDealFx] = useState<DealFxTrigger | null>(null)
+  // Which of your own hand indices `dealFx` hasn't landed yet — these sit in
+  // the fan already, at their true final seats, just invisible until then
+  // (see `HandCard`'s own `invisible`).
+  const [dealPendingIndices, setDealPendingIndices] = useState<number[]>([])
   // The attacking card's flight, which runs *before* the attack it belongs to
   // is dispatched — see `launchSortie`.
   const [sortie, setSortie] = useState<AttackSortieTrigger | null>(null)
@@ -245,6 +271,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // The hand index currently in the air, if any — hidden from the fan for
   // as long as `placeFx` is flying it (see `PlayerHand`'s own `placingIndex`).
   const [placingIndex, setPlacingIndex] = useState<number | null>(null)
+  // Your own hand indices a `drawFx` batch is currently carrying — hidden
+  // from the fan the same way, so the real card doesn't sit in the fan
+  // already while its own flourish is still mid-flight to it. The
+  // opponent's hand shows no indices at all (just a count), so their side
+  // of the same problem is a count to subtract instead.
+  const [hiddenDrawIndices, setHiddenDrawIndices] = useState<number[]>([])
+  const [hiddenFoeDrawCount, setHiddenFoeDrawCount] = useState(0)
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -548,15 +581,37 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const handoffTimers = useRef<ReturnType<typeof setTimeout>[]>([])
   useEffect(() => () => handoffTimers.current.forEach(clearTimeout), [])
 
-  const presentHandoff = (cue: TurnCue | null, draws: DrawFxTrigger['draws']) => {
+  /** Hides whichever hand indices/count a batch of draws is about to carry,
+   *  right as the flight itself is scheduled — so the real cards stay out
+   *  of the fan for exactly as long as `drawFx` is in the air, not from the
+   *  moment the engine actually dealt them (which, for a turn-start draw,
+   *  is several beats earlier — see `presentHandoff` below). */
+  const hideDrawnCards = (youNewIndices: number[], foeDrawCount: number) => {
+    if (youNewIndices.length) setHiddenDrawIndices((prev) => [...prev, ...youNewIndices])
+    if (foeDrawCount) setHiddenFoeDrawCount((prev) => prev + foeDrawCount)
+  }
+
+  const presentHandoff = (
+    cue: TurnCue | null,
+    draws: DrawFxTrigger['draws'],
+    youNewIndices: number[],
+    foeDrawCount: number,
+  ) => {
     if (cue) {
       handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
       if (draws.length) {
         handoffTimers.current.push(
-          setTimeout(() => setDrawFx({ id: ++drawFxId.current, draws }), (BEAT_S + 2 * BEAT_S) * 1000),
+          setTimeout(
+            () => {
+              hideDrawnCards(youNewIndices, foeDrawCount)
+              setDrawFx({ id: ++drawFxId.current, draws })
+            },
+            (BEAT_S + 2 * BEAT_S) * 1000,
+          ),
         )
       }
     } else if (draws.length) {
+      hideDrawnCards(youNewIndices, foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws })
     }
   }
@@ -580,6 +635,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const announced = useRef<string | null>(null)
   const pendingCue = useRef<TurnCue | null>(null)
   const pendingDraws = useRef<DrawFxTrigger['draws']>([])
+  const pendingYouIndices = useRef<number[]>([])
+  const pendingFoeCount = useRef(0)
 
   useEffect(() => {
     const prevLen = seenLogLen.current
@@ -607,6 +664,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       ]
     })
 
+    // Draws always push to the end of `hand`, in order — search and dig's
+    // own `addToHand` calls do too — so whatever grew this commit is
+    // exactly the last `youDrawCount` indices of the hand as it stands
+    // right now, regardless of anything else (a played card's own splice
+    // included) that also happened earlier in the same commit.
+    const youDrawCount = draws.filter((d) => d.side === 'you').length
+    const youNewIndices = Array.from({ length: youDrawCount }, (_, i) => you.hand.length - youDrawCount + i)
+    const foeDrawCount = draws.length - youDrawCount
+
     let cue: TurnCue | null = null
     if (coinSettled && !simulating && state.phase === 'main') {
       const key = `${state.turn}:${state.current}`
@@ -619,10 +685,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (!cue && draws.length === 0) return
 
     if (fxInFlight.current) {
+      // Accumulated, not overwritten: a second commit landing while the
+      // first is still queued (say, a mid-turn Miracle draw right before
+      // the turn's own hand-off draw) would otherwise wipe the first draw's
+      // own indices out from under it — its card is already in `hand` by
+      // then, so losing the index here means it skips the hide entirely and
+      // just appears, unannounced, while only the later draw gets to fly.
       if (cue) pendingCue.current = cue
-      pendingDraws.current = draws
+      pendingDraws.current = [...pendingDraws.current, ...draws]
+      pendingYouIndices.current = [...pendingYouIndices.current, ...youNewIndices]
+      pendingFoeCount.current += foeDrawCount
     } else {
-      presentHandoff(cue, draws)
+      presentHandoff(cue, draws, youNewIndices, foeDrawCount)
     }
     // Re-fires on every commit that could carry a fresh draw or a fresh
     // turn — the guards above are what keep it a no-op otherwise.
@@ -694,9 +768,11 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setHeld(null)
     fxInFlight.current = false
     if (pendingCue.current || pendingDraws.current.length) {
-      presentHandoff(pendingCue.current, pendingDraws.current)
+      presentHandoff(pendingCue.current, pendingDraws.current, pendingYouIndices.current, pendingFoeCount.current)
       pendingCue.current = null
       pendingDraws.current = []
+      pendingYouIndices.current = []
+      pendingFoeCount.current = 0
     }
   }
 
@@ -1027,6 +1103,29 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const foePileRef = useRef<HTMLDivElement>(null)
   const youHandRef = useRef<HTMLDivElement>(null)
   const foeHandRef = useRef<HTMLDivElement>(null)
+
+  // Fires once the kickoff card is gone: your opening hand flies in from
+  // the pile, one card at a time, left to right, into a fan that's already
+  // its true five-card shape from the first card on (see `dealCardRect` and
+  // `HandCard`'s own `invisible`). A missing pile or tray just deals the
+  // hand in place instead of skipping it outright — the match still has to
+  // be playable even if this couldn't measure anything to fly between.
+  const dealFxId = useRef(0)
+  const startDeal = () => {
+    const pileEl = youPileRef.current
+    const trayEl = youHandRef.current
+    const count = you.hand.length
+    if (!pileEl || !trayEl || count === 0) {
+      setHandsRevealed(true)
+      return
+    }
+
+    const fromRect = pileEl.getBoundingClientRect()
+    const cards = you.hand.map((cardId, i) => ({ cardId, fromRect, toRect: dealCardRect(i, count, trayEl) }))
+    setHandsRevealed(true)
+    setDealPendingIndices(cards.map((_, i) => i))
+    setDealFx({ id: ++dealFxId.current, cards })
+  }
 
   // A drop target padded a few px beyond its own box, so a drop that lands
   // just outside a slot's visible edge — an easy miss on a small touchscreen
@@ -1406,7 +1505,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         }}
       >
         <div ref={foeHandRef} className="w-full">
-          <OpponentHand count={handsRevealed ? foe.hand.length : 0} />
+          <OpponentHand count={handsRevealed ? Math.max(0, foe.hand.length - hiddenFoeDrawCount) : 0} />
         </div>
 
         {/* Nudged down via `transform`, same reasoning as YOU_ROW_LIFT below:
@@ -1643,6 +1742,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               simulating={simulating}
               playable={actionsFor.byHand}
               placingIndex={placingIndex}
+              hiddenDrawIndices={hiddenDrawIndices}
+              dealPendingIndices={dealPendingIndices}
               onTap={(index) => {
                 // Setup places cards by drag only now — a tap during setup used
                 // to auto-assign the next open slot, but that made the drag
@@ -1763,9 +1864,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
       <AttackSortie trigger={sortie} onDone={landSortie} />
 
-      <DrawFx trigger={drawFx} onDone={() => setDrawFx(null)} />
+      <DrawFx
+        trigger={drawFx}
+        onDone={() => {
+          setDrawFx(null)
+          setHiddenDrawIndices([])
+          setHiddenFoeDrawCount(0)
+        }}
+      />
 
       <PlaceFx trigger={placeFx} onLand={landPlaceFx} onDone={() => setPlaceFx(null)} />
+
+      <DealFx
+        trigger={dealFx}
+        onCardLand={(i) => setDealPendingIndices((prev) => prev.filter((x) => x !== i))}
+        onDone={() => setDealFx(null)}
+      />
 
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
@@ -1780,7 +1894,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             cue={kickoff}
             onDone={() => {
               setKickoff(null)
-              setHandsRevealed(true)
+              startDeal()
             }}
           />
         )}
@@ -1935,6 +2049,8 @@ function PlayerHand({
   simulating,
   playable,
   placingIndex,
+  hiddenDrawIndices,
+  dealPendingIndices,
   onTap,
   onDragStart,
   onDropEnd,
@@ -1953,6 +2069,16 @@ function PlayerHand({
    *  here the same as a setup pick is, so the flying copy over the board
    *  is the only one on screen while it plays. */
   placingIndex: number | null
+  /** Indices a `drawFx` batch is currently carrying — hidden the same way,
+   *  so a just-drawn card doesn't sit in the fan already while its own
+   *  flourish is still flying it there. */
+  hiddenDrawIndices: number[]
+  /** Indices the opening deal hasn't revealed yet — unlike the two above,
+   *  these stay *in* the fan's own layout (so the fan is already its final
+   *  five-card shape from the first card on) but render invisible and
+   *  unreachable until `DealFx` lands each one. See `HandCard`'s own
+   *  `invisible`. */
+  dealPendingIndices: number[]
   onTap: (index: number, isBasic: boolean) => void
   onDragStart: (index: number) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
@@ -1970,7 +2096,12 @@ function PlayerHand({
   // centre, for any hand size and whichever card was just picked.
   const visibleIndices = hand
     .map((_, i) => i)
-    .filter((i) => i !== placingIndex && !(setupPhase && (setupActive === i || setupBench.includes(i))))
+    .filter(
+      (i) =>
+        i !== placingIndex &&
+        !hiddenDrawIndices.includes(i) &&
+        !(setupPhase && (setupActive === i || setupBench.includes(i))),
+    )
   const count = visibleIndices.length
   const mid = (count - 1) / 2
   const rotateStep = fanRotateStep(count)
@@ -2233,8 +2364,11 @@ function PlayerHand({
         // as it never having left. Mid-match has no equivalent limbo: a
         // played card leaves `hand` for real, immediately, on dispatch — but
         // a drop's own placement is held back until `PlaceFx` lands (see
-        // `placingIndex`), so this card needs hiding a beat early too.
-        if (index === placingIndex || (setupPhase && (pickedActive || pickedBench))) return null
+        // `placingIndex`), and a draw's own arrival the same way until
+        // `drawFx` lands (see `hiddenDrawIndices`), so both need hiding a
+        // beat early too.
+        if (index === placingIndex || hiddenDrawIndices.includes(index) || (setupPhase && (pickedActive || pickedBench)))
+          return null
         const isBasic = basicsInHand.some((b) => b.index === index)
         // Rank among the visible cards, not the raw hand index — see the
         // comment on `visibleIndices` above.
@@ -2261,6 +2395,7 @@ function PlayerHand({
             }}
             controls={handleFor(index)}
             canLift={canLift}
+            invisible={dealPendingIndices.includes(index)}
             pose={{
               // The fan itself never moves — only `y` and `scale` change for
               // whichever card is focused, so there's nothing else to
@@ -2357,6 +2492,7 @@ function HandCard({
   controls,
   elementRef,
   disabled,
+  invisible,
   onClick,
   onBrush,
   onUnbrush,
@@ -2370,6 +2506,13 @@ function HandCard({
   controls: DragControls
   elementRef: (el: HTMLButtonElement | null) => void
   disabled: boolean
+  /** Sitting in its true resting spot already — so the fan's own shape is
+   *  final and doesn't reshuffle as siblings arrive — but not shown or
+   *  reachable yet: the opening deal reveals cards left to right into a
+   *  fan that's already the right shape from the first one, rather than a
+   *  fan that grows and repositions everyone already in it as each new
+   *  card joins. */
+  invisible?: boolean
   onClick?: (() => void) | undefined
   onBrush: () => void
   onUnbrush: () => void
@@ -2406,12 +2549,14 @@ function HandCard({
         marginLeft: -HAND_W / 2,
         zIndex: pose.zIndex,
         transformOrigin: 'bottom center',
+        opacity: invisible ? 0 : 1,
+        pointerEvents: invisible ? 'none' : undefined,
       }}
       animate={{ rotate: pose.rotate, scale: pose.scale }}
       transition={FAN_SPRING}
       onPointerEnter={onBrush}
       onPointerLeave={onUnbrush}
-      drag={canLift}
+      drag={canLift && !invisible}
       // Never from this card's own pointerdown: the tray reads the gesture
       // first and starts the drag itself, so that riffling sideways through
       // the hand doesn't pull a card out of it. See PlayerHand's own doc.

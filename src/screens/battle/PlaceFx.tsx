@@ -26,9 +26,9 @@ import { requireCard } from '@/data/cards'
  * Figure standing on it, which keeps its old face right up until the new one
  * lands. The card itself doesn't vanish outright on contact: it settles with
  * a small squash-and-rebound, like something with real weight meeting the
- * mat, while a burst of gold rays shoots out from underneath it — and only
- * once that settles does the card fade the rest of the way out, handing off
- * to the Figure now actually standing in its place.
+ * mat, while a burst of white-gold light shoots out from underneath it — and
+ * only once that settles does the card fade the rest of the way out, handing
+ * off to the Figure now actually standing in its place.
  */
 
 export interface PlaceFxTrigger {
@@ -42,19 +42,30 @@ export interface PlaceFxTrigger {
   toRect: DOMRect
 }
 
-const RISE_S = 0.38
 /** How long the card holds at the centre of the screen, turned face-up,
  *  before falling — brief on purpose: nothing here is being read for the
  *  first time the way a drawn card is, this is a beat of drama rather than
- *  information. */
+ *  information. Fixed, unlike the rise and drop below: nothing about a hold
+ *  in place scales with distance. */
 const HOLD_S = 0.18
-const DROP_S = 0.3
 /** The settle: a squash-and-rebound on contact, then the fade that hands
- *  off to the real Figure the landing just placed. */
+ *  off to the real Figure the landing just placed. Also fixed — a contact
+ *  effect, not a trip. */
 const IMPACT_S = 0.35
 
-const TO_LAND_S = RISE_S + HOLD_S + DROP_S
-const TOTAL_S = TO_LAND_S + IMPACT_S
+const RISE_MIN_S = 0.3
+const RISE_MAX_S = 0.5
+const DROP_MIN_S = 0.24
+const DROP_MAX_S = 0.46
+/** The speed, in px/s, the rise and drop are paced to — each phase's own
+ *  duration is its distance divided by this, clamped to the ranges above.
+ *  A flat duration regardless of distance is what made the Bench's own drop
+ *  read as rushed: it travels much farther from the held centre position
+ *  than the Active slot does, so covering that ground in the same fixed
+ *  time is a genuinely faster drop, whatever the clock says. Pacing both
+ *  phases by speed instead keeps every destination feeling like the same
+ *  weight of card making the same kind of trip. */
+const TRAVEL_PX_PER_S = 1500
 
 /** How much larger the card gets at the centre of the screen — matched to
  *  the draw reveal's own peak, so the two "hero" flourishes this game has
@@ -62,7 +73,37 @@ const TOTAL_S = TO_LAND_S + IMPACT_S
 const PEAK_SCALE = 1.7
 
 const SHADOW = '0 10px 20px rgba(0,0,0,.55)'
-const GOLD = 'var(--gold-bright, #e8c274)'
+/** The burst's own colours — white at the core fading to a warm yellow at
+ *  the tip of each ray, rather than the game's usual gold leaf: this is
+ *  meant to read as light itself breaking through, not another gilded
+ *  surface like the frames and orbs already are. */
+const WHITE = '#ffffff'
+const YELLOW = '#ffe066'
+
+/**
+ * Every timing and position this flight needs, derived once from the two
+ * rects a trigger carries — shared between the component that schedules
+ * `onLand`/`onDone` and the two that actually animate, so neither can drift
+ * out of sync with the other's idea of how long the trip takes.
+ */
+function computeTimings(fromRect: DOMRect, toRect: DOMRect) {
+  const fromCX = fromRect.left + fromRect.width / 2
+  const fromCY = fromRect.top + fromRect.height / 2
+  const toCX = toRect.left + toRect.width / 2
+  const toCY = toRect.top + toRect.height / 2
+  const peakX = window.innerWidth / 2
+  const peakY = window.innerHeight / 2
+
+  const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+  const riseDist = Math.hypot(peakX - fromCX, peakY - fromCY)
+  const dropDist = Math.hypot(toCX - peakX, toCY - peakY)
+  const RISE_S = clamp(riseDist / TRAVEL_PX_PER_S, RISE_MIN_S, RISE_MAX_S)
+  const DROP_S = clamp(dropDist / TRAVEL_PX_PER_S, DROP_MIN_S, DROP_MAX_S)
+  const TO_LAND_S = RISE_S + HOLD_S + DROP_S
+  const TOTAL_S = TO_LAND_S + IMPACT_S
+
+  return { fromCX, fromCY, toCX, toCY, peakX, peakY, RISE_S, DROP_S, TO_LAND_S, TOTAL_S }
+}
 
 export function PlaceFx({
   trigger,
@@ -81,7 +122,8 @@ export function PlaceFx({
   const id = trigger?.id
 
   useEffect(() => {
-    if (id === undefined) return
+    if (id === undefined || !trigger) return
+    const { TO_LAND_S, TOTAL_S } = computeTimings(trigger.fromRect, trigger.toRect)
     const landTimer = setTimeout(onLand, TO_LAND_S * 1000)
     const doneTimer = setTimeout(onDone, TOTAL_S * 1000)
     return () => {
@@ -95,8 +137,11 @@ export function PlaceFx({
 
   return (
     <div className="cov-place-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
+      {/* Painted first, so it sits *behind* the card in the same stacking
+          context — light breaking out from underneath it, not laid over
+          the top of it. */}
+      <LightBurst trigger={trigger} />
       <PlaceCard trigger={trigger} />
-      <GoldBurst toRect={trigger.toRect} />
     </div>
   )
 }
@@ -105,12 +150,7 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
   const { cardId, fromRect, toRect } = trigger
 
   const path = useMemo(() => {
-    const fromCX = fromRect.left + fromRect.width / 2
-    const fromCY = fromRect.top + fromRect.height / 2
-    const toCX = toRect.left + toRect.width / 2
-    const toCY = toRect.top + toRect.height / 2
-    const peakX = window.innerWidth / 2
-    const peakY = window.innerHeight / 2
+    const { fromCX, fromCY, toCX, toCY, peakX, peakY, RISE_S, TO_LAND_S, TOTAL_S } = computeTimings(fromRect, toRect)
     const endScale = toRect.width / fromRect.width
 
     const at = (cx: number, cy: number, scale: number) => ({ x: cx - fromCX, y: cy - fromCY, scale })
@@ -201,40 +241,50 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
   )
 }
 
-/** How many rays break from under the card — enough to read as a burst
- *  rather than a fan of individual spokes, few enough that each one is
- *  still a distinct shaft of light rather than a blurred wheel. */
-const RAY_COUNT = 10
+/** How many rays break from under the card — enough to read as a genuine
+ *  burst rather than a handful of spokes, still few enough that each one
+ *  is a distinct shaft of light rather than a blurred wheel. */
+const RAY_COUNT = 18
 
-/** The gold light breaking from under the card the instant it lands — a
- *  small core flash and a burst of thin rays shooting outward from it,
- *  timed to start exactly on contact rather than riding the card's own
- *  transition. Rays, not a radius: the light is meant to read as shafts
- *  breaking outward from underneath the card, not a glow spreading evenly
- *  around it. */
-function GoldBurst({ toRect }: { toRect: DOMRect }) {
+/**
+ * The light breaking from under the card the instant it lands — a bright
+ * white-gold core and a burst of rays shooting outward from it, timed to
+ * start exactly on contact rather than riding the card's own transition.
+ *
+ * Rays, not a radius: the light is meant to read as shafts breaking outward
+ * from underneath the card, not a glow spreading evenly around it. Both the
+ * core and the rays use `screen` blend mode, which is what "brighter" means
+ * against a background this dark — it adds light onto what's already
+ * there instead of painting a flat colour over it, so overlapping rays and
+ * the core they share actually intensify each other the way real light does.
+ */
+function LightBurst({ trigger }: { trigger: PlaceFxTrigger }) {
+  const { toRect } = trigger
+  const { TO_LAND_S } = useMemo(() => computeTimings(trigger.fromRect, trigger.toRect), [trigger])
+
   const cx = toRect.left + toRect.width / 2
   const cy = toRect.top + toRect.height / 2
-  const rayLength = toRect.width * 1.6
-  const rayWidth = toRect.width * 0.05
+  const rayLength = toRect.width * 1.9
+  const rayWidth = toRect.width * 0.07
+  const coreSize = toRect.width * 0.5
 
   return (
-    <div className="absolute" style={{ left: cx, top: cy, width: 0, height: 0 }}>
+    <div className="absolute" style={{ left: cx, top: cy, width: 0, height: 0, mixBlendMode: 'screen' }}>
       {/* The core the rays appear to shoot out of — small and quick,
           nowhere near the spread a radial glow would need, since it's a
           source for the rays to read from rather than the effect itself. */}
       <motion.div
         className="absolute rounded-full"
         style={{
-          left: -toRect.width * 0.16,
-          top: -toRect.width * 0.16,
-          width: toRect.width * 0.32,
-          height: toRect.width * 0.32,
-          background: GOLD,
-          boxShadow: `0 0 ${toRect.width * 0.4}px ${toRect.width * 0.14}px ${GOLD}`,
+          left: -coreSize / 2,
+          top: -coreSize / 2,
+          width: coreSize,
+          height: coreSize,
+          background: WHITE,
+          boxShadow: `0 0 ${toRect.width * 0.9}px ${toRect.width * 0.3}px ${YELLOW}`,
         }}
         initial={{ opacity: 0, scale: 0.2 }}
-        animate={{ opacity: [0, 1, 0], scale: [0.2, 1, 1.2] }}
+        animate={{ opacity: [0, 1, 0], scale: [0.2, 1, 1.3] }}
         transition={{ duration: IMPACT_S * 0.75, delay: TO_LAND_S, ease: 'easeOut' }}
       />
 
@@ -243,7 +293,7 @@ function GoldBurst({ toRect }: { toRect: DOMRect }) {
         // Alternating lengths read as a burst radiating unevenly, the way
         // real light through a break does, rather than a perfect gear of
         // identical spokes.
-        const length = rayLength * (i % 2 === 0 ? 1 : 0.62)
+        const length = rayLength * (i % 2 === 0 ? 1 : 0.6)
         return (
           <motion.div
             key={i}
@@ -253,7 +303,7 @@ function GoldBurst({ toRect }: { toRect: DOMRect }) {
               top: -length,
               width: rayWidth,
               height: length,
-              background: `linear-gradient(to top, ${GOLD}, transparent)`,
+              background: `linear-gradient(to top, ${WHITE}, ${YELLOW} 45%, transparent)`,
               transformOrigin: '50% 100%',
               rotate: angle,
             }}
