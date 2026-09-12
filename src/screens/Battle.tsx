@@ -591,12 +591,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
   // The unit the turn banner's own entrance is paced on — the same ~420ms
   // "beat" the result screen already waits one out on (see `resultReady`
-  // below). A strike lands, a beat later the turn banner rises — but the
-  // turn-start draw riding along with it no longer waits on the banner at
-  // all: it takes flight the instant the hand-off itself is presented,
-  // same as a mid-turn effect's own draw (a Miracle, a Covenant) always
-  // has. A card is drawn the moment it's drawn; only the announcement of
-  // whose turn it is has a beat of its own to make.
+  // below). A strike lands, a beat later the turn banner rises; the
+  // turn-start draw riding along with it stays ghosted in the fan for as
+  // long as the banner is up and only takes flight once it has actually
+  // swept off screen (see `releaseCue`) — the two would otherwise compete
+  // for the same moment of attention. A mid-turn effect's own draw (a
+  // Miracle, a Covenant) has no banner to share the screen with and is
+  // never held back.
   const BEAT_S = 0.42
 
   const handoffTimers = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -629,6 +630,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       hideDrawnCards(pending.youNewIndices, pending.foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws: pending.draws })
     }
+  }
+
+  // The turn-start draw's own flight — held back until the turn banner it
+  // rides in with has fully swept off screen, rather than flying out from
+  // underneath it. The ghost placeholder (see `hiddenDrawIndices`) still
+  // takes the drawn card's seat in the fan the instant it's known, same as
+  // ever; only the reveal itself waits on the banner. See `releaseCue`.
+  const pendingPostCue = useRef<DrawFxTrigger['draws']>([])
+
+  const releaseCue = () => {
+    setTurnCue(null)
+    const draws = pendingPostCue.current
+    pendingPostCue.current = []
+    if (draws.length) setDrawFx({ id: ++drawFxId.current, draws })
   }
 
   const foePlaceFxId = useRef(0)
@@ -691,6 +706,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (heads !== null) {
       pendingPostCoinFlip.current = { draws, youNewIndices, foeDrawCount }
       setCoinFlipFx({ id: ++coinFlipFxId.current, heads })
+    } else if (cue && draws.length) {
+      // The turn-start draw riding along with this cue — ghosted right
+      // away, but its own flight waits for `releaseCue`, once the banner
+      // it arrived under has actually cleared the screen.
+      hideDrawnCards(youNewIndices, foeDrawCount)
+      pendingPostCue.current = draws
     } else if (draws.length) {
       hideDrawnCards(youNewIndices, foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws })
@@ -2060,7 +2081,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
       <AnimatePresence>
-        {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}
+        {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={releaseCue} />}
       </AnimatePresence>
 
       <AnimatePresence>
