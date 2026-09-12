@@ -1207,13 +1207,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   }
 
   /**
-   * A card dropped into an empty slot doesn't land there itself — like the
-   * attack sortie, the real placement (a setup pick or a PLAY_FIGURE
-   * dispatch) is held in `pendingPlacement` and only runs once `PlaceFx`'s
-   * own flight actually reaches the slot (`landPlaceFx`, wired to its
-   * `onLand`). Ascending onto an occupied slot skips this entirely — that
-   * Figure is already standing right there, so there's no empty slot for a
-   * card to make an entrance into.
+   * A card dropped onto a slot doesn't land there itself — like the attack
+   * sortie, the real placement (a setup pick, a PLAY_FIGURE dispatch, or an
+   * ASCEND) is held in `pendingPlacement` and only runs once `PlaceFx`'s own
+   * flight actually reaches the slot (`landPlaceFx`, wired to its `onLand`).
+   * An ASCEND's target is occupied rather than empty, but the flight and the
+   * hand-off are otherwise identical — the Figure already standing there
+   * just keeps its old face until the new one actually lands on it.
    */
   const pendingPlacement = useRef<(() => void) | null>(null)
   const placeFxId = useRef(0)
@@ -1253,10 +1253,14 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       }
       return
     }
+    // Both a PLAY_FIGURE and an ASCEND get the same entrance — the target
+    // slot just isn't empty for the second one, so the card lands on the
+    // Figure already standing there instead of the mat under it. The
+    // ascension itself still doesn't happen until `onLand`, same as a fresh
+    // placement: the Figure on the board keeps its old face right up until
+    // the new one actually arrives.
     const drop = legalHandDrop(index, point)
-    if (!drop) return
-    if (drop.action.type === 'PLAY_FIGURE') launchPlaceFx(index, point, drop.el, () => dispatch(drop.action))
-    else dispatch(drop.action)
+    if (drop) launchPlaceFx(index, point, drop.el, () => dispatch(drop.action))
   }
 
   const handleAltarDrag = (point: { x: number; y: number }) => {

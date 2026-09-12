@@ -18,15 +18,17 @@ import { requireCard } from '@/data/cards'
  * briefly, then falls straight down into the slot it was bound for.
  *
  * The moment it lands is the moment the placement actually happens: `onLand`
- * fires right there, which is what the screen dispatches PLAY_FIGURE (or
- * commits a setup pick) from, so the real Figure appears in the slot exactly
- * as the card that became it finishes falling — the same "the drop causes
- * the arrival" ordering the sortie's own `onDone` is built on. The card
- * itself doesn't vanish outright on contact: it settles with a small
- * squash-and-rebound, like something with real weight meeting the mat, while
- * a burst of gold rays shoots out from underneath it — and only once that
- * settles does the card fade the rest of the way out, handing off to the
- * Figure now actually standing in its place.
+ * fires right there, which is what the screen dispatches PLAY_FIGURE and
+ * ASCEND from (or commits a setup pick), so the real Figure appears — or, for
+ * an ASCEND, ascends — in the slot exactly as the card that caused it
+ * finishes falling. The same "the drop causes the arrival" ordering the
+ * sortie's own `onDone` is built on; an ASCEND's target just already has a
+ * Figure standing on it, which keeps its old face right up until the new one
+ * lands. The card itself doesn't vanish outright on contact: it settles with
+ * a small squash-and-rebound, like something with real weight meeting the
+ * mat, while a burst of gold rays shoots out from underneath it — and only
+ * once that settles does the card fade the rest of the way out, handing off
+ * to the Figure now actually standing in its place.
  */
 
 export interface PlaceFxTrigger {
