@@ -16,6 +16,11 @@ import { motion } from 'framer-motion'
  * ring does. Yours arrives in full gold leaf; the opponent's is the same
  * plate in cold ash, so the two are distinguishable at a glance even before
  * the words are read.
+ *
+ * Also stands in for the one-off "Match Start" card at kickoff, in gold
+ * leaf and with its own `label` in place of a side's name — the plate
+ * itself has no notion of whose turn it is, so nothing else here has to
+ * change for a cue that belongs to neither player.
  */
 
 /** Total lifetime, including both sweeps. The hold in the middle is what's
@@ -26,6 +31,9 @@ export interface TurnCue {
   /** Unique per announcement, so repeats of the same side still replay. */
   key: string
   mine: boolean
+  /** Overrides the mine-based "Your Turn"/"Opponent's Turn" text — used for
+   *  the one-off "Match Start" card, which belongs to neither side. */
+  label?: string
 }
 
 export function TurnAnnounce({ cue, onDone }: { cue: TurnCue | null; onDone: () => void }) {
@@ -39,7 +47,7 @@ export function TurnAnnounce({ cue, onDone }: { cue: TurnCue | null; onDone: () 
   if (!cue) return null
 
   const { mine } = cue
-  const label = mine ? 'Your Turn' : "Opponent's Turn"
+  const label = cue.label ?? (mine ? 'Your Turn' : "Opponent's Turn")
   // The opponent's plate is the same gold leaf drained of its warmth rather
   // than a different colour altogether — the mat has one metal on it, and a
   // second hue here would read as a different game's UI.

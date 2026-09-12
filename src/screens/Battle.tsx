@@ -215,6 +215,12 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // rest of the presentation.
   const [attackFx, setAttackFx] = useState<AttackFxTrigger | null>(null)
   const [turnCue, setTurnCue] = useState<TurnCue | null>(null)
+  // The shared "Match Start" card, once per match, before either hand is
+  // dealt — see the kickoff effect below.
+  const [kickoff, setKickoff] = useState<TurnCue | null>(null)
+  // False until the kickoff card has had its say — both hands render empty
+  // until then, so nobody has anything to place or peek at underneath it.
+  const [handsRevealed, setHandsRevealed] = useState(false)
   // The attacking card's flight, which runs *before* the attack it belongs to
   // is dispatched — see `launchSortie`.
   const [sortie, setSortie] = useState<AttackSortieTrigger | null>(null)
@@ -245,7 +251,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     settleCoin,
     simulating,
     simulate,
-  } = useMatch(config, presenting, stageAttack)
+  } = useMatch(config, presenting, stageAttack, handsRevealed)
+
+  // Fires once the coin settles: both hands are still empty at this point
+  // (see `handsRevealed`), so this is the very first thing either player
+  // sees once the coin flip itself is out of the way. Its own `onDone`
+  // below is what actually deals the hands in.
+  const kickedOff = useRef(false)
+  useEffect(() => {
+    if (!coinSettled || kickedOff.current) return
+    kickedOff.current = true
+    setKickoff({ key: 'kickoff', mine: true, label: 'Match Start' })
+  }, [coinSettled])
 
   const [sheet, setSheet] = useState<{ title: string; subtitle?: string; options: SheetOption[] } | null>(
     null,
@@ -1334,7 +1351,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         }}
       >
         <div ref={foeHandRef} className="w-full">
-          <OpponentHand count={foe.hand.length} />
+          <OpponentHand count={handsRevealed ? foe.hand.length : 0} />
         </div>
 
         {/* Nudged down via `transform`, same reasoning as YOU_ROW_LIFT below:
@@ -1562,7 +1579,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               spanning the tray means that 50% is always 50% of the screen. */}
           <div ref={youHandRef} className="absolute inset-x-0 bottom-0">
             <PlayerHand
-              hand={you.hand}
+              hand={handsRevealed ? you.hand : []}
               setupActive={setupActive}
               setupBench={setupBench}
               basicsInHand={basicsInHand}
@@ -1698,6 +1715,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
       <AnimatePresence>
         {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={() => setTurnCue(null)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {kickoff && (
+          <TurnAnnounce
+            key={kickoff.key}
+            cue={kickoff}
+            onDone={() => {
+              setKickoff(null)
+              setHandsRevealed(true)
+            }}
+          />
+        )}
       </AnimatePresence>
 
       <AnimatePresence>

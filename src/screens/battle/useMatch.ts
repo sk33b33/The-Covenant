@@ -54,11 +54,18 @@ const AI_THINKING_MS = 1400
  *   because the screen can only build that callback out of `dispatch`, which
  *   it does not have until this hook has returned. Left unset, or set to a
  *   handler that declines, the action is applied here as it always was.
+ * @param handsRevealed Holds both sides' opening-board setup back until the
+ *   screen has dealt the opening hand into view. The engine deals it the
+ *   instant the match is created, well before the coin has even settled —
+ *   without this the opponent (and, under Simulate, "you") would place a
+ *   board pulled from a hand nobody has been shown yet, out from under the
+ *   screen's own "Match Start" card and empty-handed opening beat.
  */
 export function useMatch(
   config: MatchConfig,
   presenting = false,
   stageAttack?: MutableRefObject<((side: PlayerId, action: Action) => boolean) | undefined>,
+  handsRevealed = true,
 ) {
   const [state, setState] = useState<MatchState>(() =>
     createMatch({
@@ -124,17 +131,18 @@ export function useMatch(
 
   /* --------------------------------------------------------- the opponent */
 
-  // The opponent places its opening board as soon as the coin settles.
+  // The opponent places its opening board as soon as the coin settles and
+  // both hands have been dealt into view.
   const foeSetUp = useRef(false)
   useEffect(() => {
-    if (!coinSettled || state.phase !== 'setup' || foeSetUp.current) return
+    if (!coinSettled || !handsRevealed || state.phase !== 'setup' || foeSetUp.current) return
     if (state.players.foe.active) return
 
     foeSetUp.current = true
     const rng = createRng(state.rngState ^ 0x1234abcd)
     const timer = setTimeout(() => setState((s) => reduce(s, aiSetup(s, 'foe', rng))), 400)
     return () => clearTimeout(timer)
-  }, [coinSettled, state])
+  }, [coinSettled, handsRevealed, state])
 
   // Your own opening board, but only once you've handed the match to
   // Simulate — otherwise this is yours to place by hand, same drag-and-drop
@@ -143,14 +151,14 @@ export function useMatch(
   // guarding foe's half against a flag that has nothing to do with it.
   const meSetUp = useRef(false)
   useEffect(() => {
-    if (!simulating || !coinSettled || state.phase !== 'setup' || meSetUp.current) return
+    if (!simulating || !coinSettled || !handsRevealed || state.phase !== 'setup' || meSetUp.current) return
     if (state.players.you.active) return
 
     meSetUp.current = true
     const rng = createRng(state.rngState ^ 0x5a5a5a5a)
     const timer = setTimeout(() => setState((s) => reduce(s, aiSetup(s, 'you', rng))), 400)
     return () => clearTimeout(timer)
-  }, [simulating, coinSettled, state])
+  }, [simulating, coinSettled, handsRevealed, state])
 
   // Whichever side the AI is driving right now — the opponent always, and
   // the player too once Simulate has taken the match over — plus any
