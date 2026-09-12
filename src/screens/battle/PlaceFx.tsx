@@ -24,11 +24,9 @@ import { requireCard } from '@/data/cards'
  * finishes falling. The same "the drop causes the arrival" ordering the
  * sortie's own `onDone` is built on; an ASCEND's target just already has a
  * Figure standing on it, which keeps its old face right up until the new one
- * lands. The card itself doesn't vanish outright on contact: it settles with
- * a small squash-and-rebound, like something with real weight meeting the
- * mat, while a burst of white-gold light shoots out from underneath it — and
- * only once that settles does the card fade the rest of the way out, handing
- * off to the Figure now actually standing in its place.
+ * lands. The card itself doesn't vanish outright on contact: it holds there
+ * a beat, then fades the rest of the way out, handing off to the Figure now
+ * actually standing in its place.
  *
  * The Active slot gets the bigger version of this: it's the one spot on the
  * board every attack and every turn actually revolves around, so a card
@@ -57,10 +55,9 @@ export interface PlaceFxTrigger {
  *  information. Fixed, unlike the rise and drop below: nothing about a hold
  *  in place scales with distance. */
 const HOLD_S = 0.18
-/** The settle: a squash-and-rebound on contact, then the fade that hands
- *  off to the real Figure the landing just placed. Also fixed — a contact
- *  effect, not a trip. */
-const IMPACT_S = 0.35
+/** The fade that hands off to the real Figure the landing just placed. Also
+ *  fixed — a settle, not a trip. */
+const FADE_S = 0.35
 
 const RISE_MIN_S = 0.3
 const RISE_MAX_S = 0.5
@@ -96,12 +93,6 @@ const ACTIVE_PEAK_LIFT = 0.1
 const ACTIVE_FLIP_EXTRA_S = 0.4
 
 const SHADOW = '0 10px 20px rgba(0,0,0,.55)'
-/** The burst's own colours — white at the core fading to a warm yellow at
- *  the tip of each ray, rather than the game's usual gold leaf: this is
- *  meant to read as light itself breaking through, not another gilded
- *  surface like the frames and orbs already are. */
-const WHITE = '#ffffff'
-const YELLOW = '#ffe066'
 
 /**
  * Every timing and position this flight needs, derived once from the two
@@ -125,7 +116,7 @@ function computeTimings(fromRect: DOMRect, toRect: DOMRect, isActive: boolean) {
   const RISE_S = clamp(riseDist / RISE_PX_PER_S, RISE_MIN_S, RISE_MAX_S)
   const DROP_S = clamp(dropDist / DROP_PX_PER_S, DROP_MIN_S, DROP_MAX_S)
   const TO_LAND_S = RISE_S + flipExtraS + HOLD_S + DROP_S
-  const TOTAL_S = TO_LAND_S + IMPACT_S
+  const TOTAL_S = TO_LAND_S + FADE_S
 
   return { fromCX, fromCY, toCX, toCY, peakX, peakY, peakScale, flipExtraS, RISE_S, DROP_S, TO_LAND_S, TOTAL_S }
 }
@@ -162,10 +153,6 @@ export function PlaceFx({
 
   return (
     <div className="cov-place-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
-      {/* Painted first, so it sits *behind* the card in the same stacking
-          context — light breaking out from underneath it, not laid over
-          the top of it. */}
-      <LightBurst trigger={trigger} />
       <PlaceCard trigger={trigger} />
     </div>
   )
@@ -190,10 +177,6 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
     // so this is the only change a longer flip needs here.
     const t2 = (RISE_S + flipExtraS + HOLD_S) / TOTAL_S
     const t3 = TO_LAND_S / TOTAL_S
-    // The rebound plays out entirely inside the impact tail, well short of
-    // `1` — everything after it is the fade alone.
-    const bounce1 = (TO_LAND_S + IMPACT_S * 0.3) / TOTAL_S
-    const bounce2 = (TO_LAND_S + IMPACT_S * 0.6) / TOTAL_S
 
     // The Active slot's own double turn: past the first reveal at `t1`, it
     // turns away again and reveals a second time, ending on `t1f` rather
@@ -221,10 +204,10 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
 
     return {
       card: {
-        x: [start.x, peak.x, peak.x, end.x, end.x - 4, end.x + 4, end.x],
-        y: [start.y, peak.y, peak.y, end.y, end.y + 3, end.y - 2, end.y],
-        scale: [1, peakScale, peakScale, endScale, endScale * 0.86, endScale * 1.08, endScale],
-        opacity: [1, 1, 1, 1, 1, 1, 0],
+        x: [start.x, peak.x, peak.x, end.x, end.x],
+        y: [start.y, peak.y, peak.y, end.y, end.y],
+        scale: [1, peakScale, peakScale, endScale, endScale],
+        opacity: [1, 1, 1, 1, 0],
         transition: {
           // One ease per segment rather than one for the whole path — a
           // single 'easeOut' across every stop front-loads speed at the
@@ -233,17 +216,11 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
           // at rest, and the drop leaving the held card at rest again.
           // 'easeInOut' either side of those two standstills is what
           // actually reads as one continuous motion rather than several
-          // separate ones stitched together. The rebound keeps its own
-          // snap — a real landing doesn't ease into the ground.
-          default: {
-            duration: TOTAL_S,
-            times: [0, t1, t2, t3, bounce1, bounce2, 1],
-            ease: ['easeInOut', 'linear', 'easeInOut', 'easeOut', 'easeInOut', 'easeOut'],
-          },
-          // Its own curve: opaque all the way through the rebound, fading
-          // only in the sliver left after it settles — the same reasoning
-          // the draw reveal's own late fade is built on.
-          opacity: { duration: TOTAL_S, ease: 'easeIn', times: [0, t3, bounce2, 1] },
+          // separate ones stitched together. It lands and simply fades —
+          // no rebound — so the last segment is the fade alone.
+          duration: TOTAL_S,
+          times: [0, t1, t2, t3, 1],
+          ease: ['easeInOut', 'linear', 'easeInOut', 'easeOut'],
         },
       },
       flip,
@@ -283,131 +260,5 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
         </div>
       </motion.div>
     </motion.div>
-  )
-}
-
-/** How many rays break from under the card — enough to read as a genuine
- *  burst rather than a handful of spokes, still few enough that each one
- *  is a distinct shaft of light rather than a blurred wheel. */
-const RAY_COUNT = 30
-/** How many motes of dust scatter with the rays — small, irregular grit
- *  thrown outward by the same impact, rather than more of the same shafts. */
-const SPARK_COUNT = 24
-
-/** A cheap, deterministic stand-in for `Math.random()` keyed off an index —
- *  the scatter should look different from one spark to the next, but not
- *  reshuffle itself on every re-render of the same trigger. */
-function pseudoRandom(seed: number) {
-  const x = Math.sin(seed * 12.9898) * 43758.5453
-  return x - Math.floor(x)
-}
-
-/**
- * The light breaking from under the card the instant it lands — a bright
- * white-gold core, a burst of rays shooting outward from it, and a scatter
- * of dust motes riding the same impact, all timed to start exactly on
- * contact rather than riding the card's own transition.
- *
- * Rays, not a radius: the light is meant to read as shafts breaking outward
- * from underneath the card, not a glow spreading evenly around it. The dust
- * is what keeps that from reading as too clean a shape — real light breaking
- * through debris throws grit as well as beams, at angles and distances the
- * evenly-spaced rays never take. All three use `screen` blend mode, which is
- * what "brighter" means against a background this dark — it adds light onto
- * what's already
- * there instead of painting a flat colour over it, so overlapping rays and
- * the core they share actually intensify each other the way real light does.
- */
-function LightBurst({ trigger }: { trigger: PlaceFxTrigger }) {
-  const { toRect } = trigger
-  const { TO_LAND_S } = useMemo(
-    () => computeTimings(trigger.fromRect, trigger.toRect, trigger.isActive),
-    [trigger],
-  )
-
-  const cx = toRect.left + toRect.width / 2
-  const cy = toRect.top + toRect.height / 2
-  const rayLength = toRect.width * 1.9
-  const rayWidth = toRect.width * 0.07
-  const coreSize = toRect.width * 0.5
-
-  return (
-    <div className="absolute" style={{ left: cx, top: cy, width: 0, height: 0, mixBlendMode: 'screen' }}>
-      {/* The core the rays appear to shoot out of — small and quick,
-          nowhere near the spread a radial glow would need, since it's a
-          source for the rays to read from rather than the effect itself. */}
-      <motion.div
-        className="absolute rounded-full"
-        style={{
-          left: -coreSize / 2,
-          top: -coreSize / 2,
-          width: coreSize,
-          height: coreSize,
-          background: WHITE,
-          boxShadow: `0 0 ${toRect.width * 0.9}px ${toRect.width * 0.3}px ${YELLOW}`,
-        }}
-        initial={{ opacity: 0, scale: 0.2 }}
-        animate={{ opacity: [0, 1, 0], scale: [0.2, 1, 1.3] }}
-        transition={{ duration: IMPACT_S * 0.75, delay: TO_LAND_S, ease: 'easeOut' }}
-      />
-
-      {Array.from({ length: RAY_COUNT }, (_, i) => {
-        const angle = (360 / RAY_COUNT) * i
-        // Alternating lengths read as a burst radiating unevenly, the way
-        // real light through a break does, rather than a perfect gear of
-        // identical spokes.
-        const length = rayLength * (i % 2 === 0 ? 1 : 0.6)
-        return (
-          <motion.div
-            key={i}
-            className="absolute"
-            style={{
-              left: -rayWidth / 2,
-              top: -length,
-              width: rayWidth,
-              height: length,
-              background: `linear-gradient(to top, ${WHITE}, ${YELLOW} 45%, transparent)`,
-              transformOrigin: '50% 100%',
-              rotate: angle,
-            }}
-            initial={{ scaleY: 0, opacity: 0 }}
-            animate={{ scaleY: [0, 1, 0.8], opacity: [0, 1, 0] }}
-            transition={{ duration: IMPACT_S, delay: TO_LAND_S, ease: 'easeOut' }}
-          />
-        )
-      })}
-
-      {Array.from({ length: SPARK_COUNT }, (_, i) => {
-        // Its own angle, independent of the rays' evenly-spaced spokes —
-        // dust doesn't fly in a wheel, it scatters. Distance and size vary
-        // per-mote too, so the field reads as grit thrown by the impact
-        // rather than a second, denser ring of rays.
-        const angle = pseudoRandom(i * 3.1) * 360
-        const distance = rayLength * (0.35 + pseudoRandom(i * 7.7) * 0.85)
-        const size = toRect.width * (0.02 + pseudoRandom(i * 5.3) * 0.035)
-        const dx = Math.cos((angle * Math.PI) / 180) * distance
-        const dy = Math.sin((angle * Math.PI) / 180) * distance
-        // A little jitter on the timing too, so the dust doesn't all
-        // twinkle out in perfect lockstep with the rays or each other.
-        const delay = TO_LAND_S + pseudoRandom(i * 9.1) * IMPACT_S * 0.25
-        return (
-          <motion.div
-            key={i}
-            className="absolute rounded-full"
-            style={{
-              left: -size / 2,
-              top: -size / 2,
-              width: size,
-              height: size,
-              background: i % 3 === 0 ? YELLOW : WHITE,
-              boxShadow: `0 0 ${size * 2}px ${size * 0.6}px ${WHITE}`,
-            }}
-            initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
-            animate={{ x: [0, dx * 0.6, dx], y: [0, dy * 0.6, dy], opacity: [0, 1, 0], scale: [0.4, 1, 0.5] }}
-            transition={{ duration: IMPACT_S * 1.3, delay, ease: 'easeOut' }}
-          />
-        )
-      })}
-    </div>
   )
 }
