@@ -29,6 +29,12 @@ import { requireCard } from '@/data/cards'
  * mat, while a burst of white-gold light shoots out from underneath it — and
  * only once that settles does the card fade the rest of the way out, handing
  * off to the Figure now actually standing in its place.
+ *
+ * The Active slot gets the bigger version of this: it's the one spot on the
+ * board every attack and every turn actually revolves around, so a card
+ * landing there earns a taller, larger peak and a second full turn in the
+ * air — flip, reveal, flip away, reveal again — before it holds and falls,
+ * where a Bench arrival gets the single turn described above.
  */
 
 export interface PlaceFxTrigger {
@@ -40,6 +46,9 @@ export interface PlaceFxTrigger {
   /** The slot it's bound for — the Active slot or a Bench slot, always your
    *  own; nothing else in this game hands a card off through a drag. */
   toRect: DOMRect
+  /** Whether `toRect` is the Active slot rather than a Bench one — the one
+   *  drop that gets the taller peak and the double flip. */
+  isActive: boolean
 }
 
 /** How long the card holds at the centre of the screen, turned face-up,
@@ -55,22 +64,36 @@ const IMPACT_S = 0.35
 
 const RISE_MIN_S = 0.3
 const RISE_MAX_S = 0.5
-const DROP_MIN_S = 0.24
-const DROP_MAX_S = 0.46
-/** The speed, in px/s, the rise and drop are paced to — each phase's own
- *  duration is its distance divided by this, clamped to the ranges above.
- *  A flat duration regardless of distance is what made the Bench's own drop
- *  read as rushed: it travels much farther from the held centre position
- *  than the Active slot does, so covering that ground in the same fixed
- *  time is a genuinely faster drop, whatever the clock says. Pacing both
- *  phases by speed instead keeps every destination feeling like the same
- *  weight of card making the same kind of trip. */
-const TRAVEL_PX_PER_S = 1500
+/** The drop got its own, slower speed and its own, wider bounds: pacing it
+ *  off the same 1500px/s the rise uses still read as rushed for the Bench,
+ *  which travels much farther from the held centre position than the
+ *  Active slot does — a card that size covering that much ground in well
+ *  under half a second reads as thrown, not set down. Slower and given more
+ *  room to clamp into is what makes a long Bench drop feel like the same
+ *  weight of card taking its time, rather than the short Active drop just
+ *  padded out. */
+const RISE_PX_PER_S = 1500
+const DROP_PX_PER_S = 950
+const DROP_MIN_S = 0.34
+const DROP_MAX_S = 0.68
 
 /** How much larger the card gets at the centre of the screen — matched to
  *  the draw reveal's own peak, so the two "hero" flourishes this game has
- *  read as the same scale of moment. */
+ *  read as the same scale of moment. The Active slot gets a bigger, higher
+ *  peak still: it's the one arrival every attack and turn actually revolves
+ *  around, so it earns the more prominent version of this beat. */
 const PEAK_SCALE = 1.7
+const ACTIVE_PEAK_SCALE = 2.1
+/** How far above true screen centre the Active peak holds, as a fraction of
+ *  screen height — enough to read as its own deliberately higher position
+ *  rather than the same centre point just enlarged. */
+const ACTIVE_PEAK_LIFT = 0.1
+
+/** The Active drop's extra turn in the air: a second full flip cycle (away,
+ *  then back to face-up) tacked onto the end of the first, so the card
+ *  reveals itself, turns away again, and reveals itself a second time
+ *  before it ever holds still. Bench keeps just the one flip. */
+const ACTIVE_FLIP_EXTRA_S = 0.4
 
 const SHADOW = '0 10px 20px rgba(0,0,0,.55)'
 /** The burst's own colours — white at the core fading to a warm yellow at
@@ -86,23 +109,25 @@ const YELLOW = '#ffe066'
  * `onLand`/`onDone` and the two that actually animate, so neither can drift
  * out of sync with the other's idea of how long the trip takes.
  */
-function computeTimings(fromRect: DOMRect, toRect: DOMRect) {
+function computeTimings(fromRect: DOMRect, toRect: DOMRect, isActive: boolean) {
   const fromCX = fromRect.left + fromRect.width / 2
   const fromCY = fromRect.top + fromRect.height / 2
   const toCX = toRect.left + toRect.width / 2
   const toCY = toRect.top + toRect.height / 2
   const peakX = window.innerWidth / 2
-  const peakY = window.innerHeight / 2
+  const peakY = window.innerHeight / 2 - (isActive ? window.innerHeight * ACTIVE_PEAK_LIFT : 0)
+  const peakScale = isActive ? ACTIVE_PEAK_SCALE : PEAK_SCALE
+  const flipExtraS = isActive ? ACTIVE_FLIP_EXTRA_S : 0
 
   const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
   const riseDist = Math.hypot(peakX - fromCX, peakY - fromCY)
   const dropDist = Math.hypot(toCX - peakX, toCY - peakY)
-  const RISE_S = clamp(riseDist / TRAVEL_PX_PER_S, RISE_MIN_S, RISE_MAX_S)
-  const DROP_S = clamp(dropDist / TRAVEL_PX_PER_S, DROP_MIN_S, DROP_MAX_S)
-  const TO_LAND_S = RISE_S + HOLD_S + DROP_S
+  const RISE_S = clamp(riseDist / RISE_PX_PER_S, RISE_MIN_S, RISE_MAX_S)
+  const DROP_S = clamp(dropDist / DROP_PX_PER_S, DROP_MIN_S, DROP_MAX_S)
+  const TO_LAND_S = RISE_S + flipExtraS + HOLD_S + DROP_S
   const TOTAL_S = TO_LAND_S + IMPACT_S
 
-  return { fromCX, fromCY, toCX, toCY, peakX, peakY, RISE_S, DROP_S, TO_LAND_S, TOTAL_S }
+  return { fromCX, fromCY, toCX, toCY, peakX, peakY, peakScale, flipExtraS, RISE_S, DROP_S, TO_LAND_S, TOTAL_S }
 }
 
 export function PlaceFx({
@@ -123,7 +148,7 @@ export function PlaceFx({
 
   useEffect(() => {
     if (id === undefined || !trigger) return
-    const { TO_LAND_S, TOTAL_S } = computeTimings(trigger.fromRect, trigger.toRect)
+    const { TO_LAND_S, TOTAL_S } = computeTimings(trigger.fromRect, trigger.toRect, trigger.isActive)
     const landTimer = setTimeout(onLand, TO_LAND_S * 1000)
     const doneTimer = setTimeout(onDone, TOTAL_S * 1000)
     return () => {
@@ -147,30 +172,58 @@ export function PlaceFx({
 }
 
 function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
-  const { cardId, fromRect, toRect } = trigger
+  const { cardId, fromRect, toRect, isActive } = trigger
 
   const path = useMemo(() => {
-    const { fromCX, fromCY, toCX, toCY, peakX, peakY, RISE_S, TO_LAND_S, TOTAL_S } = computeTimings(fromRect, toRect)
+    const { fromCX, fromCY, toCX, toCY, peakX, peakY, peakScale, flipExtraS, RISE_S, TO_LAND_S, TOTAL_S } =
+      computeTimings(fromRect, toRect, isActive)
     const endScale = toRect.width / fromRect.width
 
     const at = (cx: number, cy: number, scale: number) => ({ x: cx - fromCX, y: cy - fromCY, scale })
     const start = at(fromCX, fromCY, 1)
-    const peak = at(peakX, peakY, PEAK_SCALE)
+    const peak = at(peakX, peakY, peakScale)
     const end = at(toCX, toCY, endScale)
 
     const t1 = RISE_S / TOTAL_S
-    const t2 = (RISE_S + HOLD_S) / TOTAL_S
+    // The hold stretches to cover the Active drop's extra flip cycle too —
+    // the card's position and scale are already flat across it either way,
+    // so this is the only change a longer flip needs here.
+    const t2 = (RISE_S + flipExtraS + HOLD_S) / TOTAL_S
     const t3 = TO_LAND_S / TOTAL_S
     // The rebound plays out entirely inside the impact tail, well short of
     // `1` — everything after it is the fade alone.
     const bounce1 = (TO_LAND_S + IMPACT_S * 0.3) / TOTAL_S
     const bounce2 = (TO_LAND_S + IMPACT_S * 0.6) / TOTAL_S
 
+    // The Active slot's own double turn: past the first reveal at `t1`, it
+    // turns away again and reveals a second time, ending on `t1f` rather
+    // than holding flat straight through — Bench keeps the single turn.
+    const t1f = (RISE_S + flipExtraS) / TOTAL_S
+    const t1mid = (t1 + t1f) / 2
+    const flip = isActive
+      ? {
+          rotateY: [0, 180, 360, 540, 540],
+          transition: {
+            duration: TOTAL_S,
+            times: [0, t1, t1mid, t1f, 1],
+            ease: ['easeInOut', 'easeInOut', 'easeInOut', 'linear'],
+          },
+        }
+      : {
+          // Turns face-up on the way to the centre, not on the way down —
+          // by the time it holds there the reveal is already done. Eased
+          // both ways for the same reason the rise above is: it leaves one
+          // standstill (flat at 0°) and arrives at another (flat at 180°,
+          // held through the hold that follows).
+          rotateY: [0, 180, 180],
+          transition: { duration: TOTAL_S, times: [0, t1, 1], ease: ['easeInOut', 'linear'] as const },
+        }
+
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x, end.x - 4, end.x + 4, end.x],
         y: [start.y, peak.y, peak.y, end.y, end.y + 3, end.y - 2, end.y],
-        scale: [1, PEAK_SCALE, PEAK_SCALE, endScale, endScale * 0.86, endScale * 1.08, endScale],
+        scale: [1, peakScale, peakScale, endScale, endScale * 0.86, endScale * 1.08, endScale],
         opacity: [1, 1, 1, 1, 1, 1, 0],
         transition: {
           // One ease per segment rather than one for the whole path — a
@@ -193,20 +246,12 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
           opacity: { duration: TOTAL_S, ease: 'easeIn', times: [0, t3, bounce2, 1] },
         },
       },
-      flip: {
-        // Turns face-up on the way to the centre, not on the way down —
-        // by the time it holds there the reveal is already done. Eased
-        // both ways for the same reason the rise above is: it leaves one
-        // standstill (flat at 0°) and arrives at another (flat at 180°,
-        // held through the hold that follows).
-        rotateY: [0, 180, 180],
-        transition: { duration: TOTAL_S, times: [0, t1, 1], ease: ['easeInOut', 'linear'] },
-      },
+      flip,
     }
     // Recomputed only if the trip itself changes — the rects are measured
     // once, at the moment the card was dropped.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromRect, toRect])
+  }, [fromRect, toRect, isActive])
 
   return (
     <motion.div
@@ -244,23 +289,41 @@ function PlaceCard({ trigger }: { trigger: PlaceFxTrigger }) {
 /** How many rays break from under the card — enough to read as a genuine
  *  burst rather than a handful of spokes, still few enough that each one
  *  is a distinct shaft of light rather than a blurred wheel. */
-const RAY_COUNT = 18
+const RAY_COUNT = 30
+/** How many motes of dust scatter with the rays — small, irregular grit
+ *  thrown outward by the same impact, rather than more of the same shafts. */
+const SPARK_COUNT = 24
+
+/** A cheap, deterministic stand-in for `Math.random()` keyed off an index —
+ *  the scatter should look different from one spark to the next, but not
+ *  reshuffle itself on every re-render of the same trigger. */
+function pseudoRandom(seed: number) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
 
 /**
  * The light breaking from under the card the instant it lands — a bright
- * white-gold core and a burst of rays shooting outward from it, timed to
- * start exactly on contact rather than riding the card's own transition.
+ * white-gold core, a burst of rays shooting outward from it, and a scatter
+ * of dust motes riding the same impact, all timed to start exactly on
+ * contact rather than riding the card's own transition.
  *
  * Rays, not a radius: the light is meant to read as shafts breaking outward
- * from underneath the card, not a glow spreading evenly around it. Both the
- * core and the rays use `screen` blend mode, which is what "brighter" means
- * against a background this dark — it adds light onto what's already
+ * from underneath the card, not a glow spreading evenly around it. The dust
+ * is what keeps that from reading as too clean a shape — real light breaking
+ * through debris throws grit as well as beams, at angles and distances the
+ * evenly-spaced rays never take. All three use `screen` blend mode, which is
+ * what "brighter" means against a background this dark — it adds light onto
+ * what's already
  * there instead of painting a flat colour over it, so overlapping rays and
  * the core they share actually intensify each other the way real light does.
  */
 function LightBurst({ trigger }: { trigger: PlaceFxTrigger }) {
   const { toRect } = trigger
-  const { TO_LAND_S } = useMemo(() => computeTimings(trigger.fromRect, trigger.toRect), [trigger])
+  const { TO_LAND_S } = useMemo(
+    () => computeTimings(trigger.fromRect, trigger.toRect, trigger.isActive),
+    [trigger],
+  )
 
   const cx = toRect.left + toRect.width / 2
   const cy = toRect.top + toRect.height / 2
@@ -310,6 +373,38 @@ function LightBurst({ trigger }: { trigger: PlaceFxTrigger }) {
             initial={{ scaleY: 0, opacity: 0 }}
             animate={{ scaleY: [0, 1, 0.8], opacity: [0, 1, 0] }}
             transition={{ duration: IMPACT_S, delay: TO_LAND_S, ease: 'easeOut' }}
+          />
+        )
+      })}
+
+      {Array.from({ length: SPARK_COUNT }, (_, i) => {
+        // Its own angle, independent of the rays' evenly-spaced spokes —
+        // dust doesn't fly in a wheel, it scatters. Distance and size vary
+        // per-mote too, so the field reads as grit thrown by the impact
+        // rather than a second, denser ring of rays.
+        const angle = pseudoRandom(i * 3.1) * 360
+        const distance = rayLength * (0.35 + pseudoRandom(i * 7.7) * 0.85)
+        const size = toRect.width * (0.02 + pseudoRandom(i * 5.3) * 0.035)
+        const dx = Math.cos((angle * Math.PI) / 180) * distance
+        const dy = Math.sin((angle * Math.PI) / 180) * distance
+        // A little jitter on the timing too, so the dust doesn't all
+        // twinkle out in perfect lockstep with the rays or each other.
+        const delay = TO_LAND_S + pseudoRandom(i * 9.1) * IMPACT_S * 0.25
+        return (
+          <motion.div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              left: -size / 2,
+              top: -size / 2,
+              width: size,
+              height: size,
+              background: i % 3 === 0 ? YELLOW : WHITE,
+              boxShadow: `0 0 ${size * 2}px ${size * 0.6}px ${WHITE}`,
+            }}
+            initial={{ x: 0, y: 0, opacity: 0, scale: 0.4 }}
+            animate={{ x: [0, dx * 0.6, dx], y: [0, dy * 0.6, dy], opacity: [0, 1, 0], scale: [0.4, 1, 0.5] }}
+            transition={{ duration: IMPACT_S * 1.3, delay, ease: 'easeOut' }}
           />
         )
       })}

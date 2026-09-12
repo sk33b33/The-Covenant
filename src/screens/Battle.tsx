@@ -1322,7 +1322,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (!cardId) return
     pendingPlacement.current = commit
     setPlacingIndex(index)
-    setPlaceFx({ id: ++placeFxId.current, cardId, fromRect: handCardRectAt(point), toRect: slotEl.getBoundingClientRect() })
+    setPlaceFx({
+      id: ++placeFxId.current,
+      cardId,
+      fromRect: handCardRectAt(point),
+      toRect: slotEl.getBoundingClientRect(),
+      isActive: slotEl === activeSlotRef.current,
+    })
   }
 
   /** The card has reached the slot: run whichever placement it was carrying

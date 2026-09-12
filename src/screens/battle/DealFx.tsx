@@ -5,7 +5,7 @@ import { requireCard } from '@/data/cards'
 
 /**
  * The opening deal: your five opening-hand cards flying from the deck pile
- * into their own seats in the fan, left to right, one after another.
+ * into their own seats in the fan, right to left, one after another.
  *
  * Unlike a drawn card or a placed one, nothing here is a reveal — an opening
  * hand was never face-down to you, so every card here shows its real face
@@ -37,6 +37,14 @@ export interface DealFxTrigger {
 const STAGGER_S = 0.16
 const FLY_S = 0.36
 
+/** Each card's own place in the launch order — the rightmost seat (the
+ *  highest index) leaves the pile first, working back toward the left, so
+ *  the deal reads right to left even though every card still ends up at its
+ *  own correct seat (`dealCardRect` never changes). */
+function delayFor(index: number, count: number) {
+  return (count - 1 - index) * STAGGER_S
+}
+
 export function DealFx({
   trigger,
   onCardLand,
@@ -54,8 +62,9 @@ export function DealFx({
 
   useEffect(() => {
     if (id === undefined || !trigger) return
-    const landTimers = trigger.cards.map((_, i) => setTimeout(() => onCardLand(i), (i * STAGGER_S + FLY_S) * 1000))
-    const total = trigger.cards.length ? (trigger.cards.length - 1) * STAGGER_S + FLY_S : 0
+    const count = trigger.cards.length
+    const landTimers = trigger.cards.map((_, i) => setTimeout(() => onCardLand(i), (delayFor(i, count) + FLY_S) * 1000))
+    const total = count ? (count - 1) * STAGGER_S + FLY_S : 0
     const doneTimer = setTimeout(onDone, total * 1000)
     return () => {
       landTimers.forEach(clearTimeout)
@@ -69,7 +78,7 @@ export function DealFx({
   return (
     <div className="cov-deal-fx fixed inset-0 z-40 pointer-events-none" aria-hidden="true">
       {trigger.cards.map((card, i) => (
-        <DealCard key={i} card={card} delay={i * STAGGER_S} />
+        <DealCard key={i} card={card} delay={delayFor(i, trigger.cards.length)} />
       ))}
     </div>
   )
