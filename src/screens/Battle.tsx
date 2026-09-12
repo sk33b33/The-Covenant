@@ -269,7 +269,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     coinSettled,
     settleCoin,
     simulating,
-    simulate,
+    toggleSimulating,
   } = useMatch(config, presenting, stageAttack, handsRevealed)
 
   // Fires once the coin settles: both hands are still empty at this point
@@ -1294,14 +1294,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setActionOpen(false)
   }
 
-  // Simulate hands your side to the AI for the rest of the match — at the
-  // same pace it already plays the opponent at, not a fast-forward, so a
-  // hand-off partway through still reads as the same match continuing
-  // rather than cutting straight to a result. Offered any time there's
-  // still a match to play and nobody's already simulating it.
-  const canSimulate = !simulating && state.phase !== 'ended'
-  const runSimulate = () => {
-    simulate()
+  // Auto hands your side to the AI — at the same pace it already plays the
+  // opponent at, not a fast-forward, so a hand-off partway through still
+  // reads as the same match continuing rather than cutting straight to a
+  // result. A toggle rather than a one-shot: offered any time there's still
+  // a match to play, whichever way it currently reads, so a player can take
+  // a turn back the moment they want it.
+  const canAuto = state.phase !== 'ended'
+  const autoLabel = simulating ? 'Auto Off' : 'Auto On'
+  const toggleAuto = () => {
+    toggleSimulating()
     setActionOpen(false)
   }
 
@@ -1311,7 +1313,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const canConcede = state.phase !== 'ended'
 
   /** Whether the round button has anything at all behind it. */
-  const hasAction = Boolean(actionLabel) || canSimulate || canConcede
+  const hasAction = Boolean(actionLabel) || canAuto || canConcede
   const askConcede = () => {
     setActionOpen(false)
     setSheet({
@@ -1669,9 +1671,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                       less common choice of the two, and shouldn't sit where
                       a thumb reaching for "Start Match"/"End Turn" would
                       land on it by accident. */}
-                  {/* Above Simulate, which is itself above the primary
-                      action: the further a choice is from a thumb resting on
-                      the button that opened this, the harder it is to pick by
+                  {/* Above Auto, which is itself above the primary action:
+                      the further a choice is from a thumb resting on the
+                      button that opened this, the harder it is to pick by
                       accident — and conceding is the one here that cannot be
                       taken back. */}
                   {canConcede && (
@@ -1679,9 +1681,9 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                       Concede
                     </Button>
                   )}
-                  {canSimulate && (
-                    <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={runSimulate}>
-                      Simulate Match
+                  {canAuto && (
+                    <Button variant="raised" className="!px-4 !py-2 text-sm" onClick={toggleAuto}>
+                      {autoLabel}
                     </Button>
                   )}
                   {actionLabel && (
@@ -1716,9 +1718,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 background: hasAction ? 'var(--surface-raised)' : 'var(--bg-sunk)',
                 opacity: hasAction ? 1 : 0.5,
               }}
-              aria-label={
-                actionLabel ?? (canSimulate ? 'Simulate Match' : canConcede ? 'Concede' : 'No action available')
-              }
+              aria-label={actionLabel ?? (canAuto ? autoLabel : canConcede ? 'Concede' : 'No action available')}
               aria-expanded={actionOpen}
             >
               <CheckIcon size={16} className={hasAction ? 'text-[var(--gold-bright)]' : 'text-ink-faint'} />
@@ -2782,12 +2782,12 @@ function TurnBanner({ state, simulating }: { state: MatchState; simulating: bool
   // the clash ring wants kept clear.
   //
   // What is left here is only what has no other home: the hand-off to
-  // Simulate, and the prompt owed after a knockout. Setup still carries no
+  // Auto, and the prompt owed after a knockout. Setup still carries no
   // label at all — the mat's own slot outlines and the fanned hand are the
   // instruction, not a line of copy above them.
   const mine = state.promoting === 'you'
   const label = simulating
-    ? 'Simulating…'
+    ? 'Auto Playing…'
     : state.phase === 'promote'
       ? mine
         ? 'Choose a Figure'

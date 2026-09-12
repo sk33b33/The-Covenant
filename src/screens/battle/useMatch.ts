@@ -78,10 +78,12 @@ export function useMatch(
 
   const [error, setError] = useState<string | null>(null)
   const [aiThinking, setAiThinking] = useState(false)
-  // Once set, the player's own side plays itself for the rest of the match —
-  // one-way, not a pause. Nothing here needs to interrupt it partway through;
-  // it exists to hand a match off to the AI, not to referee a tug-of-war over
-  // who's driving.
+  // While set, the player's own side plays itself — a toggle (the screen's
+  // "Auto On"/"Auto Off" control), not a one-way hand-off, so a player can
+  // take a turn back the moment they want it. Every effect below that reads
+  // this already re-checks it on each commit rather than latching a
+  // decision once, which is what lets flipping it back off mid-turn cancel
+  // whatever the AI was about to do on this side without any extra code.
   const [simulating, setSimulating] = useState(false)
 
   /** Clocks in seconds. Frozen while the coin is still in the air. */
@@ -305,6 +307,6 @@ export function useMatch(
     coinSettled,
     settleCoin: useCallback(() => setCoinSettled(true), []),
     simulating,
-    simulate: useCallback(() => setSimulating(true), []),
+    toggleSimulating: useCallback(() => setSimulating((v) => !v), []),
   }
 }
