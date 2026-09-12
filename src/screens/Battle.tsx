@@ -662,10 +662,19 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     }
     foePlaceInFlight.current = true
     setHiddenFoeFigureUid(next.uid)
+    // A single card-sized rect, not the whole hand tray's — `foeHandRef`
+    // wraps every card back at once, and `PlaceCard` sizes itself directly
+    // off `fromRect.width`, so handing it the tray's own (much wider,
+    // wrongly proportioned once `aspectRatio` stretched it) rect is what
+    // made the flight card balloon to the tray's full size instead of
+    // matching a real hand card, same as the ones your own drops fly from.
+    const trayRect = fromEl.getBoundingClientRect()
+    const cardH = HAND_W * (88 / 63)
+    const fromRect = new DOMRect(trayRect.left + trayRect.width / 2 - HAND_W / 2, trayRect.top, HAND_W, cardH)
     setFoePlaceFx({
       id: ++foePlaceFxId.current,
       cardId: next.cardId,
-      fromRect: fromEl.getBoundingClientRect(),
+      fromRect,
       toRect: next.toEl.getBoundingClientRect(),
       isActive: next.isActive,
     })
@@ -3155,6 +3164,13 @@ function TurnBanner({ state, simulating }: { state: MatchState; simulating: bool
  *  text and the overlay's own dismissal below, so both keep pace with it. */
 const COIN_FLIP_S = 3.1
 
+/** A single easeOutExpo-shaped curve, shared by both the match-start spin
+ *  and the mid-match one: most of the rotation burns off in a small
+ *  fraction of the duration, and the rest is a long, continuously
+ *  decelerating glide to a dead stop — one bezier, so there's no seam
+ *  partway through for the motion to visibly kink at. */
+const COIN_EASE = [0.16, 1, 0.3, 1] as const
+
 function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onDone, (COIN_FLIP_S + 0.7) * 1000)
@@ -3187,16 +3203,19 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
             initial={{ rotateY: 0 }}
-            // Two segments now, not one continuous ease: a superfast, steady
-            // whirl through most of the rotation first — the coin is still
-            // in the air, so there's nothing to read yet — then the last
-            // stretch, saved for the finish, eases all the way down to a
-            // dead stop exactly on the result. A single ease across the
-            // whole spin never got fast enough at the top without also
-            // making the landing feel rushed; splitting the two lets each
-            // have its own pace.
-            animate={{ rotateY: [0, heads ? 1620 : 1782, heads ? 1800 : 1980] }}
-            transition={{ duration: COIN_FLIP_S, times: [0, 0.35, 1], ease: ['linear', 'easeOut'] }}
+            // One continuous curve, not two stitched segments — a pair of
+            // keyframes with their own separate eases (a fast linear whirl,
+            // then a separately-eased settle) meets in the middle at
+            // whatever velocity each side's curve happens to end or start
+            // on, and those never actually matched: the spin visibly
+            // kinked at the seam instead of reading as one motion slowing
+            // down. `COIN_EASE` covers the whole trip by itself — a single
+            // bezier is smooth by construction, with no seam to kink at —
+            // shaped so most of the rotation still burns off in the first
+            // fraction of the duration and the rest is a long, gentle
+            // glide to a dead stop exactly on the result.
+            animate={{ rotateY: heads ? 1800 : 1980 }}
+            transition={{ duration: COIN_FLIP_S, ease: COIN_EASE }}
           >
             {/* Heads: the Covenant mark, facing the viewer at rest. */}
             <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
@@ -3268,11 +3287,12 @@ function EffectCoinFlip({ heads, onDone }: { heads: boolean; onDone: () => void 
             className="relative w-full h-full"
             style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
             initial={{ rotateY: 0 }}
-            // Same shape as the match-start spin — superfast first, then a
-            // short, decisive settle — just compressed into a beat instead
-            // of several seconds.
-            animate={{ rotateY: [0, heads ? 1620 : 1782, heads ? 1800 : 1980] }}
-            transition={{ duration: EFFECT_COIN_FLIP_S, times: [0, 0.35, 1], ease: ['linear', 'easeOut'] }}
+            // The same single curve as the match-start spin (`COIN_EASE`)
+            // — superfast first, then a smooth, continuous glide to a
+            // stop, with no seam partway through — just compressed into a
+            // beat instead of several seconds.
+            animate={{ rotateY: heads ? 1800 : 1980 }}
+            transition={{ duration: EFFECT_COIN_FLIP_S, ease: COIN_EASE }}
           >
             <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden' }}>
               <img src={asset('art/coin-heads.webp')} alt="" className="w-full h-full object-cover" />
