@@ -35,6 +35,7 @@ import {
 import { AttackSortie, type AttackSortieTrigger } from './battle/AttackSortie'
 import { DrawFx, type DrawFxTrigger } from './battle/DrawFx'
 import { MatchResult } from './battle/MatchResult'
+import { PlaceFx, type PlaceFxTrigger } from './battle/PlaceFx'
 import { BoardFigure } from './battle/BoardFigure'
 import { TurnAnnounce, type TurnCue } from './battle/TurnAnnounce'
 import { useMatch, type MatchConfig } from './battle/useMatch'
@@ -93,6 +94,16 @@ function drawLandingRect(side: PlayerId, trayEl: HTMLDivElement): DOMRect {
   const left = tray.left + tray.width / 2 - HAND_W / 2
   const top = side === 'you' ? tray.bottom - HAND_CARD_H : tray.top
   return new DOMRect(left, top, HAND_W, HAND_CARD_H)
+}
+
+/**
+ * A hand-card-sized rect centred on wherever a drop actually happened, for
+ * `PlaceFx` — the drag can end anywhere the finger let go, not just a
+ * card's own resting spot in the fan, so there is no element left to
+ * measure by the time the drop resolves.
+ */
+function handCardRectAt(point: { x: number; y: number }): DOMRect {
+  return new DOMRect(point.x - HAND_W / 2, point.y - HAND_CARD_H / 2, HAND_W, HAND_CARD_H)
 }
 
 /*
@@ -227,6 +238,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // The most recent batch of draws, flying from pile to hand — see the
   // log-diffing effect below for how this gets filled in.
   const [drawFx, setDrawFx] = useState<DrawFxTrigger | null>(null)
+  // A hand card's own flight into the slot it was just dropped on — see
+  // `launchPlaceFx`. The real placement runs on `PlaceFx`'s own `onLand`,
+  // not on the drop itself.
+  const [placeFx, setPlaceFx] = useState<PlaceFxTrigger | null>(null)
+  // The hand index currently in the air, if any — hidden from the fan for
+  // as long as `placeFx` is flying it (see `PlayerHand`'s own `placingIndex`).
+  const [placingIndex, setPlacingIndex] = useState<number | null>(null)
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -234,7 +252,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // without this the two run over each other in both directions: the AI's
   // first move arriving under its own turn card, or its next move arriving
   // on top of the attack you just watched it make.
-  const presenting = attackFx !== null || turnCue !== null || sortie !== null || drawFx !== null
+  const presenting =
+    attackFx !== null || turnCue !== null || sortie !== null || drawFx !== null || placeFx !== null
 
   // Filled in below, once `dispatch` exists to build it out of.
   const stageAttack = useRef<((side: PlayerId, action: Action) => boolean) | undefined>(undefined)
@@ -1187,6 +1206,34 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     setMagnet(target ? { target, cardId: you.hand[index]! } : null)
   }
 
+  /**
+   * A card dropped into an empty slot doesn't land there itself — like the
+   * attack sortie, the real placement (a setup pick or a PLAY_FIGURE
+   * dispatch) is held in `pendingPlacement` and only runs once `PlaceFx`'s
+   * own flight actually reaches the slot (`landPlaceFx`, wired to its
+   * `onLand`). Ascending onto an occupied slot skips this entirely — that
+   * Figure is already standing right there, so there's no empty slot for a
+   * card to make an entrance into.
+   */
+  const pendingPlacement = useRef<(() => void) | null>(null)
+  const placeFxId = useRef(0)
+
+  const launchPlaceFx = (index: number, point: { x: number; y: number }, slotEl: HTMLDivElement, commit: () => void) => {
+    const cardId = you.hand[index]
+    if (!cardId) return
+    pendingPlacement.current = commit
+    setPlacingIndex(index)
+    setPlaceFx({ id: ++placeFxId.current, cardId, fromRect: handCardRectAt(point), toRect: slotEl.getBoundingClientRect() })
+  }
+
+  /** The card has reached the slot: run whichever placement it was carrying
+   *  and let the hand show its own true state again. */
+  const landPlaceFx = () => {
+    pendingPlacement.current?.()
+    pendingPlacement.current = null
+    setPlacingIndex(null)
+  }
+
   const handleHandDragEnd = (index: number, point: { x: number; y: number }) => {
     setViableGlow([])
     setMagnet(null)
@@ -1199,15 +1246,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       if (!basicsInHand.some((b) => b.index === index)) return
 
       const el = slotAt(point)
-      if (el === activeSlotRef.current) placeActive(index)
+      if (el && el === activeSlotRef.current) launchPlaceFx(index, point, el, () => placeActive(index))
       else {
         const slot = benchSlotRefs.current.indexOf(el)
-        if (el && slot !== -1) placeBench(index, slot)
+        if (el && slot !== -1) launchPlaceFx(index, point, el, () => placeBench(index, slot))
       }
       return
     }
     const drop = legalHandDrop(index, point)
-    if (drop) dispatch(drop.action)
+    if (!drop) return
+    if (drop.action.type === 'PLAY_FIGURE') launchPlaceFx(index, point, drop.el, () => dispatch(drop.action))
+    else dispatch(drop.action)
   }
 
   const handleAltarDrag = (point: { x: number; y: number }) => {
@@ -1587,6 +1636,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               myTurn={myTurn}
               simulating={simulating}
               playable={actionsFor.byHand}
+              placingIndex={placingIndex}
               onTap={(index) => {
                 // Setup places cards by drag only now — a tap during setup used
                 // to auto-assign the next open slot, but that made the drag
@@ -1710,6 +1760,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       <AttackSortie trigger={sortie} onDone={landSortie} />
 
       <DrawFx trigger={drawFx} onDone={() => setDrawFx(null)} />
+
+      <PlaceFx trigger={placeFx} onLand={landPlaceFx} onDone={() => setPlaceFx(null)} />
 
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
 
@@ -1878,6 +1930,7 @@ function PlayerHand({
   myTurn,
   simulating,
   playable,
+  placingIndex,
   onTap,
   onDragStart,
   onDropEnd,
@@ -1892,6 +1945,10 @@ function PlayerHand({
   /** The AI is playing this side now — every gesture here is inert. */
   simulating: boolean
   playable: Map<number, Action[]>
+  /** The card currently in the air after a drop — see `PlaceFx`. Hidden
+   *  here the same as a setup pick is, so the flying copy over the board
+   *  is the only one on screen while it plays. */
+  placingIndex: number | null
   onTap: (index: number, isBasic: boolean) => void
   onDragStart: (index: number) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
@@ -1909,7 +1966,7 @@ function PlayerHand({
   // centre, for any hand size and whichever card was just picked.
   const visibleIndices = hand
     .map((_, i) => i)
-    .filter((i) => !(setupPhase && (setupActive === i || setupBench.includes(i))))
+    .filter((i) => i !== placingIndex && !(setupPhase && (setupActive === i || setupBench.includes(i))))
   const count = visibleIndices.length
   const mid = (count - 1) / 2
   const rotateStep = fanRotateStep(count)
@@ -2170,8 +2227,10 @@ function PlayerHand({
         // there and nowhere else — showing it in both places at once (a
         // ring around it here, the same card seated in the slot there) read
         // as it never having left. Mid-match has no equivalent limbo: a
-        // played card leaves `hand` for real, immediately, on dispatch.
-        if (setupPhase && (pickedActive || pickedBench)) return null
+        // played card leaves `hand` for real, immediately, on dispatch — but
+        // a drop's own placement is held back until `PlaceFx` lands (see
+        // `placingIndex`), so this card needs hiding a beat early too.
+        if (index === placingIndex || (setupPhase && (pickedActive || pickedBench))) return null
         const isBasic = basicsInHand.some((b) => b.index === index)
         // Rank among the visible cards, not the raw hand index — see the
         // comment on `visibleIndices` above.
