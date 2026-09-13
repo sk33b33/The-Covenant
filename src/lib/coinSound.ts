@@ -2,10 +2,10 @@ import { asset } from './asset'
 import { useSettings } from '@/store/settings'
 
 /**
- * The coin's own spin — a short recorded rattle-and-clink, not synthesised
- * the way `tap.ts`'s click is: that one is a few milliseconds of tone with
- * nothing to it but pitch and decay, this is a real physical sound with a
- * texture no oscillator would fake convincingly.
+ * The coin's own flip — a short recorded clip, not synthesised the way
+ * `tap.ts`'s click is: that one is a few milliseconds of tone with nothing
+ * to it but pitch and decay, this is a real physical sound with a texture
+ * no oscillator would fake convincingly.
  *
  * One element, built once and reused for every flip — a card that flips a
  * coin more than once in a match has no reason to re-fetch and re-decode
@@ -18,7 +18,7 @@ import { useSettings } from '@/store/settings'
  */
 
 /** The clip's own length, from scripts/trim-audio.py. */
-const COIN_SOUND_S = 2.09
+const COIN_SOUND_S = 1.54
 
 let el: HTMLAudioElement | null = null
 

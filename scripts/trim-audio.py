@@ -18,10 +18,23 @@ import argparse
 import sys
 from pathlib import Path
 
-# Bitrates and sample rates for MPEG-1 Layer III, indexed by the header's bits.
-BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
-SAMPLE_RATES = [44100, 48000, 32000, 0]
-SAMPLES_PER_FRAME = 1152
+# Layer III's bitrate table, sample-rate table and samples-per-frame all
+# depend on the MPEG *version* a given frame declares, not just Layer III
+# itself — MPEG-2 and MPEG-2.5 halve the samples per frame (576, not 1152)
+# and use their own, lower bitrate ladder. Treating every frame as MPEG-1
+# read a real MPEG-2 clip's own frames as exactly half their true length —
+# every duration this script reported for one came out exactly halved.
+# Indexed by the header's own version bits: 0b00 MPEG-2.5, 0b10 MPEG-2,
+# 0b11 MPEG-1 (0b01 is reserved and never produced by an encoder).
+MPEG1_BITRATES = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
+MPEG2_BITRATES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0]
+BITRATE_TABLES = {3: MPEG1_BITRATES, 2: MPEG2_BITRATES, 0: MPEG2_BITRATES}
+SAMPLE_RATE_TABLES = {
+    3: [44100, 48000, 32000, 0],
+    2: [22050, 24000, 16000, 0],
+    0: [11025, 12000, 8000, 0],
+}
+SAMPLES_PER_FRAME_TABLE = {3: 1152, 2: 576, 0: 576}
 
 
 def id3_length(data: bytes) -> int:
@@ -48,14 +61,23 @@ def trim(data: bytes, seconds: float) -> tuple[bytes, float, int]:
             i += 1
             continue
 
-        bitrate = BITRATES[(data[i + 2] >> 4) & 0xF]
-        rate = SAMPLE_RATES[(data[i + 2] >> 2) & 0x3]
+        version = (data[i + 1] >> 3) & 0x3
+        if version == 1 or version not in BITRATE_TABLES:
+            # 0b01 is a reserved version an encoder never actually writes —
+            # this is sync bits lining up by coincidence in ordinary data,
+            # not a real frame.
+            i += 1
+            continue
+
+        bitrate = BITRATE_TABLES[version][(data[i + 2] >> 4) & 0xF]
+        rate = SAMPLE_RATE_TABLES[version][(data[i + 2] >> 2) & 0x3]
         if not bitrate or not rate:
             i += 1
             continue
 
-        length = (SAMPLES_PER_FRAME // 8 * bitrate * 1000) // rate + ((data[i + 2] >> 1) & 1)
-        duration = SAMPLES_PER_FRAME / rate
+        samples_per_frame = SAMPLES_PER_FRAME_TABLE[version]
+        length = (samples_per_frame // 8 * bitrate * 1000) // rate + ((data[i + 2] >> 1) & 1)
+        duration = samples_per_frame / rate
 
         if kept + duration > seconds:
             break
