@@ -22,6 +22,7 @@ import { ENERGY_LABEL, isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
+import { playCoinSpin } from '@/lib/coinSound'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
 import {
@@ -3304,6 +3305,11 @@ function CoinFlip({ first, onDone }: { first: 'you' | 'foe'; onDone: () => void 
     return () => clearTimeout(timer)
   }, [onDone])
 
+  // Stretched to exactly `COIN_FLIP_S` (see `playCoinSpin`), so the rattle
+  // starts with the spin and runs out right as it settles on the result.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => playCoinSpin(COIN_FLIP_S), [])
+
   const heads = first === 'you'
 
   return (
@@ -3399,6 +3405,12 @@ function EffectCoinFlip({ heads, onDone }: { heads: boolean; onDone: () => void 
     const timer = setTimeout(onDone, (EFFECT_COIN_FLIP_S + 0.55) * 1000)
     return () => clearTimeout(timer)
   }, [onDone])
+
+  // Stretched to `EFFECT_COIN_FLIP_S` instead of `COIN_FLIP_S` — the same
+  // clip as the match-start flip, just compressed into this one's own
+  // shorter beat so the two still stay in sync with their own spins.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => playCoinSpin(EFFECT_COIN_FLIP_S), [])
 
   return (
     <motion.div
