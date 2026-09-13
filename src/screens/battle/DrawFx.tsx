@@ -60,20 +60,16 @@ const FOE_TOTAL_S = FOE_FLY_S + FOE_DROP_S
 const REVEAL_FLY_S = 0.4
 /** How long the card holds at the centre of the screen, turned face-up —
  *  the beat that actually shows you the card, long enough to actually read
- *  it rather than glimpse it. */
-const REVEAL_HOLD_S = 0.65
+ *  it rather than glimpse it. Longer than the rise alone would need: this
+ *  used to share its own back half with a double-flip's second turn, which
+ *  is gone now (a single turn, timed to finish exactly as the card reaches
+ *  the peak, needs none of that borrowed time) — folded back in here
+ *  instead of simply dropped, so the reveal reads *longer*, not shorter,
+ *  for no longer spending part of the hold still turning. */
+const REVEAL_HOLD_S = 1.05
 const REVEAL_DROP_S = 0.35
 
 const OWN_TOTAL_S = REVEAL_FLY_S + REVEAL_HOLD_S + REVEAL_DROP_S
-
-/** How long the reveal's own double-flip takes to turn and settle — fixed,
- *  not stretched across however long the hold happens to last, and set to
- *  the exact pace a placed card's own double-flip already turns at (see
- *  `PlaceFx`'s `RISE_S + FLIP_EXTRA_S`), so a drawn card's arrival reads as
- *  the same flourish, not a slower echo of it. Comfortably shorter than
- *  `REVEAL_FLY_S + REVEAL_HOLD_S`, so the card still settles, already
- *  turned face-up, before the hold it's read during is over. */
-const FLIP_S = 0.8
 
 /** How long a full batch takes when every card in it draws one at a time —
  *  each side's own trip, `n` times over, rather than a fixed small stagger
@@ -194,17 +190,6 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
 
     const flyAt = REVEAL_FLY_S / total
     const holdAt = (REVEAL_FLY_S + REVEAL_HOLD_S) / total
-    // The reveal turns twice, not once — the same double-flip a placed
-    // card's own arrival uses (see `PlaceFx`): it turns face-up as it
-    // reaches the peak, turns away again, then turns face-up a second time
-    // to settle on, rather than a single flat turn. A drawn card is read
-    // exactly as closely as a played one; it earns the same flourish, not
-    // a lesser version of it — including the *pace* of it: `flipEndAt` is
-    // pinned to a fixed `FLIP_S`, the same span `PlaceFx`'s own double-flip
-    // takes, rather than `holdAt` (which would stretch it to match however
-    // long this particular hold happens to last).
-    const flipEndAt = FLIP_S / total
-    const flipMidAt = (flyAt + flipEndAt) / 2
     return {
       card: {
         x: [start.x, peak.x, peak.x, end.x],
@@ -217,8 +202,12 @@ function DrawCard({ draw, delay }: { draw: DrawFxCard; delay: number }) {
         },
       },
       flip: {
-        rotateY: [0, 180, 360, 540, 540],
-        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, flipMidAt, flipEndAt, 1] },
+        // A single turn, not the double-flip a placed card's own arrival
+        // uses — timed to finish exactly as the card reaches the peak
+        // (`flyAt`), so it arrives already face-up rather than still
+        // turning partway through the hold that's meant to show it off.
+        rotateY: [0, 180, 180],
+        transition: { duration: total, delay, ease: 'easeInOut', times: [0, flyAt, 1] },
       },
     }
     // Recomputed only if the trip itself changes — the rects are measured
