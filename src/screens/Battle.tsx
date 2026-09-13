@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AnimatePresence,
   DragControls,
@@ -284,14 +284,21 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const [coinFlipFx, setCoinFlipFx] = useState<{ id: number; heads: boolean } | null>(null)
   // The opponent's own plays and ascensions get the same PlaceFx flourish as
   // yours — but reactively, since the AI dispatches its own actions and the
-  // board has already changed by the time this screen finds out. The newly
+  // board has already changed by the time this screen finds out. Each newly
   // arrived (or newly ascended) Figure is hidden by `uid` — board slots have
-  // no "index in hand" to hide the way a drawn card does — for as long as
-  // `foePlaceFx` is in flight, then revealed the instant it lands, in place
-  // of a `PlaceFx` cue that never had a real placement to hold back. See
-  // `startNextFoePlace`.
+  // no "index in hand" to hide the way a drawn card does — the moment it's
+  // detected, not merely once its own flight actually starts: a burst that
+  // places more than one Figure in a single commit (the AI's own opening
+  // SETUP fills Active and all three Bench at once) already has every one
+  // of them sitting in `foe.bench`/`foe.active` from that first commit on,
+  // so only hiding whichever one is *currently* flying left every other
+  // queued Figure showing, unhidden, well before its own turn in the queue
+  // ever came up. A `Set` rather than one uid is what lets more than one
+  // stay hidden at a time while they wait. Each is revealed the instant its
+  // own flight lands, in place of a `PlaceFx` cue that never had a real
+  // placement to hold back. See `startNextFoePlace`.
   const [foePlaceFx, setFoePlaceFx] = useState<PlaceFxTrigger | null>(null)
-  const [hiddenFoeFigureUid, setHiddenFoeFigureUid] = useState<string | null>(null)
+  const [hiddenFoeFigureUids, setHiddenFoeFigureUids] = useState<ReadonlySet<string>>(() => new Set())
 
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
@@ -654,12 +661,18 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
    *  last one shown. */
   const foePlaceQueue = useRef<{ uid: string; cardId: string; toEl: HTMLDivElement; isActive: boolean }[]>([])
   const foePlaceInFlight = useRef(false)
+  /** Which queued placement's flight is the one currently in the air —
+   *  read back in `onLand` to know which single uid to reveal, since
+   *  `PlaceFxTrigger` itself carries no notion of whose Figure it is. */
+  const foePlaceCurrentUid = useRef<string | null>(null)
 
   /** Pulls the next queued foe placement (if any) and sends it flying, or
    *  clears the in-flight flag once the queue is empty. Called both when a
    *  fresh one is detected and from `PlaceFx`'s own `onDone` for this
    *  trigger, so a burst of them plays out one at a time rather than all at
-   *  once. */
+   *  once. Every queued uid is already hidden the moment it's detected (see
+   *  the log-diffing effect below) — this only ever starts the *flight*,
+   *  it never has to hide anything on its own. */
   const startNextFoePlace = () => {
     const next = foePlaceQueue.current.shift()
     if (!next) {
@@ -669,14 +682,20 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     const fromEl = foeHandRef.current
     if (!fromEl) {
       // Nothing rendered yet to fly from — skip this one rather than queue
-      // it forever; the figure is already on the board underneath, just
-      // shown without a flourish, same as any other missing-slot edge case
-      // in this file.
+      // it forever. Its uid is already hidden (see above); reveal it too,
+      // or it would stay a ghost forever with no flight ever coming to
+      // release it.
+      setHiddenFoeFigureUids((prev) => {
+        if (!prev.has(next.uid)) return prev
+        const nextSet = new Set(prev)
+        nextSet.delete(next.uid)
+        return nextSet
+      })
       startNextFoePlace()
       return
     }
     foePlaceInFlight.current = true
-    setHiddenFoeFigureUid(next.uid)
+    foePlaceCurrentUid.current = next.uid
     // A single card-sized rect, not the whole hand tray's — `foeHandRef`
     // wraps every card back at once, and `PlaceCard` sizes itself directly
     // off `fromRect.width`, so handing it the tray's own (much wider,
@@ -741,7 +760,17 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const pendingFoeCount = useRef(0)
   const pendingHeads = useRef<boolean | null>(null)
 
-  useEffect(() => {
+  // `useLayoutEffect`, not `useEffect` — a plain effect runs *after* the
+  // browser has already painted the commit that grew `state.log`, and that
+  // commit already has the foe's newly placed or ascended Figure sitting in
+  // `foe.bench`/`foe.active` in plain sight, `hiddenFoeFigureUids` not yet
+  // updated to hide it. That gap is exactly wide enough for the real Figure
+  // to flash on screen for a frame before this effect's own state update
+  // hides it. A layout effect runs synchronously right after the DOM
+  // updates but before the browser paints, so the state it sets here lands
+  // in the *same* commit the viewer ever sees — nothing is ever shown
+  // unhidden at all.
+  useLayoutEffect(() => {
     const prevLen = seenLogLen.current
     seenLogLen.current = state.log.length
     // Shorter than before means a new match replaced this one, not growth.
@@ -773,6 +802,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (foePlaces.length) {
       const activeEl = foeActiveSlotRef.current
       const benchEls = foeBenchSlotRefs.current
+      const newlyQueued: string[] = []
       for (const entry of foePlaces) {
         const uid = entry.event.uid
         let toEl: HTMLDivElement | null = null
@@ -784,7 +814,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           const idx = foe.bench.findIndex((f) => f?.uid === uid)
           if (idx !== -1 && benchEls[idx]) toEl = benchEls[idx]
         }
-        if (toEl) foePlaceQueue.current.push({ uid, cardId: entry.event.cardId, toEl, isActive })
+        if (toEl) {
+          foePlaceQueue.current.push({ uid, cardId: entry.event.cardId, toEl, isActive })
+          newlyQueued.push(uid)
+        }
+      }
+      // Hidden the instant every one of them is queued, in this same
+      // commit — not staggered to match whenever each one's own flight
+      // actually starts — so a burst that lands several at once (the
+      // opponent's opening SETUP board, chiefly) never shows any of them
+      // unhidden even for the single frame it'd otherwise take.
+      if (newlyQueued.length) {
+        setHiddenFoeFigureUids((prev) => {
+          const next = new Set(prev)
+          for (const uid of newlyQueued) next.add(uid)
+          return next
+        })
       }
       if (!foePlaceInFlight.current) startNextFoePlace()
     }
@@ -1619,10 +1664,10 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   }
 
   // The opponent's Active slot, with the same by-uid hide as their bench
-  // (see `hiddenFoeFigureUid` above) layered on top of the existing
+  // (see `hiddenFoeFigureUids` above) layered on top of the existing
   // pre-hit/felled hold `shownActive` already does.
   const rawFoeActive = shownActive('foe')
-  const foeActiveGhost = Boolean(rawFoeActive && rawFoeActive.uid === hiddenFoeFigureUid)
+  const foeActiveGhost = Boolean(rawFoeActive && hiddenFoeFigureUids.has(rawFoeActive.uid))
   const foeActiveShown = foeActiveGhost ? null : rawFoeActive
 
   return (
@@ -1685,7 +1730,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           style={{ transform: `translateY(${FOE_ROW_LIFT - BENCH_CLEARANCE}px)` }}
         >
           {foe.bench.map((figure, i) => {
-            const shown = figure && figure.uid === hiddenFoeFigureUid ? null : figure
+            const shown = figure && hiddenFoeFigureUids.has(figure.uid) ? null : figure
             return (
               <div
                 key={i}
@@ -1699,7 +1744,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                   emptyLabel=""
                   onClick={shown ? () => openFoe(shown) : undefined}
                   noPeek={Boolean(shown)}
-                  ghost={figure !== null && figure.uid === hiddenFoeFigureUid}
+                  ghost={figure !== null && hiddenFoeFigureUids.has(figure.uid)}
                 />
               </div>
             )
@@ -1714,7 +1759,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
                 that felled it has finished. A figure just placed or ascended
                 stays hidden a beat longer still, until its own reactive
                 `PlaceFx` flight actually lands on it — see
-                `hiddenFoeFigureUid`. */}
+                `hiddenFoeFigureUids`. */}
             <BoardFigure
               figure={foeActiveShown}
               width={ACTIVE_W}
@@ -2067,7 +2112,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           else is queued behind it. */}
       <PlaceFx
         trigger={foePlaceFx}
-        onLand={() => setHiddenFoeFigureUid(null)}
+        onLand={() => {
+          const uid = foePlaceCurrentUid.current
+          if (!uid) return
+          setHiddenFoeFigureUids((prev) => {
+            if (!prev.has(uid)) return prev
+            const next = new Set(prev)
+            next.delete(uid)
+            return next
+          })
+        }}
         onDone={() => {
           setFoePlaceFx(null)
           startNextFoePlace()
