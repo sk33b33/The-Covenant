@@ -629,6 +629,16 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     foeDrawCount: number
   } | null>(null)
 
+  /** A cue held back to appear *after* a coin-flip-and-draw or an attack's
+   *  own draw effect has fully played out, rather than racing it on its own
+   *  fixed beat — see the two call sites in `presentHandoff` and
+   *  `releaseCoinFlipFx` below, and the matching release in `DrawFx`'s own
+   *  `onDone`. */
+  const pendingCueAfterDraw = useRef<TurnCue | null>(null)
+  const scheduleCue = (cue: TurnCue) => {
+    handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
+  }
+
   const releaseCoinFlipFx = () => {
     setCoinFlipFx(null)
     const pending = pendingPostCoinFlip.current
@@ -636,6 +646,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (pending?.draws.length) {
       hideDrawnCards(pending.youNewIndices, pending.foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws: pending.draws })
+      // The cue (if any) waits for *this* draw's own `onDone` instead —
+      // see there — since tails (no draw) is the only way this branch is
+      // reached with nothing left still to play out.
+    } else if (pendingCueAfterDraw.current) {
+      const cue = pendingCueAfterDraw.current
+      pendingCueAfterDraw.current = null
+      scheduleCue(cue)
     }
   }
 
@@ -721,19 +738,44 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     foeDrawCount: number,
     heads: boolean | null,
   ) => {
-    if (cue) handoffTimers.current.push(setTimeout(() => setTurnCue(cue), BEAT_S * 1000))
+    // Whether `draws` is the hand-off's *own* turn-start draw — the side
+    // whose turn the cue is announcing — rather than some other side's
+    // draw landing in the same commit, chiefly an attack's own "draw a
+    // card" effect: that one belongs to whoever just attacked, whose turn
+    // this same commit is *ending*, not the side the cue is for. Only a
+    // true turn-start batch gets the "banner first, then the draw" order
+    // below; anything else keeps its own draw first and holds the cue
+    // back instead (see the `else` branch), since a card's own effect has
+    // nothing to do with whichever side's turn is coming up next.
+    const cueSide: PlayerId | null = cue ? (cue.mine ? 'you' : 'foe') : null
+    const isTurnStartBatch = cue !== null && draws.length > 0 && draws.every((d) => d.side === cueSide)
+
     if (heads !== null) {
       pendingPostCoinFlip.current = { draws, youNewIndices, foeDrawCount }
       setCoinFlipFx({ id: ++coinFlipFxId.current, heads })
-    } else if (cue && draws.length) {
+      // The cue waits for the coin (and whatever draw it grants) to fully
+      // resolve — released from `releaseCoinFlipFx` or, if it grants a
+      // draw, from that draw's own `onDone` — rather than rising on its
+      // own beat while the coin is still spinning.
+      if (cue) pendingCueAfterDraw.current = cue
+    } else if (isTurnStartBatch) {
       // The turn-start draw riding along with this cue — ghosted right
       // away, but its own flight waits for `releaseCue`, once the banner
       // it arrived under has actually cleared the screen.
+      scheduleCue(cue!)
       hideDrawnCards(youNewIndices, foeDrawCount)
       pendingPostCue.current = draws
     } else if (draws.length) {
+      // An attack's own draw effect (or any other mid-turn draw) — shown
+      // at once, exactly as a mid-turn effect's draw always has been. The
+      // cue, if this same commit also carries one, waits for this draw's
+      // own flight to land instead of rising on its own beat regardless —
+      // see `DrawFx`'s own `onDone` below.
       hideDrawnCards(youNewIndices, foeDrawCount)
       setDrawFx({ id: ++drawFxId.current, draws })
+      if (cue) pendingCueAfterDraw.current = cue
+    } else if (cue) {
+      scheduleCue(cue)
     }
   }
 
@@ -2102,6 +2144,14 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
           setDrawFx(null)
           setHiddenDrawIndices([])
           setHiddenFoeDrawCount(0)
+          // A cue held back to appear only once this draw (an attack's own
+          // effect, or a coin flip's) has actually finished, rather than
+          // racing it on its own beat — see `presentHandoff`.
+          const cue = pendingCueAfterDraw.current
+          if (cue) {
+            pendingCueAfterDraw.current = null
+            scheduleCue(cue)
+          }
         }}
       />
 
