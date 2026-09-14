@@ -97,6 +97,8 @@ interface DeckStore {
   setActive: (id: string) => void
   /** Installs the starter deck if the player has none. */
   ensureStarter: () => void
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: Persisted) => void
 }
 
 interface Persisted {
@@ -145,6 +147,11 @@ export const useDecks = create<DeckStore>((set, get) => {
     ensureStarter: () => {
       if (get().decks.length > 0) return
       get().upsert(STARTER_DECK)
+    },
+
+    hydrate: (data) => {
+      set({ ...initial, ...data })
+      persist()
     },
   }
 })

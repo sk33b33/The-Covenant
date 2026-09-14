@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 import { cx } from '@/lib/cx'
 
 /**
@@ -57,6 +57,33 @@ export function Button({
     >
       {children}
     </motion.button>
+  )
+}
+
+/* --------------------------------------------------------------- text field */
+
+type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'className'> & {
+  label: string
+}
+
+/** A single labelled input, sunk into the surface the same way the volume
+ *  track in `Slider` is — the one raised/sunk pairing this kit hasn't
+ *  needed until a real form (sign-in) showed up. */
+export function TextField({ label, id, ...rest }: TextFieldProps) {
+  const inputId = id ?? `field-${label.toLowerCase().replace(/\s+/g, '-')}`
+  return (
+    <label htmlFor={inputId} className="block text-left">
+      <span className="block text-xs font-medium text-ink-muted mb-1.5">{label}</span>
+      <input
+        id={inputId}
+        className={cx(
+          'w-full rounded-lg px-4 py-3 text-base text-ink neu-sunk',
+          'placeholder:text-ink-faint outline-none',
+          'focus-visible:ring-2 focus-visible:ring-[var(--gold-bright)]',
+        )}
+        {...rest}
+      />
+    </label>
   )
 }
 

@@ -32,6 +32,8 @@ interface ProfileStore extends ProfileState {
   addXp: (amount: number) => number
   recordBattle: (won: boolean) => void
   recordPackOpened: () => void
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: ProfileState) => void
 }
 
 const persist = (state: ProfileState) => save('profile', state)
@@ -90,6 +92,11 @@ export const useProfile = create<ProfileStore>((set, get) => ({
   recordPackOpened: () => {
     set((s) => ({ packsOpened: s.packsOpened + 1 }))
     get().addXp(ECONOMY.XP_PER_PACK)
+  },
+
+  hydrate: (data) => {
+    set({ ...initial, ...data })
+    persist(snapshot(get()))
   },
 }))
 

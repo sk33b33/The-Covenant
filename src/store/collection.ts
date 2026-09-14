@@ -30,6 +30,8 @@ interface CollectionStore extends CollectionState {
   /** Distinct cards held, and the set size. */
   progress: (setId?: string) => { owned: number; total: number }
   reset: () => void
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: CollectionState) => void
 }
 
 const snapshot = (s: CollectionStore): CollectionState => ({ owned: s.owned, unseen: s.unseen })
@@ -74,6 +76,11 @@ export const useCollection = create<CollectionStore>((set, get) => {
 
     reset: () => {
       set({ owned: {}, unseen: [] })
+      persist()
+    },
+
+    hydrate: (data) => {
+      set({ ...initial, ...data })
       persist()
     },
   }

@@ -34,6 +34,8 @@ interface EconomyStore extends EconomyState {
 
   /** Records a pack opening for the pity counter. */
   notePull: (hitRareOrBetter: boolean) => void
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: EconomyState) => void
 }
 
 const snapshot = (s: EconomyStore): EconomyState => ({
@@ -105,6 +107,11 @@ export const useEconomy = create<EconomyStore>((set, get) => {
 
     notePull: (hitRareOrBetter) => {
       set((s) => ({ sincePity: hitRareOrBetter ? 0 : s.sincePity + 1 }))
+      persist()
+    },
+
+    hydrate: (data) => {
+      set({ ...initial, ...data })
       persist()
     },
   }

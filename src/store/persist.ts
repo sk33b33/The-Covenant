@@ -1,12 +1,20 @@
 /**
  * Local persistence for player state.
  *
- * There is no server and no account. Everything the player owns — collection,
- * currencies, decks, story progress — lives on the device. localStorage is the
- * right tool here rather than IndexedDB: the whole save is a few KB of JSON,
- * it must be readable synchronously during the first render so the app never
- * flashes an empty collection, and Zustand's persist contract is synchronous.
+ * The device is always the source of truth: everything the player owns —
+ * collection, currencies, decks, story progress — lives here first.
+ * localStorage is the right tool for that rather than IndexedDB: the whole
+ * save is a few KB of JSON, it must be readable synchronously during the
+ * first render so the app never flashes an empty collection, and Zustand's
+ * persist contract is synchronous.
+ *
+ * An account is optional, layered on top rather than required: `save()`
+ * mirrors every write to Supabase too, through `cloudSave.ts`, but only once
+ * someone has actually signed in (see its own doc comment), and never in a
+ * way this file's own callers have to know about or wait on.
  */
+
+import { pushCloudState } from '@/lib/cloudSave'
 
 const PREFIX = 'covenant:'
 
@@ -41,6 +49,7 @@ export function save<T>(key: string, data: T): void {
     // Out of quota or storage denied. The session keeps working in memory;
     // losing a save is better than crashing mid-match.
   }
+  pushCloudState(key, data)
 }
 
 export function clearAll(): void {

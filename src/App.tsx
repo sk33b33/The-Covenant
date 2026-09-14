@@ -13,6 +13,7 @@ import { Shop } from '@/screens/Shop'
 import { StoryEncounter } from '@/screens/StoryEncounter'
 import { StoryMap } from '@/screens/StoryMap'
 import { Home } from '@/screens/Home'
+import { Auth } from '@/screens/Auth'
 import { Menu } from '@/screens/Menu'
 import { Missions } from '@/screens/Missions'
 import { Profile } from '@/screens/Profile'
@@ -239,6 +240,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'profile':
       return <Profile />
+
+    case 'auth':
+      return <Auth />
 
     case 'story-map':
       return <StoryMap />

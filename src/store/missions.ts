@@ -147,6 +147,8 @@ interface MissionsStore extends MissionsState {
   claim: (missionId: string) => boolean
   /** Progress toward a mission, already adjusted for the daily baseline. */
   valueFor: (mission: MissionDefinition, progress: MissionProgress) => number
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: MissionsState) => void
 }
 
 export const useMissions = create<MissionsStore>((set, get) => {
@@ -186,6 +188,11 @@ export const useMissions = create<MissionsStore>((set, get) => {
       if (mission.scope === 'lifetime') return total
       const base = get().dailyBase[mission.metric] ?? 0
       return Math.max(0, total - base)
+    },
+
+    hydrate: (data) => {
+      set({ ...initial, ...data })
+      persist()
     },
   }
 })

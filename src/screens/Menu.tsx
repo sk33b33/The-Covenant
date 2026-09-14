@@ -4,6 +4,7 @@ import { Button, Panel, Slider } from '@/components/ui'
 import { CARDS } from '@/data/cards'
 import { ECONOMY, RULES } from '@/game/config'
 import { clearAll } from '@/store/persist'
+import { useAuth } from '@/store/auth'
 import { useNav } from '@/store/nav'
 import { useProfile } from '@/store/profile'
 import { useSettings } from '@/store/settings'
@@ -21,6 +22,8 @@ import { cx } from '@/lib/cx'
 export function Menu() {
   const go = useNav((s) => s.go)
   const profile = useProfile()
+  const session = useAuth((s) => s.session)
+  const signOut = useAuth((s) => s.signOut)
 
   const [theme, setTheme] = useState<Theme>(resolveTheme)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -74,6 +77,32 @@ export function Menu() {
           <Tile icon={<ScrollIcon size={22} />} label="Missions" onClick={() => go({ name: 'missions' })} />
           <Tile icon={<SocialIcon size={22} />} label="Profile" onClick={() => go({ name: 'profile' })} />
         </div>
+
+        {/* ------------------------------------------------------------ account */}
+        {/* `session === undefined` means the very first check hasn't resolved
+            yet — rendering nothing there avoids a flash of "Sign In" for
+            someone who turns out to already be signed in (see `store/auth.ts`). */}
+        {session !== undefined && (
+          <Panel className="p-4 mt-3 flex items-center justify-between gap-3">
+            {session ? (
+              <>
+                <span className="text-sm truncate">{session.user.email}</span>
+                <Button variant="sunk" className="!px-4 !py-2 text-sm shrink-0" onClick={signOut}>
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="text-sm text-ink-muted">
+                  Sign in to carry your progress to another device.
+                </span>
+                <Button className="!px-4 !py-2 text-sm shrink-0" onClick={() => go({ name: 'auth' })}>
+                  Sign In
+                </Button>
+              </>
+            )}
+          </Panel>
+        )}
 
         {/* ----------------------------------------------------------- theme */}
         <h2 className="font-display text-md mt-6 mb-2 px-1">Appearance</h2>
@@ -183,8 +212,8 @@ export function Menu() {
         <Panel className="p-4">
           <p className="text-xs text-ink-muted leading-relaxed">
             The Covenant — a trading card game drawn from scripture. {CARDS.length} cards
-            in the Genesis set. Everything you own is stored on this device; there is
-            no account and nothing is sent anywhere.
+            in the Genesis set. Everything you own is stored on this device first;
+            signing in is optional, and only carries it to an account if you choose to.
           </p>
         </Panel>
 

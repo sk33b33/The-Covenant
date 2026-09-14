@@ -24,6 +24,8 @@ interface StoryStore extends StoryState {
    *  caller knows not to pay the first-clear reward twice. */
   clear: (encounterId: string) => boolean
   reset: () => void
+  /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
+  hydrate: (data: StoryState) => void
 }
 
 export const useStory = create<StoryStore>((set, get) => {
@@ -49,6 +51,11 @@ export const useStory = create<StoryStore>((set, get) => {
 
     reset: () => {
       set({ cleared: [], attempts: {} })
+      persist()
+    },
+
+    hydrate: (data) => {
+      set({ ...initial, ...data })
       persist()
     },
   }
