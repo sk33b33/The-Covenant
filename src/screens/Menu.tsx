@@ -145,7 +145,7 @@ export function Menu() {
           <div className="h-px" style={{ background: 'var(--bg-sunk)' }} />
           <AudioChannel
             label="Game Music"
-            description="The entry chime."
+            description="The entry chime, and the loop that plays outside — and inside — a match."
             muted={musicMuted}
             setMuted={setMusicMuted}
             volume={musicVolume}

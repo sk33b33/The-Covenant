@@ -2,30 +2,27 @@ import { asset } from './asset'
 import { useSettings } from '@/store/settings'
 
 /**
- * The looping menu music — Home, Cards, Social and Menu, and everything else
- * that isn't a match. A battle gets its own track (`battleMusic.ts`); this
- * one's job is to fill the rest of the app and get out of the way the moment
- * a match starts.
+ * The looping battle music — a match and a story encounter both render the
+ * same `Battle` screen, so both get this track instead of the menu loop
+ * `music.ts` owns everywhere else. Swapping tracks rather than just muting
+ * the menu loop is the point: a battle should sound like a battle.
  *
- * Built the same way `chime.ts` is: one element, owned by the module rather
+ * Built the same way as `music.ts`: one element, owned by the module rather
  * than by whichever screen happens to be mounted, so React's own churn —
  * StrictMode's double-mount, a route swap, `AnimatePresence` unmounting a
  * screen mid-transition — never has a chance to cut it off or restart it
- * from a component's effect cleanup running at the wrong moment. Playback
- * is driven by App.tsx's route effect (play outside a battle, pause inside
+ * from a component's effect cleanup running at the wrong moment. Playback is
+ * driven by App.tsx's route effect (play inside a battle, pause outside
  * one), so pausing and resuming is just that — the same loop picks up where
- * it left off instead of starting over each time a battle ends.
+ * it left off instead of starting over each time a battle begins.
  */
 
 let el: HTMLAudioElement | null = null
 
-/** Builds the element and starts it downloading, without playing it — the
- *  first tap on the entry screen is what actually starts playback, since
- *  that's the one gesture guaranteed to satisfy the browser's autoplay
- *  policy. */
-export function preloadMusic(): void {
+/** Builds the element and starts it downloading, without playing it. */
+export function preloadBattleMusic(): void {
   if (el) return
-  el = new Audio(asset('audio/menu-music.mp3'))
+  el = new Audio(asset('audio/battle-music.mp3'))
   el.preload = 'auto'
   el.loop = true
   syncVolume()
@@ -43,10 +40,10 @@ function syncVolume(): void {
 useSettings.subscribe(syncVolume)
 
 /** Starts the loop if it isn't already running. Safe to call repeatedly —
- *  from the route effect on every non-battle screen, say — since a track
+ *  from the route effect on every battle screen, say — since a track
  *  already playing just keeps playing. */
-export function playMusic(): void {
-  preloadMusic()
+export function playBattleMusic(): void {
+  preloadBattleMusic()
   const audio = el
   if (!audio) return
 
@@ -56,13 +53,13 @@ export function playMusic(): void {
   void audio.play().catch(() => {
     /* autoplay refused (no gesture yet) or the file hasn't arrived —
        nothing depends on it; the route effect tries again on the next
-       screen that wants it playing. */
+       battle that wants it playing. */
   })
 }
 
 /** Pauses without resetting position, so the loop resumes from wherever it
- *  was rather than restarting — entering and leaving a battle repeatedly
+ *  was rather than restarting — leaving and re-entering a battle repeatedly
  *  shouldn't mean only ever hearing the first few seconds of the track. */
-export function pauseMusic(): void {
+export function pauseBattleMusic(): void {
   el?.pause()
 }
