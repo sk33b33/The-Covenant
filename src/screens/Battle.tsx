@@ -22,6 +22,7 @@ import { ENERGY_LABEL, isFigure, type EnergyType } from '@/game/types'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
+import { playBattleMusic } from '@/lib/battleMusic'
 import { playCoinSpin } from '@/lib/coinSound'
 import { cx } from '@/lib/cx'
 import { ActionSheet, type SheetOption } from './battle/ActionSheet'
@@ -1352,6 +1353,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // `HandCard`'s own `invisible`). A missing pile or tray just deals the
   // hand in place instead of skipping it outright — the match still has to
   // be playable even if this couldn't measure anything to fly between.
+  //
+  // This is also the earliest moment the battle track is allowed to start
+  // (see its own call at the kickoff card's `onDone`, right beside this):
+  // the coin flip and the "Match Start" card that follows it both have
+  // their own sound and their own beat, and starting the score any sooner
+  // would have it competing with both instead of picking up right as they
+  // finish.
   const dealFxId = useRef(0)
   const startDeal = () => {
     const pileEl = youPileRef.current
@@ -2198,6 +2206,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             cue={kickoff}
             onDone={() => {
               setKickoff(null)
+              playBattleMusic()
               startDeal()
             }}
           />

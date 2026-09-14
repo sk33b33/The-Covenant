@@ -11,10 +11,15 @@ import { useSettings } from '@/store/settings'
  * than by whichever screen happens to be mounted, so React's own churn —
  * StrictMode's double-mount, a route swap, `AnimatePresence` unmounting a
  * screen mid-transition — never has a chance to cut it off or restart it
- * from a component's effect cleanup running at the wrong moment. Playback is
- * driven by App.tsx's route effect (play inside a battle, pause outside
- * one), so pausing and resuming is just that — the same loop picks up where
- * it left off instead of starting over each time a battle begins.
+ * from a component's effect cleanup running at the wrong moment.
+ *
+ * Pausing is driven by App.tsx's route effect, the instant a battle route
+ * stops being current — but starting is not the same effect's job. Battle.tsx
+ * calls `playBattleMusic` itself, once its own coin-flip-then-kickoff-banner
+ * intro has actually finished, so the track never has to start underneath
+ * that sequence's own sound and beat. Pausing and resuming is just that,
+ * either way: the same loop picks up where it left off instead of starting
+ * over each time a battle begins.
  */
 
 let el: HTMLAudioElement | null = null

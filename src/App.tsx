@@ -20,7 +20,7 @@ import { Social } from '@/screens/Social'
 import { Placeholder } from '@/screens/Placeholder'
 import { playTap } from '@/lib/tap'
 import { pauseMusic, playMusic } from '@/lib/music'
-import { pauseBattleMusic, playBattleMusic } from '@/lib/battleMusic'
+import { pauseBattleMusic } from '@/lib/battleMusic'
 import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
 
 /** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
@@ -69,16 +69,22 @@ export default function App() {
   // The menu music loop plays everywhere except an actual match — a quick
   // battle and a story encounter both render the same `Battle` screen
   // underneath, so both count, and get the battle track instead. Calling
-  // `playMusic`/`playBattleMusic` on every render of their own side is safe
-  // to do because it's a no-op once that loop is already running; what that
-  // repetition buys is that switching Home → Cards → Social never has to
-  // know it needs to ask for the music, because it was never stopped in the
-  // first place. It only actually swaps right here, the moment a battle
-  // route starts or stops being current.
+  // `playMusic` on every render of its own side is safe to do because it's a
+  // no-op once that loop is already running; what that repetition buys is
+  // that switching Home → Cards → Social never has to know it needs to ask
+  // for the music, because it was never stopped in the first place.
+  //
+  // Entering a battle route only pauses the menu loop here — it does not
+  // start the battle track. `Battle` itself calls `playBattleMusic` once its
+  // own coin-flip-then-kickoff-banner intro has actually finished (see
+  // `startDeal` in Battle.tsx), so the battle track never has to compete
+  // with that sequence's own animation and sound. Leaving is the one swap
+  // that happens right here: `pauseBattleMusic` is safe to call regardless
+  // of whether the track was ever actually started, and `playMusic` picks
+  // the menu loop back up from wherever it left off.
   useEffect(() => {
     if (route.name === 'battle' || route.name === 'story-encounter') {
       pauseMusic()
-      playBattleMusic()
     } else {
       pauseBattleMusic()
       playMusic()
