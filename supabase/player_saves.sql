@@ -1,4 +1,7 @@
--- Run this once in your Supabase project's SQL editor.
+-- Run this in your Supabase project's SQL editor. Safe to run more than
+-- once — every statement either checks for its own prior existence or
+-- replaces itself outright, so re-running after a partial failure (or just
+-- to be sure) never errors on "already exists."
 --
 -- One table holds every signed-in player's progress, shaped to mirror
 -- src/store/persist.ts's own local envelope exactly: `state` ends up looking
@@ -15,6 +18,9 @@ create table if not exists player_saves (
 
 alter table player_saves enable row level security;
 
+-- Postgres has no `create policy if not exists`, so the drop-then-create
+-- pair is what makes this idempotent instead.
+drop policy if exists "Users manage their own save" on player_saves;
 create policy "Users manage their own save"
   on player_saves
   for all
