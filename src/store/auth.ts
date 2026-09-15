@@ -67,6 +67,10 @@ interface AuthState {
 
   signUp: (email: string, password: string) => Promise<boolean>
   signInWithPassword: (email: string, password: string) => Promise<boolean>
+  /** Redirects the whole page to Google and back — there is no boolean
+   *  result to return here the way the password flows have one, since a
+   *  successful call never returns to this tab at all. */
+  signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
   clearError: () => void
 }
@@ -110,6 +114,28 @@ export const useAuth = create<AuthState>((set) => ({
       return false
     }
     return true
+  },
+
+  signInWithGoogle: async () => {
+    const supabase = client()
+    if (!supabase) {
+      set({ error: NOT_CONFIGURED })
+      return
+    }
+
+    set({ error: null })
+    // `import.meta.env.BASE_URL` is the same repo-subpath prefix `asset()`
+    // resolves art under (see `lib/asset.ts`) — Google needs to land back on
+    // a real page under that prefix, not the site root, when this is served
+    // from a GitHub Pages project page rather than a domain root.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + import.meta.env.BASE_URL },
+    })
+    // Success never reaches here — the browser has already navigated to
+    // Google. Only a failure to even start the redirect (provider not
+    // enabled in the Supabase dashboard, network down) does.
+    if (error) set({ error: error.message })
   },
 
   signOut: async () => {
