@@ -16,7 +16,6 @@
     "art:import": "python3 scripts/import-card-art.py"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
     "framer-motion": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

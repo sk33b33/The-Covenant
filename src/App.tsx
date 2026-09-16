@@ -22,6 +22,7 @@ import { Placeholder } from '@/screens/Placeholder'
 import { playTap } from '@/lib/tap'
 import { pauseMusic, playMusic } from '@/lib/music'
 import { pauseBattleMusic } from '@/lib/battleMusic'
+import { useAuth } from '@/store/auth'
 import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
 
 /** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
@@ -34,6 +35,7 @@ const COMING_SOON_ICON: Record<ComingSoonIcon, React.ReactNode> = {
 export default function App() {
   const route = useNav((s) => s.route)
   const back = useNav((s) => s.back)
+  const signedIn = useAuth((s) => s.signedIn)
 
   // The hardware and browser back gesture pops our stack instead of leaving
   // the app. A sentinel history entry gives us something to pop.
@@ -106,6 +108,22 @@ export default function App() {
     route.name !== 'pack-open' &&
     route.name !== 'story-encounter' &&
     route.name !== 'deck-builder'
+
+  // Signing in is mandatory — there is no guest play, and no account
+  // creation here at all (that only ever happens on the portal website).
+  // While signed out, `Auth` *is* the entire app: no tab bar, no route
+  // tree, no way to reach anything else, since there's nothing behind it
+  // to fall back to any more. The moment `signedIn` flips true, the normal
+  // tree below takes over and `route` picks up wherever it already was
+  // (its own default, `{ name: 'enter' }`, on a fresh load) — the existing
+  // tap-to-enter splash still runs right after, unchanged.
+  if (!signedIn) {
+    return (
+      <div className="h-full bg-bg text-ink">
+        <Auth />
+      </div>
+    )
+  }
 
   return (
     <div className="h-full bg-bg text-ink">
@@ -240,9 +258,6 @@ function Screen({ route }: { route: Route }) {
 
     case 'profile':
       return <Profile />
-
-    case 'auth':
-      return <Auth />
 
     case 'story-map':
       return <StoryMap />
