@@ -23,6 +23,7 @@ export type Route =
   | { name: 'shop' }
   | { name: 'missions' }
   | { name: 'profile' }
+  | { name: 'bible' }
   | { name: 'deck-builder'; deckId?: string }
   | { name: 'story-map' }
   | { name: 'story-encounter'; encounterId: string }

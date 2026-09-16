@@ -5,6 +5,7 @@ import { CardViewer } from '@/components/card/CardViewer'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
 import { BattleRoute } from '@/screens/BattleRoute'
+import { Bible } from '@/screens/Bible'
 import { Collection } from '@/screens/Collection'
 import { DeckBuilder } from '@/screens/DeckBuilder'
 import { Enter } from '@/screens/Enter'
@@ -258,6 +259,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'profile':
       return <Profile />
+
+    case 'bible':
+      return <Bible />
 
     case 'story-map':
       return <StoryMap />

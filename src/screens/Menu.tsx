@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CheckIcon, ScrollIcon, SocialIcon, TreeMark } from '@/art/icons'
+import { BookIcon, CheckIcon, ScrollIcon, SocialIcon, TreeMark } from '@/art/icons'
 import { Button, Panel, Slider } from '@/components/ui'
 import { CARDS } from '@/data/cards'
 import { ECONOMY, RULES } from '@/game/config'
@@ -73,9 +73,10 @@ export function Menu() {
           </span>
         </button>
 
-        <div className="grid grid-cols-2 gap-3 mt-3">
+        <div className="grid grid-cols-3 gap-3 mt-3">
           <Tile icon={<ScrollIcon size={22} />} label="Missions" onClick={() => go({ name: 'missions' })} />
           <Tile icon={<SocialIcon size={22} />} label="Profile" onClick={() => go({ name: 'profile' })} />
+          <Tile icon={<BookIcon size={22} />} label="Bible" onClick={() => go({ name: 'bible' })} />
         </div>
 
         {/* ------------------------------------------------------------ account */}

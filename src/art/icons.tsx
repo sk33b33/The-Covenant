@@ -104,6 +104,15 @@ export const ScrollIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** An open book, spine down the middle — the Bible reader. */
+export const BookIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 6.4c-1.6-1.4-3.6-2-6.6-2a1.4 1.4 0 0 0-1.4 1.4v11.8c0 .9.8 1.5 1.6 1.4 2.6-.3 4.6.2 6.4 1.6" />
+    <path d="M12 6.4c1.6-1.4 3.6-2 6.6-2a1.4 1.4 0 0 1 1.4 1.4v11.8c0 .9-.8 1.5-1.6 1.4-2.6-.3-4.6.2-6.4 1.6Z" />
+    <path d="M12 6.4v14.2" />
+  </Icon>
+)
+
 /** Trade: two cards passing in opposite directions. */
 export const TradeIcon = (p: IconProps) => (
   <Icon {...p}>
