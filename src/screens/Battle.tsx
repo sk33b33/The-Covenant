@@ -13,6 +13,7 @@ import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { CheckIcon, ResetIcon } from '@/art/icons'
 import { Button } from '@/components/ui'
+import { Card } from '@/components/card/Card'
 import { PressableCard } from '@/components/card/PressableCard'
 import { requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
@@ -158,6 +159,23 @@ const fanSpanStep = (count: number) => (count > 1 ? Math.min(34, Math.max(18, 12
 /** How far a card's own distance from the fan's middle bows it along the arc. */
 const FAN_ARC = 1.4
 
+/** How much wider than its resting spacing your own fan opens once a hold
+ *  has actually started browsing it (see `spread` in `PlayerHand`) — enough
+ *  that neighbours stop overlapping almost entirely, since the whole point
+ *  of spreading is to give the finger sliding across the fan an unambiguous
+ *  target at every position. Never applied to the opponent's fan, which
+ *  never browses. */
+const SPREAD_SPAN_FACTOR = 1.9
+
+/** The arc flattens toward a straight, evenly spaced row while spread, the
+ *  same reasoning as the span above — a resting fan's bow is part of what
+ *  makes it read as a hand of cards, but it also worsens exactly the
+ *  ambiguity spreading exists to remove. Rotation flattens all the way to 0
+ *  for the same reason (see its own use in `PlayerHand`); the arc keeps a
+ *  small fraction of its own rather than also going fully flat, since a
+ *  dead-straight row of cards reads as a ruler rather than a hand. */
+const SPREAD_ARC_FACTOR = 0.25
+
 /** How long a finger has to stay down on the hand before it starts browsing
  *  (widening the fan, popping up whichever card it's over) rather than
  *  simply being the start of an ordinary tap or drag. */
@@ -273,6 +291,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // The hand index currently in the air, if any — hidden from the fan for
   // as long as `placeFx` is flying it (see `PlayerHand`'s own `placingIndex`).
   const [placingIndex, setPlacingIndex] = useState<number | null>(null)
+  // Which of your own hand cards a hold-and-spread gesture is currently
+  // showing large on screen, if any — see `PlayerHand`'s own `onPreview` and
+  // `HandPreview` below. Lifted up here (rather than kept local to
+  // `PlayerHand`) because the preview itself renders from this component's
+  // own overlay list, alongside every other flourish that draws over the
+  // whole board rather than inside one tray.
+  const [handPreviewCardId, setHandPreviewCardId] = useState<string | null>(null)
   // Your own hand indices a `drawFx` batch is currently carrying — hidden
   // from the fan the same way, so the real card doesn't sit in the fan
   // already while its own flourish is still mid-flight to it. The
@@ -2031,6 +2056,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               onDragStart={handleHandDragStart}
               onDropEnd={handleHandDragEnd}
               onDragMove={handleHandDrag}
+              onPreview={setHandPreviewCardId}
             />
           </div>
 
@@ -2194,6 +2220,8 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
       />
 
       <AttackFx trigger={attackFx} onDone={releaseAttackFx} />
+
+      <HandPreview cardId={handPreviewCardId} />
 
       <AnimatePresence>
         {turnCue && <TurnAnnounce key={turnCue.key} cue={turnCue} onDone={releaseCue} />}
@@ -2368,6 +2396,7 @@ function PlayerHand({
   onDragStart,
   onDropEnd,
   onDragMove,
+  onPreview,
 }: {
   hand: string[]
   setupActive: number | null
@@ -2397,6 +2426,9 @@ function PlayerHand({
   onDragStart: (index: number) => void
   onDropEnd: (index: number, point: { x: number; y: number }) => void
   onDragMove: (index: number, point: { x: number; y: number }) => void
+  /** Which card a hold-and-spread gesture wants shown large on screen right
+   *  now, `null` once it isn't showing one — see `HandPreview` in `Battle`. */
+  onPreview: (cardId: string | null) => void
 }) {
   // Which hand indices are actually rendered right now — a card picked for
   // a slot during setup is hidden (the early `return null` below), and the
@@ -2418,8 +2450,14 @@ function PlayerHand({
     .filter((i) => i !== placingIndex && !(setupPhase && (setupActive === i || setupBench.includes(i))))
   const count = visibleIndices.length
   const mid = (count - 1) / 2
-  const rotateStep = fanRotateStep(count)
-  const spanStep = fanSpanStep(count)
+  // True for as long as a hold is actively browsing the fan — see its own
+  // setters further down, both where `reading` becomes `'browse'`. Flat and
+  // wide while true: see `SPREAD_SPAN_FACTOR`/`SPREAD_ARC_FACTOR`'s own
+  // comments for why rotation goes all the way to 0 while the arc keeps a
+  // fraction of its own.
+  const [spread, setSpread] = useState(false)
+  const rotateStep = spread ? 0 : fanRotateStep(count)
+  const spanStep = fanSpanStep(count) * (spread ? SPREAD_SPAN_FACTOR : 1)
 
   // The lift a card gets as a thumb brushes across the fan without yet
   // committing to a drag — the same tell a hand of real cards gives when
@@ -2428,21 +2466,16 @@ function PlayerHand({
   // browsers, and this game is touch-first.
   const [brushed, setBrushed] = useState<number | null>(null)
 
-  // A little extra lift and size for whichever card a held finger is
-  // currently resting on while browsing the hand — a small, quiet tell
-  // rather than a card popping out to full size: the fan itself never moves,
-  // so there's nothing else to settle before this one card can rise and its
-  // predecessor can fall back, which is what keeps the handoff between two
-  // cards feeling like one continuous motion instead of a jump.
-  const BROWSE_LIFT = 22
-  const BROWSE_SCALE = 1.14
-
-  // A held finger browses the hand, lifting whichever card sits under it —
-  // distinct from the drag-to-play gesture below. It lives at the tray level
-  // rather than on each card, because the card the finger ends up over after
-  // a hold has *moved* is not necessarily the one it started on; a per-card
-  // gesture would lose the finger the instant it crossed into a neighbour's
-  // box.
+  // A held finger opens the whole fan up and browses it, rather than lifting
+  // whichever single card sits under it in place — the actual reveal is the
+  // large `HandPreview` `Battle` renders elsewhere on screen (driven by
+  // `onPreview` below), not a nudge on the card itself, so `spread` (declared
+  // above, alongside the geometry it drives) only has to widen every card's
+  // own resting spot enough to give each one real, unambiguous room as the
+  // finger slides across it. It lives at the tray level rather than on each
+  // card, because the card the finger ends up over after a hold has *moved*
+  // is not necessarily the one it started on; a per-card gesture would lose
+  // the finger the instant it crossed into a neighbour's box.
   const [focusIndex, setFocusIndex] = useState<number | null>(null)
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
   const activePointer = useRef<number | null>(null)
@@ -2454,19 +2487,6 @@ function PlayerHand({
   // whole hand, and that fight against Framer's own drag tracking is what
   // made moving a card feel glitchy. Both stop the moment this flips true.
   const draggingCard = useRef(false)
-  // Which card that is, and whether it was the focused (lifted) one the
-  // instant its drag began. Framer adds the live drag offset on top of
-  // whatever the fan currently targets for x/y — so clearing the focus the
-  // moment a drag starts (needed so whichever *other* card was lifted settles
-  // back down) was itself a bug: it changed the dragged card's own target
-  // mid-gesture, and the render jumped by the difference before the rest of
-  // the drag continued smoothly from the new baseline. Freezing this card's
-  // own focus state here and reusing it for the rest of its drag keeps its
-  // target constant throughout, so only the drag offset moves it. It settles
-  // back to its real resting pose with a normal spring once the drag actually
-  // ends, since only then does this stop being read.
-  const draggingIndex = useRef<number | null>(null)
-  const frozenPose = useRef<{ isFocused: boolean } | null>(null)
 
   /**
    * Every card in hand can be picked up and carried anywhere on your side of
@@ -2568,6 +2588,7 @@ function PlayerHand({
   const focusOn = (index: number | null) => {
     focused.current = index
     setFocusIndex(index)
+    onPreview(index !== null ? (hand[index] ?? null) : null)
   }
 
   // The gesture is tracked on the window rather than on this tray. A card
@@ -2585,6 +2606,7 @@ function PlayerHand({
     clearTimeout(holdTimer.current)
     activePointer.current = null
     reading.current = 'undecided'
+    setSpread(false)
     focusOn(null)
   }
 
@@ -2614,6 +2636,7 @@ function PlayerHand({
       }
       if (sideways < SCRUB_SLACK) return
       reading.current = 'browse'
+      setSpread(true)
       clearTimeout(holdTimer.current)
     }
 
@@ -2651,6 +2674,7 @@ function PlayerHand({
     holdTimer.current = setTimeout(() => {
       if (activePointer.current === null || reading.current !== 'undecided') return
       reading.current = 'browse'
+      setSpread(true)
       focusOn(hitTest(lastPoint.current.x, lastPoint.current.y) ?? from.current.index)
     }, HOLD_TO_FAN_MS)
   }
@@ -2692,13 +2716,7 @@ function PlayerHand({
         // or position change to go with it — see the pose below, which never
         // reads viability at all.
         const viability = viabilityOf(index)
-        let isFocused = focusIndex === index
-        // This card is mid-drag: use the focus state frozen the instant
-        // that drag began instead of the live (already-cleared) browse
-        // state — see frozenPose's own comment for why.
-        if (draggingIndex.current === index && frozenPose.current) {
-          isFocused = frozenPose.current.isFocused
-        }
+        const isFocused = focusIndex === index
 
         return (
           <HandCard
@@ -2711,34 +2729,27 @@ function PlayerHand({
             invisible={dealPendingIndices.includes(index)}
             ghost={isGhost}
             pose={{
-              // The fan itself never moves — only `y` and `scale` change for
-              // whichever card is focused, so there's nothing else to
-              // resettle when the finger moves on to a neighbour, and the
-              // handoff between the two reads as one continuous motion
-              // instead of the fan itself lurching.
+              // The fan spreads as a whole while browsing (see `spread`
+              // above) rather than lifting whichever one card is focused in
+              // place — the actual reveal is `HandPreview`, rendered
+              // elsewhere on screen, so nothing here needs its own `y`/scale
+              // change to sell "this one's focused."
               x: offset * spanStep,
-              y: offset * offset * FAN_ARC - (brushed === index ? 10 : 0) - (isFocused ? BROWSE_LIFT : 0),
+              y: offset * offset * FAN_ARC * (spread ? SPREAD_ARC_FACTOR : 1) - (brushed === index ? 10 : 0),
               rotate: offset * rotateStep,
-              scale: isFocused ? BROWSE_SCALE : 1,
+              scale: 1,
               // A plain ribbon spread: stacking order always follows hand
               // order, full stop. Whether a card is viable never changes it —
               // a viable card earlier in the hand stays exactly as overlapped
               // by its later neighbours as a non-viable one would be, rather
-              // than jumping ahead of them. Only the browsed (held-and-lifted)
-              // card is ever an exception, since it's meant to visibly clear
-              // the row while it's focused.
+              // than jumping ahead of them. Only the browsed (focused) card is
+              // ever an exception, since it's meant to visibly clear the row
+              // while spread even before the cards have fully settled apart.
               zIndex: isFocused ? 3000 : index,
             }}
             onBrush={() => setBrushed(index)}
             onUnbrush={() => setBrushed((b) => (b === index ? null : b))}
             onLift={() => {
-              // Freeze this card's own focus state first, then clear the
-              // shared browse state — so whichever *other* card was lifted
-              // settles back down immediately (nothing is fighting its
-              // drag), while this one keeps rendering the exact pose it had
-              // the instant it grabbed, all the way to drop.
-              frozenPose.current = { isFocused }
-              draggingIndex.current = index
               draggingCard.current = true
               endGesture()
               onDragStart(index)
@@ -2746,8 +2757,6 @@ function PlayerHand({
             onCarry={(point) => onDragMove(index, point)}
             onRelease={(point) => {
               draggingCard.current = false
-              draggingIndex.current = null
-              frozenPose.current = null
               setBrushed(null)
               onDropEnd(index, point)
             }}
@@ -2776,7 +2785,11 @@ function PlayerHand({
                 className={cx('rounded-[8%]', viability && 'cov-hand-glow')}
                 style={viability ? VIABILITY_GLOW[viability] : undefined}
               >
-                <PressableCard card={requireCard(cardId)} compact noHolo noPeek={setupPhase} />
+                {/* Always `noPeek`: a hand card's own hold gesture is the
+                    tray's, not `PressableCard`'s built-in one — see the fan's
+                    own hold-and-spread handling above and `HandPreview`
+                    below, which is what a hold shows instead. */}
+                <PressableCard card={requireCard(cardId)} compact noHolo noPeek />
               </div>
             )}
           </HandCard>
@@ -2912,8 +2925,14 @@ function HandCard({
       // Straightens to upright the instant a card lifts off the fan, rather
       // than carrying its resting tilt around under the thumb — a card you're
       // holding reads as held, not still leaning the way it happened to sit
-      // in the hand. Nothing here persists past the gesture.
-      whileDrag={{ zIndex: 2000, scale: 1.1, rotate: 0 }}
+      // in the hand. The shadow is what actually sells "lifted" rather than
+      // merely "bigger": nothing here persists past the gesture.
+      whileDrag={{
+        zIndex: 2000,
+        scale: 1.1,
+        rotate: 0,
+        filter: 'drop-shadow(0 6px 10px rgba(0,0,0,.45))',
+      }}
       onDragStart={() => {
         dragging.current = true
         onLift()
@@ -2933,6 +2952,48 @@ function HandCard({
     >
       {children}
     </motion.button>
+  )
+}
+
+/**
+ * The large, readable view a hold-and-spread gesture shows — see `spread`
+ * and `onPreview` in `PlayerHand`. Deliberately not `CardViewer`/`usePeek`
+ * (the "hold any card anywhere" viewer every other surface in the game
+ * uses): that one is a full-screen, pointer-events-live modal with its own
+ * tilt-tracking and tap-to-close scrim, and mounting it here would fight the
+ * tray's own in-flight pointer session for the same finger. This is a
+ * strictly passive readout instead — `pointer-events-none` throughout, so it
+ * can never be the element `PlayerHand`'s own `hitTest` finds under the
+ * finger, no matter where it's drawn on screen or how the two overlap.
+ *
+ * Centred in whatever room is left above the hand tray (the padding below
+ * mirrors `HAND_TRAY_CALC`) rather than truly full-screen, which is also
+ * what keeps it clear of the fan itself: the gesture reading the finger's
+ * position never has to compete with the thing drawn in response to it.
+ */
+function HandPreview({ cardId }: { cardId: string | null }) {
+  return (
+    <div
+      className="cov-hand-preview fixed inset-0 z-40 flex items-center justify-center px-10 pointer-events-none"
+      style={{ paddingBottom: HAND_TRAY_CALC }}
+      aria-hidden="true"
+    >
+      <AnimatePresence>
+        {cardId && (
+          <motion.div
+            key={cardId}
+            className="w-full"
+            style={{ maxWidth: 260 }}
+            initial={{ opacity: 0, scale: 0.86, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+          >
+            <Card card={requireCard(cardId)} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }
 
