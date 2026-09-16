@@ -2,9 +2,16 @@ import { client } from './supabase'
 
 /**
  * The sync primitives `persist.ts` and `store/auth.ts` build on. Neither
- * function here ever throws: a signed-out player, an unconfigured build (see
- * `supabase.ts`), or a dropped connection are all just "no cloud right now,"
- * the same as a `localStorage` write `persist.ts` itself can't complete.
+ * function here ever throws or blocks its caller: a signed-out player, an
+ * unconfigured build (see `supabase.ts`), or a dropped connection are all
+ * just "no cloud right now," the same as a `localStorage` write `persist.ts`
+ * itself can't complete.
+ *
+ * A failure still gets logged, though (`console.error`, never thrown) — this
+ * is the one thing in the app where failing perfectly silently is actively
+ * the wrong call: an RLS policy or a missing RPC function would otherwise
+ * drop a player's progress with literally nothing anywhere to show it, which
+ * is exactly the bug this logging exists to make visible instead.
  */
 
 /**
@@ -27,10 +34,12 @@ export function pushCloudState(key: string, data: unknown): void {
 
   void supabase.auth.getSession().then(({ data: { session } }) => {
     if (!session) return
-    // Offline, RLS misconfigured, the table doesn't exist yet — none of it
-    // is checked here. Nothing depends on this succeeding; the local save
-    // through `persist.ts` already landed regardless.
-    void supabase.rpc('merge_player_state', { patch: { [key]: data } })
+    void supabase.rpc('merge_player_state', { patch: { [key]: data } }).then(({ error }) => {
+      // Nothing here depends on this succeeding — the local save through
+      // `persist.ts` already landed regardless — but a player's progress
+      // silently never reaching the cloud is worth knowing about.
+      if (error) console.error(`[cloudSave] push of "${key}" failed:`, error)
+    })
   })
 }
 
@@ -54,6 +63,7 @@ export async function pullCloudState(): Promise<Record<string, unknown> | null> 
     .eq('user_id', userId)
     .maybeSingle()
 
+  if (error) console.error('[cloudSave] pull failed:', error)
   if (error || !data) return null
   return (data.state as Record<string, unknown>) ?? null
 }
