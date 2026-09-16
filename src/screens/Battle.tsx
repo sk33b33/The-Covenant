@@ -2975,21 +2975,30 @@ function HandPreview({ cardId }: { cardId: string | null }) {
       style={{ paddingBottom: HAND_TRAY_CALC }}
       aria-hidden="true"
     >
-      <AnimatePresence>
-        {cardId && (
-          <motion.div
-            key={cardId}
-            className="w-full"
-            style={{ maxWidth: 260 }}
-            initial={{ opacity: 0, scale: 0.86, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92 }}
-            transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-          >
-            <Card card={requireCard(cardId)} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* One stable, already-centered box — sized by its own aspect ratio
+          regardless of whether a card is showing, so the flex row above
+          never has to re-centre around it. Without this, `AnimatePresence`
+          briefly mounting both the outgoing and incoming card as it swaps
+          (sliding fast enough to cross more than one card in a beat) put two
+          items in that flex row at once, and centring around a shifting item
+          count is exactly what read as the preview popping sideways before
+          landing back in the middle instead of just crossfading in place. */}
+      <div className="relative w-full" style={{ maxWidth: 260, aspectRatio: '63 / 88' }}>
+        <AnimatePresence>
+          {cardId && (
+            <motion.div
+              key={cardId}
+              className="absolute inset-0"
+              initial={{ opacity: 0, scale: 0.86, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+            >
+              <Card card={requireCard(cardId)} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
