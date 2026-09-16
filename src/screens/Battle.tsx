@@ -164,17 +164,14 @@ const FAN_ARC = 1.4
  *  that neighbours stop overlapping almost entirely, since the whole point
  *  of spreading is to give the finger sliding across the fan an unambiguous
  *  target at every position. Never applied to the opponent's fan, which
- *  never browses. */
+ *  never browses.
+ *
+ *  The vertical arc widens by this same factor (see its own use in
+ *  `PlayerHand`) rather than flattening — a fan spread wide but bowed flat
+ *  reads as a straight row of cards, not a hand held open wider, and rotation
+ *  is untouched too for the same reason: spreading is meant to look like the
+ *  same fan opened up, not a different shape. */
 const SPREAD_SPAN_FACTOR = 1.9
-
-/** The arc flattens toward a straight, evenly spaced row while spread, the
- *  same reasoning as the span above — a resting fan's bow is part of what
- *  makes it read as a hand of cards, but it also worsens exactly the
- *  ambiguity spreading exists to remove. Rotation flattens all the way to 0
- *  for the same reason (see its own use in `PlayerHand`); the arc keeps a
- *  small fraction of its own rather than also going fully flat, since a
- *  dead-straight row of cards reads as a ruler rather than a hand. */
-const SPREAD_ARC_FACTOR = 0.25
 
 /** How long a finger has to stay down on the hand before it starts browsing
  *  (widening the fan, popping up whichever card it's over) rather than
@@ -2451,12 +2448,12 @@ function PlayerHand({
   const count = visibleIndices.length
   const mid = (count - 1) / 2
   // True for as long as a hold is actively browsing the fan — see its own
-  // setters further down, both where `reading` becomes `'browse'`. Flat and
-  // wide while true: see `SPREAD_SPAN_FACTOR`/`SPREAD_ARC_FACTOR`'s own
-  // comments for why rotation goes all the way to 0 while the arc keeps a
-  // fraction of its own.
+  // setters further down, both where `reading` becomes `'browse'`. Wider
+  // while true, not flatter — see `SPREAD_SPAN_FACTOR`'s own comment for why
+  // rotation is untouched and the arc (below, where `y` is computed) widens
+  // by the same factor instead of shrinking.
   const [spread, setSpread] = useState(false)
-  const rotateStep = spread ? 0 : fanRotateStep(count)
+  const rotateStep = fanRotateStep(count)
   const spanStep = fanSpanStep(count) * (spread ? SPREAD_SPAN_FACTOR : 1)
 
   // The lift a card gets as a thumb brushes across the fan without yet
@@ -2735,7 +2732,7 @@ function PlayerHand({
               // elsewhere on screen, so nothing here needs its own `y`/scale
               // change to sell "this one's focused."
               x: offset * spanStep,
-              y: offset * offset * FAN_ARC * (spread ? SPREAD_ARC_FACTOR : 1) - (brushed === index ? 10 : 0),
+              y: offset * offset * FAN_ARC * (spread ? SPREAD_SPAN_FACTOR : 1) - (brushed === index ? 10 : 0),
               rotate: offset * rotateStep,
               scale: 1,
               // A plain ribbon spread: stacking order always follows hand
