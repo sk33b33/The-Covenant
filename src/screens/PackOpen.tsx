@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
-import { CardBack } from '@/art/CardBack'
 import { PackWrapper } from '@/art/PackWrapper'
 import { RarityMark } from '@/art/RarityMark'
 import { TalentIcon } from '@/art/icons'
@@ -21,10 +20,13 @@ type Phase = 'sealed' | 'revealing' | 'summary'
 /**
  * Opening a pack.
  *
- * The sequence is the point: a sealed wrapper you tear, five face-down cards,
- * then one flip at a time so each card gets its own beat. Revealing all five at
- * once would take the same information and throw away the only moment in the
- * game where a card arrives.
+ * The sequence is the point: a sealed wrapper you tear, then five cards
+ * already face up, stacked like a hand of cards fanned toward you. Swiping
+ * (either direction — the swipe is the "next" gesture, not a left/right
+ * choice) peels the front card away and promotes the next one forward, so
+ * each card still gets its own moment in focus even though nothing is
+ * hidden. A "Reveal All" skip is there for whoever already knows what they
+ * want to see: the collection grid.
  *
  * The pull is resolved once, up front, from a seeded RNG — the animation
  * reveals a decided result rather than deciding as it goes, so nothing can
@@ -45,7 +47,6 @@ export function PackOpen({ packId, source }: { packId: string; source: 'free' | 
   const recordPackOpened = useProfile((s) => s.recordPackOpened)
 
   const [phase, setPhase] = useState<Phase>('sealed')
-  const [flipped, setFlipped] = useState<boolean[]>([false, false, false, false, false])
   const [pull, setPull] = useState<{ cards: CardData[]; newIds: string[]; talents: number } | null>(
     null,
   )
@@ -108,15 +109,6 @@ export function PackOpen({ packId, source }: { packId: string; source: 'free' | 
     addTalents,
   ])
 
-  const flip = (index: number) => {
-    setFlipped((prev) => {
-      if (prev[index]) return prev
-      const next = [...prev]
-      next[index] = true
-      return next
-    })
-  }
-
   if (!pack || !set) {
     return (
       <div className="h-full grid place-items-center px-8 text-center">
@@ -147,8 +139,6 @@ export function PackOpen({ packId, source }: { packId: string; source: 'free' | 
           <Revealing
             key="revealing"
             cards={pull.cards}
-            flipped={flipped}
-            onFlip={flip}
             onDone={() => setPhase('summary')}
             god={isGodPack(pull.cards)}
           />
@@ -231,52 +221,67 @@ const SWIPE_THRESHOLD = 90
  *  of even a wide phone, so it's fully gone rather than clipped mid-flight. */
 const EXIT_X = 560
 
-/** How long the card's own snap-back to centre takes after a reveal swipe
- *  (paired with the tight, overdamped `dragTransition` below) — and how
- *  long the flip waits before starting, so it turns over once stationary
- *  rather than mid-slide. */
-const REVEAL_SNAP_MS = 140
+/** How many cards behind the front one show as a peeking stack. Anything
+ *  further back sits at the same resting spot as the third card, invisible,
+ *  so it's already in place — never flying in from off-screen — the moment
+ *  it's promoted into view. */
+const STACK_DEPTH = 2
+
+/** Every card's target transform, purely a function of its distance from
+ *  the front (`offset = index - focus`). Nothing here is per-card state —
+ *  moving `focus`, whether by a swipe or a tap on the position row, just
+ *  gives every card a new offset and lets its own `animate` prop ease
+ *  there, which is what makes "jump to card 1" from card 4 look like the
+ *  stack sliding back into place rather than a hard cut. */
+function stackTarget(offset: number, direction: 1 | -1) {
+  if (offset < 0) {
+    // Already passed. Sent off in whichever direction it was swiped, so a
+    // dismissal keeps travelling the way the thumb was already moving
+    // rather than picking a side for it. Where it lands doesn't matter
+    // beyond "invisible" — nothing here is ever seen again unless the
+    // position row jumps back to it, at which point it eases back in from
+    // this same spot.
+    return { x: direction * EXIT_X, y: -6, scale: 0.9, opacity: 0, rotate: direction * 8 }
+  }
+  const depth = Math.min(offset, STACK_DEPTH + 1)
+  return {
+    x: 0,
+    y: depth * -24,
+    scale: 1 - depth * 0.08,
+    opacity: depth > STACK_DEPTH ? 0 : 1 - depth * 0.3,
+    rotate: 0,
+  }
+}
 
 function Revealing({
   cards,
-  flipped,
-  onFlip,
   onDone,
   god,
 }: {
   cards: CardData[]
-  flipped: boolean[]
-  onFlip: (i: number) => void
   onDone: () => void
   god: boolean
 }) {
   const [focus, setFocus] = useState(0)
-  // Which way the card in hand should fly off, once it's dismissed rather
-  // than snapped back — read from the swipe that dismissed it, so the exit
-  // continues in the same direction the thumb was already moving instead of
-  // picking a side for you.
-  const [exitX, setExitX] = useState(EXIT_X)
+  // Which way the last-dismissed card flew — `stackTarget` above reads this
+  // for every card currently behind the front (see its own comment).
+  const [direction, setDirection] = useState<1 | -1>(1)
 
-  const revealed = !!flipped[focus]
+  const front = cards[focus]!
+  const chase = RARITY_ORDER[front.rarity] >= RARITY_ORDER.rare
+
+  const advance = (dir: 1 | -1) => {
+    setDirection(dir)
+    if (focus < cards.length - 1) setFocus((f) => f + 1)
+    else onDone()
+  }
 
   const onDragEnd = (_event: unknown, info: PanInfo) => {
     if (Math.abs(info.offset.x) < SWIPE_THRESHOLD) return
-
-    // First swipe on a face-down card reveals it — but only once the card
-    // has actually snapped back to centre. Starting the flip immediately on
-    // release turned it over while it was still sliding in from wherever the
-    // thumb let go, so the card read as skidding and spinning at once rather
-    // than turning over in place. The snap-back itself is tuned fast and
-    // overdamped below (REVEAL_SNAP_MS) so this delay is barely noticeable
-    // as a pause — it's just enough for the slide to finish first.
-    if (!revealed) {
-      window.setTimeout(() => onFlip(focus), REVEAL_SNAP_MS)
-      return
-    }
-
-    setExitX(info.offset.x > 0 ? EXIT_X : -EXIT_X)
-    if (focus < cards.length - 1) setFocus((f) => f + 1)
-    else onDone()
+    // Either direction just means "next" — this is a stack you work through,
+    // not a left/right choice — but which way it was swiped still decides
+    // which way the dismissed card flies off.
+    advance(info.offset.x > 0 ? 1 : -1)
   }
 
   return (
@@ -287,61 +292,88 @@ function Revealing({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
-      {god && (
-        <motion.p
-          className="text-center font-display tracking-[0.3em] text-sm pt-safe mt-4"
-          style={{ color: '#f2c85a' }}
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: [0.6, 1, 0.6], y: 0 }}
-          transition={{ opacity: { duration: 2.2, repeat: Infinity }, y: { duration: 0.4 } }}
+      <div className="flex items-start justify-between px-5 pt-safe mt-2">
+        <div className="flex-1">
+          {god && (
+            <motion.p
+              className="font-display tracking-[0.3em] text-sm"
+              style={{ color: '#f2c85a' }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: [0.6, 1, 0.6], y: 0 }}
+              transition={{ opacity: { duration: 2.2, repeat: Infinity }, y: { duration: 0.4 } }}
+            >
+              SACRED PULL
+            </motion.p>
+          )}
+        </div>
+        <button
+          onClick={onDone}
+          className="text-xs font-medium tracking-wide shrink-0"
+          style={{ color: 'rgba(240,220,188,.55)' }}
         >
-          SACRED PULL
-        </motion.p>
-      )}
+          Reveal All
+        </button>
+      </div>
 
       <div className="relative flex-1 flex items-center justify-center px-8 min-h-0">
-        <div className="relative w-full max-w-[290px]" style={{ perspective: '1400px' }}>
-          {/* `wait` holds the next card back until the dismissed one has
-              fully finished its exit — so a card never starts arriving
-              while the last one is still on its way off screen. */}
-          <AnimatePresence initial={false} mode="wait">
-            <motion.div
-              key={focus}
-              drag="x"
-              // A zero-width box: there is nowhere the card is allowed to
-              // rest *except* centre, so any release that isn't a dismissal
-              // springs straight back there on its own, for free.
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.7}
-              // Overdamped: the release snaps straight back to centre with
-              // no bounce or overshoot, so it settles fast and predictably
-              // rather than the default spring's slower, springier return —
-              // which is what let the flip below catch it still mid-slide.
-              dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
-              onDragEnd={onDragEnd}
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ x: exitX, opacity: 0, rotate: exitX > 0 ? 8 : -8 }}
-              transition={{ type: 'spring', stiffness: 480, damping: 34 }}
-              // Tapping still works too — a swipe is the primary gesture,
-              // but a plain tap costs nothing to also honour, the same way
-              // a hold is additive over a tap everywhere else in this game.
-              onClick={() => (revealed ? onDragEnd(null, { offset: { x: EXIT_X } } as PanInfo) : onFlip(focus))}
-              className="cursor-grab active:cursor-grabbing"
-              aria-label={revealed ? 'Swipe to continue' : 'Swipe to reveal'}
-              role="button"
-            >
-              <FlipCard card={cards[focus]!} revealed={revealed} />
-            </motion.div>
+        <div className="relative w-full max-w-[290px]">
+          <HeavenlyGlow key={`glow-${focus}`} />
+
+          {cards.map((card, i) => {
+            const offset = i - focus
+            const isFront = offset === 0
+            return (
+              <motion.div
+                key={card.id + i}
+                drag={isFront ? 'x' : false}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.7}
+                dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
+                onDragEnd={isFront ? onDragEnd : undefined}
+                initial={false}
+                animate={stackTarget(offset, direction)}
+                transition={{ type: 'spring', stiffness: 480, damping: 34 }}
+                style={{
+                  position: offset === 0 ? 'relative' : 'absolute',
+                  inset: offset === 0 ? undefined : 0,
+                  // The just-departed card (offset -1) sits above the new
+                  // front one so it visibly flies away over the top of the
+                  // stack instead of vanishing behind it the instant focus
+                  // moves on. Anything further back than that is invisible
+                  // regardless, so its stacking order doesn't matter.
+                  zIndex: offset === -1 ? cards.length + 1 : offset >= 0 ? cards.length - offset : 0,
+                  pointerEvents: isFront ? 'auto' : 'none',
+                }}
+                className={isFront ? 'cursor-grab active:cursor-grabbing' : undefined}
+              >
+                <PressableCard card={card} standalone={isFront} noPeek={!isFront} />
+              </motion.div>
+            )
+          })}
+
+          {/* Flare behind a good pull. Keyed to `focus` so it replays fresh
+              every time a rare-or-better card becomes the front one, rather
+              than only once on that card's original mount. */}
+          <AnimatePresence>
+            {chase && (
+              <motion.div
+                key={`flare-${focus}`}
+                className="absolute inset-0 -z-10 pointer-events-none"
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: [0, 0.95, 0.35], scale: 1.7 }}
+                transition={{ duration: 1.1, times: [0, 0.35, 1], ease: 'easeOut' }}
+                style={{
+                  background:
+                    'radial-gradient(circle, rgba(255,228,160,.85) 0%, rgba(255,196,92,.32) 42%, transparent 68%)',
+                }}
+              />
+            )}
           </AnimatePresence>
         </div>
       </div>
 
-      <p
-        className="text-center text-xs pb-4"
-        style={{ color: 'rgba(240,220,188,.5)' }}
-      >
-        {revealed ? 'Swipe to continue' : 'Swipe to reveal'}
+      <p className="text-center text-xs pb-4" style={{ color: 'rgba(240,220,188,.5)' }}>
+        Swipe for the next card
       </p>
 
       {/* Position row, so the player always knows how many are left. */}
@@ -356,11 +388,12 @@ function Revealing({
               i === focus ? 'w-8 h-2.5' : 'w-2.5 h-2.5',
             )}
             style={{
-              background: flipped[i]
-                ? RARITY_ORDER[card.rarity] >= RARITY_ORDER.rare
-                  ? 'var(--gold-bright)'
-                  : 'rgba(240,220,188,.5)'
-                : 'rgba(240,220,188,.16)',
+              background:
+                i <= focus
+                  ? RARITY_ORDER[card.rarity] >= RARITY_ORDER.rare
+                    ? 'var(--gold-bright)'
+                    : 'rgba(240,220,188,.5)'
+                  : 'rgba(240,220,188,.16)',
             }}
           />
         ))}
@@ -369,14 +402,13 @@ function Revealing({
   )
 }
 
-/** A soft light traced along the card's own edge, win or not — separate
- *  from the flare below, which is a brief, bright burst reserved for a
- *  rare-or-better pull. This one is constant and quiet, and it lives inside
- *  the same box the card sits in rather than the screen behind it, so it
- *  rides along with every drag, flip and exit instead of staying put while
- *  the card moves out from under it. Matches the card's own corner radius
- *  (the 4.5%/3.22% figure `Card`'s own frame uses) so the glow reads as
- *  coming from the card's edge, not from a rectangle loosely behind it. */
+/** A soft light traced along the front card's edge — constant and quiet,
+ *  unlike the brief bright flare above reserved for a rare-or-better pull.
+ *  Keyed by the caller to `focus` so it sits centred on whichever card is
+ *  currently in front rather than tracking a specific card as it moves
+ *  through the stack. Matches the card's own corner radius (the 4.5%/3.22%
+ *  figure `Card`'s own frame uses) so the glow reads as coming from the
+ *  card's edge, not from a rectangle loosely behind it. */
 function HeavenlyGlow() {
   return (
     <motion.div
@@ -390,62 +422,6 @@ function HeavenlyGlow() {
       animate={{ opacity: [0.7, 1, 0.7] }}
       transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
     />
-  )
-}
-
-function FlipCard({ card, revealed }: { card: CardData; revealed: boolean }) {
-  const chase = RARITY_ORDER[card.rarity] >= RARITY_ORDER.rare
-
-  return (
-    <div style={{ position: 'relative', transformStyle: 'preserve-3d' }}>
-      <HeavenlyGlow />
-
-      <motion.div
-        // No `initial`-to-`animate` flip on mount: a freshly arrived card is
-        // already face down, it hasn't been turned. Only a later change to
-        // `revealed` — an actual swipe — should animate the turn; arriving
-        // should just be the scale/fade entrance on the wrapper above.
-        initial={false}
-        animate={{ rotateY: revealed ? 0 : 180 }}
-        transition={{ duration: 0.62, ease: [0.22, 1, 0.36, 1] }}
-        style={{ transformStyle: 'preserve-3d', position: 'relative' }}
-      >
-        {/* Face. Inert until it is turned over: the face stays in the DOM
-            behind the back, so without this a hold — or a Tab from the
-            keyboard — would open the card and spoil its own reveal. */}
-        <div style={{ backfaceVisibility: 'hidden' }}>
-          <PressableCard card={card} standalone={revealed} noPeek={!revealed} />
-        </div>
-
-        {/* Back, pre-rotated so it faces the viewer while the card is unflipped */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backfaceVisibility: 'hidden',
-            transform: 'rotateY(180deg)',
-          }}
-        >
-          <CardBack />
-        </div>
-      </motion.div>
-
-      {/* Flare behind a good pull, timed to land as the flip finishes. */}
-      <AnimatePresence>
-        {revealed && chase && (
-          <motion.div
-            className="absolute inset-0 -z-10 pointer-events-none"
-            initial={{ opacity: 0, scale: 0.7 }}
-            animate={{ opacity: [0, 0.95, 0.35], scale: 1.7 }}
-            transition={{ duration: 1.1, times: [0, 0.35, 1], ease: 'easeOut' }}
-            style={{
-              background:
-                'radial-gradient(circle, rgba(255,228,160,.85) 0%, rgba(255,196,92,.32) 42%, transparent 68%)',
-            }}
-          />
-        )}
-      </AnimatePresence>
-    </div>
   )
 }
 
