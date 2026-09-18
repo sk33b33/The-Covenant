@@ -213,59 +213,13 @@ function Sealed({
 
 /* -------------------------------------------------------------- revealing */
 
-/** How far a swipe has to travel before it commits to something — reveal
- *  the card, or send it away — rather than springing back to center. */
+/** How far a swipe has to travel before it commits to sending the card away
+ *  — rather than springing back to center. */
 const SWIPE_THRESHOLD = 90
 
 /** How far off-screen a dismissed card flies. Comfortably past both edges
  *  of even a wide phone, so it's fully gone rather than clipped mid-flight. */
 const EXIT_X = 560
-
-/** How many cards behind the front one show as a peeking stack. Anything
- *  further back sits at the same resting spot as the third card, invisible,
- *  so it's already in place — never flying in from off-screen — the moment
- *  it's promoted into view. */
-const STACK_DEPTH = 2
-
-/** Every card's target transform, purely a function of its distance from
- *  the front (`offset = index - focus`). Nothing here is per-card state —
- *  moving `focus`, whether by a swipe or a tap on the position row, just
- *  gives every card a new offset and lets its own `animate` prop ease
- *  there, which is what makes "jump to card 1" from card 4 look like the
- *  stack sliding back into place rather than a hard cut. */
-function stackTarget(offset: number, direction: 1 | -1) {
-  if (offset < 0) {
-    // Already passed. Sent off in whichever direction it was swiped, so a
-    // dismissal keeps travelling the way the thumb was already moving
-    // rather than picking a side for it. Where it lands doesn't matter
-    // beyond "invisible" — nothing here is ever seen again unless the
-    // position row jumps back to it, at which point it eases back in from
-    // this same spot.
-    return { x: direction * EXIT_X, y: -6, scale: 0.9, opacity: 0, rotate: direction * 8 }
-  }
-  const depth = Math.min(offset, STACK_DEPTH + 1)
-  return {
-    x: 0,
-    y: depth * -24,
-    scale: 1 - depth * 0.08,
-    opacity: depth > STACK_DEPTH ? 0 : 1 - depth * 0.3,
-    rotate: 0,
-  }
-}
-
-/** A departing card (`offset < 0`) gets a fast, decisive spring of its own
- *  rather than sharing the softer one the resting stack uses. Two reasons:
- *  a stiff, quick spring resolves any lingering pull from the drag gesture
- *  it just came out of (`dragConstraints` below still wants to spring the
- *  same element back to centre the instant it's released, and a slow exit
- *  spring left that fight visible for a beat); and giving the promoted
- *  cards a brief head start delay lets the departure read as its own
- *  finished beat before the stack visibly steps forward, rather than both
- *  happening on top of each other and reading as one blurry scramble. */
-function transitionFor(offset: number) {
-  if (offset < 0) return { type: 'spring', stiffness: 700, damping: 42 } as const
-  return { type: 'spring', stiffness: 420, damping: 36, delay: 0.05 } as const
-}
 
 function Revealing({
   cards,
@@ -281,21 +235,26 @@ function Revealing({
   // the next render — see `advance`'s own comment for why that matters.
   const focusRef = useRef(0)
   focusRef.current = focus
-  // Which way the last-dismissed card flew — `stackTarget` above reads this
-  // for every card currently behind the front (see its own comment).
-  const [direction, setDirection] = useState<1 | -1>(1)
+  // Which way the dismissed card flies off — read from the swipe that sent
+  // it, so it keeps travelling the way the thumb was already moving rather
+  // than picking a side for it.
+  const [exitX, setExitX] = useState(EXIT_X)
 
-  const front = cards[focus]!
+  // Clamped defensively: this is the one value a stray extra `setFocus`
+  // call could ever push out of range, and reading past the end of `cards`
+  // is exactly what crashed this screen to a blank one with no way back
+  // before `advance` guarded against it below.
+  const front = cards[Math.min(focus, cards.length - 1)]!
   const chase = RARITY_ORDER[front.rarity] >= RARITY_ORDER.rare
 
   const advance = (dir: 1 | -1) => {
-    setDirection(dir)
+    setExitX(dir * EXIT_X)
     // A real device can fire `onDragEnd` twice for what reads as one swipe.
     // Reading and writing `focusRef` synchronously — rather than checking
     // the `focus` this closure captured, or a `setFocus` updater — means
     // the second call sees exactly what the first one just did instead of
     // a stale value, so it can only ever call `onDone` again (harmless)
-    // rather than overshoot the array and crash the screen to blank.
+    // rather than overshoot the array.
     // (`onDone` specifically has to run here, in a plain event handler, and
     // not inside a `setFocus` updater — updaters run during React's render
     // phase, and calling a *different* component's setter from there is a
@@ -347,45 +306,44 @@ function Revealing({
         </button>
       </div>
 
+      {/* One card mounted at a time, sitting directly where the last one
+          sat — this is a pile, not a fan, so there is nothing to "reveal"
+          when the next card is exposed: it was already there, right where
+          you're looking, the whole time. `initial={false}` is what makes
+          that literal — a freshly mounted card just appears at rest rather
+          than animating in from anywhere. The only motion in this whole
+          view is the front card leaving. */}
       <div className="relative flex-1 flex items-center justify-center px-8 min-h-0">
         <div className="relative w-full max-w-[290px]">
           <HeavenlyGlow key={`glow-${focus}`} />
 
-          {cards.map((card, i) => {
-            const offset = i - focus
-            const isFront = offset === 0
-            return (
-              <motion.div
-                key={card.id + i}
-                drag={isFront ? 'x' : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.7}
-                dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
-                onDragEnd={isFront ? onDragEnd : undefined}
-                initial={false}
-                animate={stackTarget(offset, direction)}
-                transition={transitionFor(offset)}
-                style={{
-                  position: offset === 0 ? 'relative' : 'absolute',
-                  inset: offset === 0 ? undefined : 0,
-                  // The just-departed card (offset -1) sits above the new
-                  // front one so it visibly flies away over the top of the
-                  // stack instead of vanishing behind it the instant focus
-                  // moves on. Anything further back than that is invisible
-                  // regardless, so its stacking order doesn't matter.
-                  zIndex: offset === -1 ? cards.length + 1 : offset >= 0 ? cards.length - offset : 0,
-                  pointerEvents: isFront ? 'auto' : 'none',
-                }}
-                className={isFront ? 'cursor-grab active:cursor-grabbing' : undefined}
-              >
-                <PressableCard card={card} standalone={isFront} noPeek={!isFront} />
-              </motion.div>
-            )
-          })}
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={focus}
+              drag="x"
+              // A zero-width box: nowhere to rest except centre, so any
+              // release that isn't a dismissal springs straight back there.
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.7}
+              dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
+              onDragEnd={onDragEnd}
+              initial={false}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              // Opacity stays 1 the whole flight — a card that fades while
+              // it's still visibly mid-air reads as glitching out rather
+              // than being thrown aside. Tightened from the previous
+              // spring (higher stiffness, more damping) so it snaps away
+              // decisively instead of drifting.
+              exit={{ x: exitX, opacity: 1, rotate: exitX > 0 ? 8 : -8 }}
+              transition={{ type: 'spring', stiffness: 620, damping: 44 }}
+              className="cursor-grab active:cursor-grabbing"
+            >
+              <PressableCard card={front} standalone noPeek={false} />
+            </motion.div>
+          </AnimatePresence>
 
           {/* Flare behind a good pull. Keyed to `focus` so it replays fresh
-              every time a rare-or-better card becomes the front one, rather
-              than only once on that card's original mount. */}
+              every time a rare-or-better card becomes the front one. */}
           <AnimatePresence>
             {chase && (
               <motion.div
