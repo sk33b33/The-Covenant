@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion'
 import { PackWrapper } from '@/art/PackWrapper'
 import { RarityMark } from '@/art/RarityMark'
@@ -253,6 +253,20 @@ function stackTarget(offset: number, direction: 1 | -1) {
   }
 }
 
+/** A departing card (`offset < 0`) gets a fast, decisive spring of its own
+ *  rather than sharing the softer one the resting stack uses. Two reasons:
+ *  a stiff, quick spring resolves any lingering pull from the drag gesture
+ *  it just came out of (`dragConstraints` below still wants to spring the
+ *  same element back to centre the instant it's released, and a slow exit
+ *  spring left that fight visible for a beat); and giving the promoted
+ *  cards a brief head start delay lets the departure read as its own
+ *  finished beat before the stack visibly steps forward, rather than both
+ *  happening on top of each other and reading as one blurry scramble. */
+function transitionFor(offset: number) {
+  if (offset < 0) return { type: 'spring', stiffness: 700, damping: 42 } as const
+  return { type: 'spring', stiffness: 420, damping: 36, delay: 0.05 } as const
+}
+
 function Revealing({
   cards,
   onDone,
@@ -263,6 +277,10 @@ function Revealing({
   god: boolean
 }) {
   const [focus, setFocus] = useState(0)
+  // Mirrors `focus`, but updates the instant `advance` runs rather than on
+  // the next render — see `advance`'s own comment for why that matters.
+  const focusRef = useRef(0)
+  focusRef.current = focus
   // Which way the last-dismissed card flew — `stackTarget` above reads this
   // for every card currently behind the front (see its own comment).
   const [direction, setDirection] = useState<1 | -1>(1)
@@ -272,8 +290,22 @@ function Revealing({
 
   const advance = (dir: 1 | -1) => {
     setDirection(dir)
-    if (focus < cards.length - 1) setFocus((f) => f + 1)
-    else onDone()
+    // A real device can fire `onDragEnd` twice for what reads as one swipe.
+    // Reading and writing `focusRef` synchronously — rather than checking
+    // the `focus` this closure captured, or a `setFocus` updater — means
+    // the second call sees exactly what the first one just did instead of
+    // a stale value, so it can only ever call `onDone` again (harmless)
+    // rather than overshoot the array and crash the screen to blank.
+    // (`onDone` specifically has to run here, in a plain event handler, and
+    // not inside a `setFocus` updater — updaters run during React's render
+    // phase, and calling a *different* component's setter from there is a
+    // silent way to break its own next update, not just a lint warning.)
+    if (focusRef.current >= cards.length - 1) {
+      onDone()
+      return
+    }
+    focusRef.current += 1
+    setFocus(focusRef.current)
   }
 
   const onDragEnd = (_event: unknown, info: PanInfo) => {
@@ -332,7 +364,7 @@ function Revealing({
                 onDragEnd={isFront ? onDragEnd : undefined}
                 initial={false}
                 animate={stackTarget(offset, direction)}
-                transition={{ type: 'spring', stiffness: 480, damping: 34 }}
+                transition={transitionFor(offset)}
                 style={{
                   position: offset === 0 ? 'relative' : 'absolute',
                   inset: offset === 0 ? undefined : 0,
