@@ -345,31 +345,42 @@ function Revealing({
               dragTransition={{ bounceStiffness: 2000, bounceDamping: 100 }}
               onDragEnd={onDragEnd}
               initial={false}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
+              // A plain settle spring with no velocity override — this is
+              // the card sitting still underneath, not the one leaving, and
+              // it must never inherit the departing card's swipe speed. It
+              // did, briefly: both targets shared one `transition` prop, so
+              // the exit's velocity (a swipe's release speed, easily a few
+              // thousand pixels/second) was handed to *this* card's spring
+              // too. A spring given a large velocity wobbles even when it
+              // starts already sitting exactly at its target, which is
+              // exactly what a freshly mounted, already-at-rest card does —
+              // that wobble was the "card below moves" bug. Each target now
+              // carries its own `transition`, so this one can never see the
+              // other's velocity again.
+              animate={{
+                opacity: 1,
+                scale: 1,
+                x: 0,
+                transition: { type: 'spring', stiffness: 420, damping: 34 },
+              }}
               // Opacity and scale stay fixed the whole flight — a card that
               // fades or tilts while it's still visibly mid-air reads as
               // glitching out rather than being thrown aside cleanly. Just
               // a straight, level slide off to whichever side it was
-              // swiped toward.
-              exit={{ x: exitX, opacity: 1, scale: 1 }}
-              // The velocity override only ever makes sense for `x` — it's
-              // the swipe's own release speed, in pixels/second, which is
-              // an enormous number for a spring to receive as a *shared*
-              // starting velocity across every animated value. Framer
-              // applies a single `transition` object's `velocity` to each
-              // property it's given for, and `opacity`/`scale` only ever
-              // travel a distance of zero (they don't change value here) —
-              // feeding that same multi-thousand-pixel/second velocity into
-              // a property with no distance to cover span made it overshoot
-              // wildly and briefly render as a huge, flipped card before
-              // settling. Scoping the velocity to `x` specifically, with an
-              // explicit no-op transition for the other two, is what fixed
-              // that; it isn't a hypothetical, it showed up as literally a
-              // scale of -6 mid-flight when checked frame by frame.
-              transition={{
-                x: { type: 'spring', stiffness: 280, damping: 26, velocity: exitVelocity },
-                opacity: { duration: 0 },
-                scale: { duration: 0 },
+              // swiped toward, continuing at the swipe's own release speed
+              // rather than a fixed, canned one — scoped to `x` alone,
+              // since `opacity`/`scale` travel no distance here and a
+              // shared velocity previously sent them (and this card's
+              // scale) careening to 6x size for a frame before settling.
+              exit={{
+                x: exitX,
+                opacity: 1,
+                scale: 1,
+                transition: {
+                  x: { type: 'spring', stiffness: 280, damping: 26, velocity: exitVelocity },
+                  opacity: { duration: 0 },
+                  scale: { duration: 0 },
+                },
               }}
               style={{ position: 'absolute', inset: 0, zIndex: 1000 - focus }}
               className="cursor-grab active:cursor-grabbing"
