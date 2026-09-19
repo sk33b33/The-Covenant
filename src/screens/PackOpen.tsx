@@ -235,10 +235,12 @@ function Revealing({
   // the next render — see `advance`'s own comment for why that matters.
   const focusRef = useRef(0)
   focusRef.current = focus
-  // Which way the dismissed card flies off — read from the swipe that sent
-  // it, so it keeps travelling the way the thumb was already moving rather
-  // than picking a side for it.
+  // Which way the dismissed card flies off, and how fast — both read from
+  // the swipe that sent it, so the exit continues the same motion the
+  // thumb was already making instead of snapping to a fixed, canned speed
+  // regardless of how hard the swipe actually was.
   const [exitX, setExitX] = useState(EXIT_X)
+  const [exitVelocity, setExitVelocity] = useState(0)
 
   // Clamped defensively: this is the one value a stray extra `setFocus`
   // call could ever push out of range, and reading past the end of `cards`
@@ -247,8 +249,9 @@ function Revealing({
   const front = cards[Math.min(focus, cards.length - 1)]!
   const chase = RARITY_ORDER[front.rarity] >= RARITY_ORDER.rare
 
-  const advance = (dir: 1 | -1) => {
+  const advance = (dir: 1 | -1, velocity = 0) => {
     setExitX(dir * EXIT_X)
+    setExitVelocity(velocity)
     // A real device can fire `onDragEnd` twice for what reads as one swipe.
     // Reading and writing `focusRef` synchronously — rather than checking
     // the `focus` this closure captured, or a `setFocus` updater — means
@@ -272,7 +275,7 @@ function Revealing({
     // Either direction just means "next" — this is a stack you work through,
     // not a left/right choice — but which way it was swiped still decides
     // which way the dismissed card flies off.
-    advance(info.offset.x > 0 ? 1 : -1)
+    advance(info.offset.x > 0 ? 1 : -1, info.velocity.x)
   }
 
   return (
@@ -311,13 +314,27 @@ function Revealing({
           when the next card is exposed: it was already there, right where
           you're looking, the whole time. `initial={false}` is what makes
           that literal — a freshly mounted card just appears at rest rather
-          than animating in from anywhere. The only motion in this whole
-          view is the front card leaving. */}
+          than animating in from anywhere.
+          No `mode="wait"` here on purpose: a spring's "done" moment is
+          fuzzy (it settles asymptotically rather than at a fixed time), and
+          waiting for the departing card's spring to formally finish before
+          mounting the next one left a beat where neither card was on
+          screen. Default mode mounts the next card immediately, underneath
+          the departing one (`zIndex` below, fixed to each instance's own
+          `focus` at the moment it was current, so an older, exiting card
+          always renders above a newer one) — it's already there, loaded,
+          the instant the swipe starts, not just once the old one clears. */}
       <div className="relative flex-1 flex items-center justify-center px-8 min-h-0">
-        <div className="relative w-full max-w-[290px]">
+        {/* Two cards can be mounted at once now (the departing one and the
+            already-loaded one beneath it), both absolutely positioned so
+            they occupy the exact same spot — which means this box can no
+            longer size itself from a normal-flow card inside it the way it
+            did with one card at a time, hence the explicit aspect-ratio
+            matching the card's own (63:88, see card.css). */}
+        <div className="relative w-full max-w-[290px] aspect-[63/88]">
           <HeavenlyGlow key={`glow-${focus}`} />
 
-          <AnimatePresence initial={false} mode="wait">
+          <AnimatePresence initial={false}>
             <motion.div
               key={focus}
               drag="x"
@@ -331,11 +348,14 @@ function Revealing({
               animate={{ opacity: 1, scale: 1, x: 0 }}
               // Opacity stays 1 the whole flight — a card that fades while
               // it's still visibly mid-air reads as glitching out rather
-              // than being thrown aside. Tightened from the previous
-              // spring (higher stiffness, more damping) so it snaps away
-              // decisively instead of drifting.
+              // than being thrown aside. Lower stiffness/damping than a
+              // snap, plus the swipe's own release velocity carried into
+              // the spring, so the exit continues however fast (or gentle)
+              // the actual swipe was rather than always moving at one
+              // fixed, canned speed.
               exit={{ x: exitX, opacity: 1, rotate: exitX > 0 ? 8 : -8 }}
-              transition={{ type: 'spring', stiffness: 620, damping: 44 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 26, velocity: exitVelocity }}
+              style={{ position: 'absolute', inset: 0, zIndex: 1000 - focus }}
               className="cursor-grab active:cursor-grabbing"
             >
               <PressableCard card={front} standalone noPeek={false} />
