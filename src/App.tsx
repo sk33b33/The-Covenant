@@ -118,7 +118,7 @@ export default function App() {
   // tree below takes over and `route` picks up wherever it already was
   // (its own default, `{ name: 'enter' }`, on a fresh load) — the existing
   // tap-to-enter splash still runs right after, unchanged.
-  if (!signedIn) {
+  if (!signedIn && !(import.meta.env.DEV && location.search.includes('skipauth'))) {
     return (
       <div className="h-full bg-bg text-ink">
         <Auth />
