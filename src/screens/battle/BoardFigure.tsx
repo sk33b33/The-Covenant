@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { CardBack } from '@/art/CardBack'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { SlotOutline } from '@/art/BattleMat'
 import { PressableCard } from '@/components/card/PressableCard'
@@ -71,6 +73,16 @@ interface Props {
    * there's nothing here yet for the slot itself to have an opinion about.
    */
   ghost?: boolean
+  /**
+   * Seated but unrevealed — the opponent's own opening SETUP board, kept
+   * face-down (a plain card back, no HP/energy/status: none of that is
+   * anyone's to know yet) until the player's own Start Match flips every one
+   * of them face-up together. Unlike `ghost`, a face-down Figure is fully
+   * real and present in its slot; only *which* Figure is being withheld.
+   * Driven purely by this boolean — flipping it is what plays the reveal,
+   * a single `rotateY` tween with no separate trigger of its own.
+   */
+  faceDown?: boolean
 }
 
 export function BoardFigure({
@@ -86,7 +98,33 @@ export function BoardFigure({
   previewCardId,
   previewTentative,
   ghost,
+  faceDown,
 }: Props) {
+  // HP/energy/status only ever pop straight in for an ordinary Figure —
+  // `showStats` starts (and stays) true immediately whenever `faceDown` is
+  // never set at all, which is every Figure but the opponent's still-hidden
+  // SETUP board. The one time this actually lags is the reveal itself: when
+  // `faceDown` flips false there, jumping straight to "true" would land the
+  // HP badge on a card still mid-turn in the flip, showing numbers for a
+  // face not onscreen yet. A short delay, roughly where the turn passes
+  // ninety degrees and the face itself starts becoming visible, is what
+  // keeps the numbers from arriving before the thing they describe.
+  //
+  // Declared before the empty-slot return below, not after it: every hook a
+  // component ever calls has to run on every render regardless of which
+  // branch that render takes, and an empty slot is a real, recurring branch
+  // here (the player's own still-unset Bench, a felled Figure's slot) — not
+  // a one-off this could get away with skipping.
+  const [showStats, setShowStats] = useState(!faceDown)
+  useEffect(() => {
+    if (faceDown) {
+      setShowStats(false)
+      return
+    }
+    const timer = setTimeout(() => setShowStats(true), 280)
+    return () => clearTimeout(timer)
+  }, [faceDown])
+
   if (!figure) {
     return (
       <div
@@ -152,8 +190,8 @@ export function BoardFigure({
       // mode closely enough, and this combination has no correctness or
       // requested-feature purpose, only an unrequested cosmetic cross-fade,
       // to be worth the risk.
-      onClick={onClick}
-      disabled={!onClick}
+      onClick={faceDown ? undefined : onClick}
+      disabled={faceDown || !onClick}
       className={cx('cov-figure-card relative shrink-0 block', className)}
       style={{ width }}
       animate={targetable ? { scale: [1, 1.04, 1] } : { scale: 1 }}
@@ -162,7 +200,7 @@ export function BoardFigure({
           ? { duration: 1.3, repeat: Infinity, ease: 'easeInOut' }
           : { type: 'spring', stiffness: 320, damping: 30 }
       }
-      aria-label={`${card.name}, ${remaining} of ${hp} HP`}
+      aria-label={faceDown ? 'Face-down card' : `${card.name}, ${remaining} of ${hp} HP`}
     >
       <div
         style={{
@@ -177,11 +215,46 @@ export function BoardFigure({
           borderRadius: '4.5% / 3.22%',
         }}
       >
-        <PressableCard card={card} compact noHolo inPlay noPeek={noPeek} />
+        {/* The flip itself: a plain boolean-driven `rotateY` tween, not a
+            one-shot trigger of its own. Mounting already face-up (the
+            overwhelming majority of Figures, which never pass `faceDown` at
+            all) costs nothing extra — `initial={false}` paints straight at
+            the resolved target with no tween to skip. Only a Figure whose
+            `faceDown` prop actually *changes* — the opponent's opening
+            SETUP board, the instant the player's own Start Match flips it —
+            ever sees this animate at all, which is what makes "no
+            entrance, one clean reveal later" fall out of the prop itself
+            rather than needing a separate cue to fire it. */}
+        <motion.div
+          style={{
+            position: 'relative',
+            width: '100%',
+            aspectRatio: '63 / 88',
+            transformStyle: 'preserve-3d',
+            borderRadius: '4.5% / 3.22%',
+          }}
+          initial={false}
+          animate={{ rotateY: faceDown ? 0 : 180 }}
+          transition={{ duration: 0.5, ease: [0.65, 0, 0.35, 1] }}
+        >
+          <div
+            className="absolute inset-0 overflow-hidden"
+            style={{ backfaceVisibility: 'hidden', borderRadius: '4.5% / 3.22%' }}
+          >
+            <CardBack />
+          </div>
+          <div
+            className="absolute inset-0 overflow-hidden"
+            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', borderRadius: '4.5% / 3.22%' }}
+          >
+            <PressableCard card={card} compact noHolo inPlay noPeek={noPeek} />
+          </div>
+        </motion.div>
       </div>
 
-      {/* HP bar, hugging the card's foot. */}
-      {!compactStats && (
+      {/* HP bar, hugging the card's foot — withheld along with every other
+          stat while face-down, since none of it is anyone's to know yet. */}
+      {!compactStats && showStats && (
         <div
           className="absolute left-[6%] right-[6%] bottom-[3%] h-[5px] rounded-pill overflow-hidden"
           style={{ background: 'rgba(10,7,3,.8)' }}
@@ -200,7 +273,7 @@ export function BoardFigure({
       )}
 
       {/* Remaining HP, large enough to read across the mat. */}
-      {!compactStats && (
+      {!compactStats && showStats && (
         <span
           className="absolute -top-1.5 -right-1 rounded-pill px-1.5 font-numeric font-bold tabular-nums leading-tight"
           style={{
@@ -214,7 +287,7 @@ export function BoardFigure({
       )}
 
       {/* Attached energy, hung clear of the HP bar at the card's foot. */}
-      {figure.energy.length > 0 && (
+      {showStats && figure.energy.length > 0 && (
         <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-0.5">
           {figure.energy.slice(0, 5).map((type, i) => (
             <EnergyOrb key={i} type={type} size={Math.max(11, width * 0.15)} />
@@ -228,7 +301,7 @@ export function BoardFigure({
       )}
 
       {/* Status markers stack down the left edge. */}
-      {figure.statuses.length > 0 && (
+      {showStats && figure.statuses.length > 0 && (
         <span className="absolute -left-1 top-1/4 flex flex-col gap-0.5 items-start">
           {figure.statuses.map((status) => (
             <span
@@ -247,7 +320,7 @@ export function BoardFigure({
 
       {/* Ascension depth, so a stacked Figure reads as one object. Kept off
           the nameplate, where it would sit on the stage label. */}
-      {figure.beneath.length > 0 && (
+      {showStats && figure.beneath.length > 0 && (
         <span
           className="absolute bottom-[9%] left-[6%] rounded-pill px-1 text-[8px] font-bold leading-tight"
           style={{ background: 'rgba(10,7,3,.9)', color: 'var(--gold-bright)' }}
