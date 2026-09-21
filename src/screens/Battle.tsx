@@ -324,16 +324,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const [foePlaceFx, setFoePlaceFx] = useState<PlaceFxTrigger | null>(null)
   const [hiddenFoeFigureUids, setHiddenFoeFigureUids] = useState<ReadonlySet<string>>(() => new Set())
 
-  // The opponent's *opening* SETUP board — unlike a mid-game arrival, this
-  // gets no flight and no early peek at all: every uid it seats goes straight
-  // in here instead of `hiddenFoeFigureUids`, which renders it seated but
-  // face-down (a plain card back) rather than hidden outright. `foeFaceDown`
-  // below is what actually reads this set; see the log-diffing effect for
-  // where it's filled in, and `startBattle`'s own SETUP dispatch for what
-  // empties it back out (`state.phase` leaving `'setup'` is the one moment
-  // every uid in here is meant to flip face-up, together, in one beat).
-  const [foeFaceDownUids, setFoeFaceDownUids] = useState<ReadonlySet<string>>(() => new Set())
-
   // Nothing the engine does is allowed to land while a strike is still in
   // the air or a hand-off card is still on screen. The engine resolves an
   // action the instant it is taken, but showing one takes over a second, and
@@ -704,14 +694,6 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     if (draws.length) setDrawFx({ id: ++drawFxId.current, draws })
   }
 
-  /** Whether the foe's opening SETUP board has already been seen. Its own
-   *  burst of 'play' entries (an Active plus every Bench pick, all in one
-   *  commit, well before the player has necessarily even finished choosing
-   *  their own) is the only thing this flag ever has to distinguish from a
-   *  real mid-game arrival — everything after it, foe-side, is a genuine
-   *  play and gets the usual flight, so this only ever flips once. */
-  const foeSetupSeen = useRef(false)
-
   const foePlaceFxId = useRef(0)
   /** Foe plays/ascensions detected while an earlier one is still flying —
    *  queued rather than dropped, same reasoning as `pendingDraws` above:
@@ -873,26 +855,25 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     // even finished choosing their own, so animating it in — or showing any
     // of it face-up — would either race the player's own picks or hand them
     // a look at what the opponent drew before the match has even started.
-    // `foeSetupSeen` is what tells the two apart: this is the very first
-    // batch of foe 'play' entries the match will ever produce (SETUP never
-    // logs an 'ascend'), so it's the only one this flag can ever catch.
+    // Nothing legal can put a foe Figure on the board during `'setup'` other
+    // than that one opening SETUP action, so `state.phase` alone — read from
+    // this same `state`, the same snapshot that just gave `foe.active`/
+    // `foe.bench` their first real Figures — already says which case this
+    // is. That's deliberate: computing it from anything reactive (a uid
+    // recorded a render later, however soon) would let this first paint go
+    // out face-up regardless, since Framer has already locked that render's
+    // rotation in as the Figure's resting value by the time a correction
+    // could land — the bug an earlier version of this shipped with. See
+    // `foeFaceDown` below for the render-side half of this.
     const foePlaces = added.filter(
       (entry): entry is typeof entry & { event: MatchEvent & { uid: string } } =>
         entry.player === 'foe' &&
         (entry.event?.kind === 'play' || entry.event?.kind === 'ascend') &&
         Boolean(entry.event.uid),
     )
-    if (foePlaces.length && !foeSetupSeen.current) {
-      // Seated already face-down, with no flight and no queue at all — see
-      // `foeFaceDown` below for where this set gets read, and `startBattle`
-      // for the SETUP dispatch whose `state.phase` transition is what flips
-      // every one of these uids face-up together.
-      foeSetupSeen.current = true
-      setFoeFaceDownUids((prev) => {
-        const next = new Set(prev)
-        for (const entry of foePlaces) next.add(entry.event.uid)
-        return next
-      })
+    if (foePlaces.length && state.phase === 'setup') {
+      // Nothing to do at all: the Figure just appears, seated and already
+      // face-down (see `foeFaceDown`), with no flight and no queue.
     } else if (foePlaces.length) {
       const activeEl = foeActiveSlotRef.current
       const benchEls = foeBenchSlotRefs.current
@@ -1771,14 +1752,13 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   const foeActiveShown = foeActiveGhost ? null : rawFoeActive
 
   // Whether a seated (never hidden) foe Figure is still showing its back —
-  // true for exactly the opening SETUP board, and only until `state.phase`
-  // itself leaves `'setup'`, at which point every uid still in this set
-  // flips face-up together in one beat. Not cleared explicitly on that
-  // transition: the `&&` here already makes every one of them read as
-  // face-up from that render on, and the stale set left behind afterward is
-  // inert — nothing ever consults it again once the phase has moved on.
-  const foeFaceDown = (uid: string) => state.phase === 'setup' && foeFaceDownUids.has(uid)
-  const foeActiveFaceDown = Boolean(foeActiveShown && foeFaceDown(foeActiveShown.uid))
+  // true for the whole of the opening SETUP board, for exactly as long as
+  // `state.phase` reads `'setup'`. Nothing else can ever put a foe Figure on
+  // the board during that phase, so this alone is the complete rule — no
+  // per-uid bookkeeping, and nothing to clear on the reveal either: the
+  // instant `state.phase` itself moves on, this reads false for all of them
+  // in the very same render, together, in one beat.
+  const foeActiveFaceDown = Boolean(foeActiveShown) && state.phase === 'setup'
 
   return (
     <div className="on-dark fixed inset-0 flex flex-col overflow-hidden">
@@ -1841,7 +1821,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
         >
           {foe.bench.map((figure, i) => {
             const shown = figure && hiddenFoeFigureUids.has(figure.uid) ? null : figure
-            const faceDown = Boolean(shown && foeFaceDown(shown.uid))
+            const faceDown = Boolean(shown) && state.phase === 'setup'
             return (
               <div
                 key={i}
