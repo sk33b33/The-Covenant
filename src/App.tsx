@@ -13,6 +13,7 @@ import { PackOpen } from '@/screens/PackOpen'
 import { Shop } from '@/screens/Shop'
 import { StoryEncounter } from '@/screens/StoryEncounter'
 import { StoryMap } from '@/screens/StoryMap'
+import { Training } from '@/screens/Training'
 import { Home } from '@/screens/Home'
 import { Auth } from '@/screens/Auth'
 import { Menu } from '@/screens/Menu'
@@ -249,7 +250,7 @@ function Screen({ route }: { route: Route }) {
       return <Shop />
 
     case 'battle':
-      return <BattleRoute deckId={route.deckId} />
+      return <BattleRoute deckId={route.deckId} training={route.training} />
 
     case 'deck-builder':
       return <DeckBuilder deckId={route.deckId} />
@@ -268,6 +269,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'story-encounter':
       return <StoryEncounter encounterId={route.encounterId} />
+
+    case 'training':
+      return <Training deckId={route.deckId} />
 
     case 'coming-soon':
       return (

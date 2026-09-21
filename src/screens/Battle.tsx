@@ -2077,6 +2077,33 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
             />
           </div>
 
+          {/* A tap anywhere else on the mat — the board, the hand, even a
+              half-finished drag underneath it — collapses the menu below
+              rather than needing the same round button a second time. A
+              plain transparent `fixed inset-0` catch-all, mounted and
+              unmounted with the menu itself so it can never intercept a tap
+              while the menu is already closed. Explicit z-index rather than
+              relying on DOM order: a focused hand card carries its own
+              elevated z-index (see `PlayerHand`'s `pose.zIndex`) that this
+              has to sit above regardless of paint order, and the menu's own
+              buttons — given a higher one still, just below — have to stay
+              reachable above *this*. */}
+          <AnimatePresence>
+            {actionOpen && hasAction && (
+              <motion.button
+                type="button"
+                aria-label="Close menu"
+                className="fixed inset-0"
+                style={{ zIndex: 3500, background: 'transparent' }}
+                onClick={() => setActionOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              />
+            )}
+          </AnimatePresence>
+
           {/* Altar, with the small popup action trigger stacked above it —
               its own layer now, pinned to the tray's right edge instead of
               sharing the hand's row (see above). Sits above the hand fan in
@@ -2087,6 +2114,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               {actionOpen && hasAction && (
                 <motion.div
                   className="absolute bottom-full mb-2 right-0 flex flex-col items-end gap-2 whitespace-nowrap"
+                  style={{ zIndex: 3600 }}
                   initial={{ opacity: 0, y: 6, scale: 0.92 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.92 }}

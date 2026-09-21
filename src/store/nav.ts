@@ -13,6 +13,10 @@ import { create } from 'zustand'
 
 export type Tab = 'home' | 'cards' | 'social' | 'battle' | 'menu'
 
+/** The three preset opponents Training offers, weakest to strongest — see
+ *  `BattleRoute` for the AI skill and deck each one actually maps to. */
+export type TrainingDifficulty = 'standard' | 'advanced' | 'master'
+
 export type Route =
   | { name: 'enter' }
   | { name: 'tab'; tab: Tab }
@@ -27,6 +31,7 @@ export type Route =
   | { name: 'deck-builder'; deckId?: string }
   | { name: 'story-map' }
   | { name: 'story-encounter'; encounterId: string }
+  | { name: 'training'; deckId?: string }
   /**
    * `at` gives each visit its own identity, the same reason `pack-open` keys
    * off `packId` and `story-encounter` off `encounterId`: `routeKey` below
@@ -48,7 +53,16 @@ export type Route =
    * it and quietly reintroduce this exact bug the next time someone adds a
    * second way to reach Battle.
    */
-  | { name: 'battle'; encounterId?: string; deckId?: string; at: number }
+  | {
+      name: 'battle'
+      encounterId?: string
+      deckId?: string
+      at: number
+      /** Set only for a training match: which preset AI tier to play against.
+       *  Unset for a Quick Battle or a story encounter — see `BattleRoute`
+       *  for what each tier actually changes. */
+      training?: TrainingDifficulty
+    }
   /** Wherever a real screen doesn't exist yet. `icon` picks from a small fixed
    *  set in App.tsx rather than carrying a React node, so a route stays a
    *  plain, serialisable value like every other one here. `note` says what
