@@ -1,4 +1,4 @@
-import { BattleIcon, ScrollIcon } from '@/art/icons'
+import { BattleIcon, ClockIcon, ScrollIcon } from '@/art/icons'
 import { PressableCard } from '@/components/card/PressableCard'
 import { Button, EmptyState, Panel } from '@/components/ui'
 import { getCard } from '@/data/cards'
@@ -123,6 +123,26 @@ export function BattleHub() {
             <span className="block font-display text-md">Story</span>
             <span className="block text-xs text-ink-muted mt-0.5">
               Genesis — five encounters, from the Garden to the Covenant
+            </span>
+          </span>
+        </button>
+
+        {/* ----------------------------------------------------- training */}
+        <button
+          onClick={() => validation.legal && go({ name: 'training', deckId: deck.id })}
+          disabled={!validation.legal}
+          className="neu rounded-lg w-full p-4 mt-3 flex items-center gap-4 text-left disabled:opacity-50"
+        >
+          <span
+            className="grid place-items-center w-12 h-12 rounded-pill shrink-0"
+            style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}
+          >
+            <ClockIcon size={24} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-display text-md">Training</span>
+            <span className="block text-xs text-ink-muted mt-0.5">
+              Practice against a preset, single-element opponent — Standard, Advanced or Master
             </span>
           </span>
         </button>
