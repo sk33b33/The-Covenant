@@ -21,6 +21,7 @@ import { useNav } from '@/store/nav'
 import { levelProgress, useProfile } from '@/store/profile'
 import { useStory } from '@/store/story'
 import { useNow } from '@/hooks/useNow'
+import { asset } from '@/lib/asset'
 import { cx } from '@/lib/cx'
 
 /**
@@ -61,12 +62,11 @@ export function Home() {
   return (
     <div className="scroll-y h-full">
       <div className="mx-auto max-w-app px-4 pt-safe pb-tabbar">
-        {/* The mark, not the profile button — a small fixed lockup so the
-            game's identity is on screen even before anything else has
-            loaded in, the way a masthead sits above a page rather than
-            inside it. Name only — the tree glyph doubled up with the one
-            already on the profile button just below it. */}
-        <div className="flex items-center pt-1">
+        {/* The mark — a small fixed lockup so the game's identity is on
+            screen even before anything else has loaded in, the way a
+            masthead sits above a page rather than inside it. */}
+        <div className="flex items-center gap-2 pt-1">
+          <img src={asset('art/logo.png')} alt="" className="h-6 w-auto shrink-0" />
           <span className="font-display text-[22px] tracking-[0.28em] uppercase text-ink-muted">
             Covenant
           </span>
