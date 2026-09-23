@@ -35,8 +35,10 @@ import { useSettings } from '@/store/settings'
  * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
  * "Simplify effects" switch in Menu → Graphics.
  *
- * Touch is the only input. The gyroscope drove this too once, which meant a
- * card turned on its own while you were reading it.
+ * A held touch or mouse press is the only input — a mouse merely hovering
+ * does nothing, the same as a finger that isn't down does nothing. The
+ * gyroscope drove this too once, which meant a card turned on its own
+ * while you were reading it.
  *
  * The overlay never scrolls. Everything is sized to fit the viewport instead,
  * because a screen that shifts under the gesture turning it is worse than a
@@ -234,15 +236,33 @@ function Viewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [close])
 
-  // Touch is the only thing that turns the card. There is deliberately no
-  // `deviceorientation` listener: driving the same tilt from the gyroscope
-  // meant a card could turn on its own while you were looking at it.
+  // Whether a press is actually down right now — the one thing standing
+  // between "turn the card" and "the pointer merely passed over it". A
+  // mouse fires `pointermove` continuously just from hovering, with no
+  // button held at all; without this gate, moving the mouse anywhere near
+  // the card tilted it, and moving it away snapped things level again
+  // (see `onPointerLeave` below, now gone) — a card that never actually
+  // held still. Touch never had the hover half of that problem (a touch
+  // pointer only exists while the finger is down), but it still isn't
+  // "smooth" for a *held* drag to reset the instant a finger drifts a few
+  // pixels past the card's own edge, which is exactly what a real touch on
+  // a card this size does often enough to notice.
+  const dragging = useRef(false)
+
+  // Touch and a held mouse button are the only things that turn the card.
+  // There is deliberately no `deviceorientation` listener: driving the same
+  // tilt from the gyroscope meant a card could turn on its own while you
+  // were looking at it.
   const track = (e: React.PointerEvent) => {
-    if (reduced.current) return
+    if (reduced.current || !dragging.current) return
     const el = frameRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge.
+    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge —
+    // clamped, not just measured, which is what lets the finger carry on
+    // past the card's own edge (pointer capture keeps `track` receiving
+    // its moves) and simply hold the tilt at its maximum rather than
+    // reading some undefined, ever-growing value out past the card.
     px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
     py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
   }
@@ -349,10 +369,12 @@ function Viewer({
           // Capture, so a drag keeps turning the card after it leaves the
           // card's own bounds instead of stopping dead at the edge.
           onPointerDown={(e) => {
+            dragging.current = true
             e.currentTarget.setPointerCapture(e.pointerId)
             track(e)
           }}
           onPointerUp={(e) => {
+            dragging.current = false
             e.currentTarget.releasePointerCapture(e.pointerId)
             level()
             // A swipe is read from where the finger ended up relative to
@@ -373,8 +395,15 @@ function Viewer({
               stepWithDirection(dx < 0 ? 1 : -1)
             }
           }}
-          onPointerLeave={level}
-          onPointerCancel={level}
+          // No `onPointerLeave` any more — see `dragging` above for why a
+          // drag that carries past the card's edge should hold its tilt
+          // rather than reset it. `onPointerCancel` is the one genuine
+          // interruption left (the OS taking the gesture for its own
+          // purposes mid-drag), and that still snaps back to level.
+          onPointerCancel={() => {
+            dragging.current = false
+            level()
+          }}
         >
           {/*
             A dedicated stage, sized to the card's own ratio directly rather

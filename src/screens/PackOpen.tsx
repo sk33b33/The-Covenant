@@ -477,15 +477,20 @@ function Summary({
 }) {
   return (
     <motion.div
-      className="flex-1 flex flex-col pt-safe"
+      className="flex-1 flex flex-col pt-safe min-h-0"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
     >
       {/* Title travels with the grid so the block stays optically centred
-          rather than leaving a gap under a pinned heading. */}
-      <div className="scroll-y flex-1 px-5 flex flex-col justify-center">
+          rather than leaving a gap under a pinned heading. `min-h-0`
+          matters on both this div and its parent above: a flex child's
+          default minimum height is its content size, not zero, so without
+          it a big pull (or a God pack) grows this column past the fixed
+          screen's height instead of scrolling — pushing the Done button
+          in the footer below off-screen with no way to reach it. */}
+      <div className="scroll-y flex-1 min-h-0 px-5 flex flex-col justify-center">
         <h2
           className="text-center font-display text-lg tracking-wide mb-4"
           style={{ color: '#f0dcbc' }}
