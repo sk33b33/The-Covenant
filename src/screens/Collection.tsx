@@ -61,6 +61,18 @@ export function Collection() {
     })
   }, [query, types, ownedOnly, owned])
 
+  // The same list, paired with each card's own owned count — handed to the
+  // viewer so a swipe there can page through exactly what's on screen here,
+  // in the same order, with each card's count following it. Kept separate
+  // from `visible` itself rather than folded into that filter/sort so the
+  // viewer's `list` type (card + count) stays specific to what it actually
+  // needs, not a general-purpose shape every other reader of `visible` has
+  // to see too.
+  const peekList = useMemo(
+    () => visible.map((card) => ({ card, count: owned[card.id] ?? 0 })),
+    [visible, owned],
+  )
+
   const toggleType = (t: EnergyType) =>
     setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
 
@@ -144,7 +156,7 @@ export function Collection() {
           </EmptyState>
         ) : (
           <div className="grid grid-cols-3 gap-2.5 mt-3">
-            {visible.map((card) => {
+            {visible.map((card, index) => {
               const count = owned[card.id] ?? 0
               return (
                 <CollectionTile
@@ -153,7 +165,17 @@ export function Collection() {
                   count={count}
                   isNew={unseen.includes(card.id)}
                   onOpen={() => {
-                    peek(card, { count })
+                    peek(card, {
+                      count,
+                      list: peekList,
+                      index,
+                      // Swiping to a card marks it seen too, same as tapping
+                      // it directly already does — a card you paged past
+                      // without pausing on it was still shown to you.
+                      onStep: (item) => {
+                        if (item.count) markSeen([item.card.id])
+                      },
+                    })
                     if (count) markSeen([card.id])
                   }}
                 />

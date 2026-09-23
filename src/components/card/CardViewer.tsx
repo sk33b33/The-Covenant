@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AnimatePresence,
   motion,
@@ -53,11 +53,33 @@ const MAX_TILT = 18
  *  thumb, not an animation chasing it. */
 const TILT_SPRING = { stiffness: 420, damping: 34, mass: 0.5 }
 
+/** How far sideways a release has to land from where the finger went down
+ *  before it reads as a swipe to the next or previous card rather than a
+ *  tilt that happened to end near an edge. */
+const SWIPE_DISTANCE = 60
+
+/** The swipe's own enter/exit, keyed off `custom` (the direction just
+ *  stepped) rather than a fixed side: paging forward brings the next card
+ *  in from the right and sends the outgoing one out to the left, and paging
+ *  back is the mirror of that — the same "content moves the way you dragged
+ *  it" a photo gallery or a page-turn reads as. A named `variants` object
+ *  rather than a function handed straight to `initial`/`animate`/`exit`:
+ *  framer only resolves `custom` through a variant lookup, not through a
+ *  bare function passed to those props directly. */
+const SWIPE_VARIANTS = {
+  enter: (dir: 1 | -1) => ({ x: `${dir * 55}%`, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: 1 | -1) => ({ x: `${dir * -55}%`, opacity: 0 }),
+}
+
 export function CardViewer() {
   const card = usePeek((s) => s.card)
   const actions = usePeek((s) => s.actions)
   const actionsNote = usePeek((s) => s.actionsNote)
   const count = usePeek((s) => s.count)
+  const list = usePeek((s) => s.list)
+  const index = usePeek((s) => s.index)
+  const step = usePeek((s) => s.step)
   const close = usePeek((s) => s.close)
 
   return (
@@ -73,6 +95,9 @@ export function CardViewer() {
           actions={actions}
           actionsNote={actionsNote}
           count={count}
+          canStepBack={list !== undefined && index !== undefined && index > 0}
+          canStepForward={list !== undefined && index !== undefined && index < list.length - 1}
+          step={step}
           close={close}
         />
       )}
@@ -85,16 +110,35 @@ function Viewer({
   actions,
   actionsNote,
   count,
+  canStepBack,
+  canStepForward,
+  step,
   close,
 }: {
   card: CardData
   actions: SheetOption[]
   actionsNote: string | undefined
   count: number | undefined
+  /** Whether a swipe (or arrow key) in either direction currently has
+   *  somewhere to go — false with no list at all, which is what keeps the
+   *  gesture inert everywhere but My Cards. */
+  canStepBack: boolean
+  canStepForward: boolean
+  step: (delta: number) => void
   close: () => void
 }) {
   const frameRef = useRef<HTMLDivElement>(null)
   const reduced = useRef(false)
+
+  // Which way the card most recently moved — the one thing about a swipe
+  // that state actually has to remember, since it decides which side the
+  // next card enters from below. Read once per swipe, at the moment it
+  // fires, rather than derived from anything that changes continuously.
+  const [swipeDir, setSwipeDir] = useState<1 | -1>(1)
+  const stepWithDirection = (delta: number) => {
+    setSwipeDir(delta > 0 ? 1 : -1)
+    step(delta)
+  }
 
   /*
    * The tilt runs entirely on motion values, never on React state.
@@ -170,9 +214,16 @@ function Viewer({
     }
   }, [])
 
-  // Escape closes, and the body must not scroll behind the overlay.
+  // Escape closes; the arrow keys step, when there's a list to step through
+  // at all — the keyboard's own equivalent of the swipe below, for whatever
+  // reaches this dialog without a touchscreen. Body scroll is locked behind
+  // the overlay for the same reason it always has been.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+      else if (e.key === 'ArrowLeft') stepWithDirection(-1)
+      else if (e.key === 'ArrowRight') stepWithDirection(1)
+    }
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -180,6 +231,7 @@ function Viewer({
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [close])
 
   // Touch is the only thing that turns the card. There is deliberately no
@@ -303,34 +355,80 @@ function Viewer({
           onPointerUp={(e) => {
             e.currentTarget.releasePointerCapture(e.pointerId)
             level()
+            // A swipe is read from where the finger ended up relative to
+            // where it went down (`down`, set by the scrim's own
+            // `onPointerDown` below, which this bubbles up to before this
+            // handler ever runs) — not a drag translation followed the
+            // whole way, the same "read the gesture at the end" shape the
+            // tilt's own tap-vs-turn split already uses. Clearly sideways
+            // (never mind a diagonal tilt-drag) and past a real travel
+            // distance is what tells a swipe from a tilt that happened to
+            // end near an edge.
+            if (!canStepBack && !canStepForward) return
+            const dx = e.clientX - down.current.x
+            const dy = e.clientY - down.current.y
+            if (Math.abs(dx) > SWIPE_DISTANCE && Math.abs(dx) > Math.abs(dy) * 1.5) {
+              // Left carries to the next card, right back to the previous —
+              // the same direction a photo gallery or a page-turn reads in.
+              stepWithDirection(dx < 0 ? 1 : -1)
+            }
           }}
           onPointerLeave={level}
           onPointerCancel={level}
         >
           {/*
-            The custom properties ride the motion element, not the Card.
-            framer-motion only subscribes a motion value on a component it
-            owns, and Card is a plain function that spreads `style` onto an
-            article — handed motion values there, React stringified them and
-            the rim sat frozen at its rest angle. Set here they inherit down to
-            the rim and the sheen, which is what `inherits: true` on each
-            @property is for.
+            A dedicated stage, sized to the card's own ratio directly rather
+            than left to size from whichever card happens to be in it: the
+            swipe transition below briefly holds an outgoing and an incoming
+            card at once, both absolutely positioned so they can overlap
+            mid-slide, and an absolutely positioned child contributes nothing
+            for its own parent to size from.
           */}
-          <motion.div
-            style={
-              {
-                rotateX,
-                rotateY,
-                transformStyle: 'preserve-3d',
-                '--holo-angle': holoAngle,
-                '--holo-opacity': holoOpacity,
-                '--rim-base': rimBase,
-                '--rim-glint': glint,
-              } as React.ComponentProps<typeof motion.div>['style']
-            }
-          >
-            <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
-          </motion.div>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '63 / 88' }}>
+            {/*
+              The custom properties ride the motion element, not the Card.
+              framer-motion only subscribes a motion value on a component it
+              owns, and Card is a plain function that spreads `style` onto an
+              article — handed motion values there, React stringified them and
+              the rim sat frozen at its rest angle. Set here they inherit down
+              to the rim and the sheen, which is what `inherits: true` on each
+              @property is for.
+
+              Keyed on the card's own id: framer only plays enter/exit for an
+              element it sees replaced, not one that merely got new props, so
+              swapping the id is what turns "the card changed" into an actual
+              transition rather than an instant swap. `initial={false}` on
+              the presence group is what keeps the *first* card from playing
+              this same enter every time the viewer itself opens — that
+              entrance already belongs to the outer frame's own scale-in.
+            */}
+            <AnimatePresence initial={false} custom={swipeDir}>
+              <motion.div
+                key={card.id}
+                custom={swipeDir}
+                style={
+                  {
+                    position: 'absolute',
+                    inset: 0,
+                    rotateX,
+                    rotateY,
+                    transformStyle: 'preserve-3d',
+                    '--holo-angle': holoAngle,
+                    '--holo-opacity': holoOpacity,
+                    '--rim-base': rimBase,
+                    '--rim-glint': glint,
+                  } as React.ComponentProps<typeof motion.div>['style']
+                }
+                variants={SWIPE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+              >
+                <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </motion.div>
 
         <div className="text-center shrink-0" style={{ color: '#f0dcbc' }}>
