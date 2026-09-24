@@ -48,10 +48,8 @@ import { useSettings } from '@/store/settings'
  */
 
 /** Degrees at the card's edge. Pronounced enough that the card visibly turns
- *  in space and the rim sweeps light across its whole travel. A corner drag
- *  leans further still — see `tiltTransformTemplate` below — so this is the
- *  edge figure, not the ceiling. */
-const MAX_TILT = 24
+ *  in space and the rim sweeps light across its whole travel. */
+const MAX_TILT = 18
 
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
@@ -174,61 +172,6 @@ function Viewer({
    */
   const rotateY = useTransform(sx, (v) => v * MAX_TILT)
   const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
-
-  /*
-   * rotateX and rotateY above are still what the holo sheen and the rim's
-   * specular read (see below) — they're a clean, separate number per axis.
-   * But applying them to the card itself as two sequential CSS rotations,
-   * `rotateX(rx) rotateY(ry)`, rotates around Y *inside the frame rotateX
-   * already tilted*, not around the screen's own Y axis. A drag straight
-   * toward a corner then doesn't lean the card toward that corner at all —
-   * it visibly twists, because the two rotations were never one motion.
-   *
-   * A real card corner does not work that way: press it and the whole edge
-   * under the finger tips away together, in a single lean along whichever
-   * direction the finger actually went. That's one rotation around one
-   * axis — CSS's `rotate3d`, turning around the axis perpendicular to the
-   * drag, `(rx, ry, 0)` — rather than two. (The axis needs no further
-   * derivation: rx and ry already point exactly the right way, since each
-   * is itself a rotation *around* one screen axis, i.e. already perpendicular
-   * to the direction that produced it.) `transformTemplate` is framer's own
-   * escape hatch for swapping in a hand-built `transform` while it keeps
-   * animating `x` (the swipe-to-next-card slide) for us underneath.
-   *
-   * The angle is capped at `MAX_TILT` rather than left to grow with the
-   * vector's own length. `hypot(rx, ry)` reaches roughly `MAX_TILT *
-   * sqrt(2)` at a corner (both axes near their own max at once) — pushed
-   * through the same `perspective` a pure edge tilt uses, that much more
-   * angle is what read as the card's own corners stretching and warping
-   * rather than a rectangle turning in space. Capping it holds every drag,
-   * corner included, to the one angle the perspective was actually tuned
-   * for; the corner still reads as more dramatic than an edge, because it's
-   * a full lean along the diagonal rather than a partial one along a single
-   * axis, without needing extra degrees to sell it.
-   */
-  const tiltTransformTemplate = ({
-    x,
-    rotateX: rx,
-    rotateY: ry,
-  }: {
-    x?: string | number
-    rotateX?: string | number
-    rotateY?: string | number
-  }) => {
-    // Framer hands these over already formatted for their resolved value
-    // type — `rotateX`/`rotateY` arrive as e.g. `"12.3deg"`, not the raw
-    // number, so a plain `Number(...)` parse silently fails to `NaN` and
-    // this template would always read a flat, untilted card. `parseFloat`
-    // reads the leading number and ignores the unit suffix. `x` gets no
-    // such parsing — it's reused as-is (`"0px"` or a swipe's `"55%"`)
-    // rather than re-wrapped in a unit that might not match its own.
-    const rxNum = parseFloat(String(rx)) || 0
-    const ryNum = parseFloat(String(ry)) || 0
-    const angle = Math.min(Math.hypot(rxNum, ryNum), MAX_TILT)
-    const translate = x === undefined ? '' : `translateX(${x})`
-    const rotate = angle === 0 ? '' : `rotate3d(${rxNum}, ${ryNum}, 0, ${angle}deg)`
-    return [translate, rotate].filter(Boolean).join(' ') || 'none'
-  }
 
   /*
    * The light is derived from the rotation, not from the pointer.
@@ -413,12 +356,7 @@ function Viewer({
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // A close vanishing point exaggerates foreshortening: the near
-            // corner balloons and the far one shrinks enough that a
-            // rectangle reads as warped rather than as itself turning in
-            // space. Distant enough here that `MAX_TILT`'s full angle still
-            // looks like a rigid card leaning, not a stretched one.
-            perspective: '2400px',
+            perspective: '1100px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
@@ -515,7 +453,6 @@ function Viewer({
                 animate="center"
                 exit="exit"
                 transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-                transformTemplate={tiltTransformTemplate}
               >
                 <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
               </motion.div>
