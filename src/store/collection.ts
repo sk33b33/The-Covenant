@@ -11,13 +11,19 @@ import { load, save } from './persist'
  * without limit as packs are opened.
  */
 
+/** How long a pulled card wears the "new" badge before it fades on its own,
+ *  for whoever never opens it to acknowledge it directly (see `markSeen`). */
+export const UNSEEN_WINDOW_MS = 12 * 60 * 60 * 1000
+
 export interface CollectionState {
   owned: Record<string, number>
-  /** Card ids seen in a pack but not yet acknowledged, for the "new" badge. */
-  unseen: string[]
+  /** Card ids pulled recently, each against when — the "new" badge in
+   *  Collection reads this against the current time and `UNSEEN_WINDOW_MS`
+   *  itself, since a timestamp doesn't stop being true on its own. */
+  unseenSince: Record<string, number>
 }
 
-const initial: CollectionState = { owned: {}, unseen: [] }
+const initial: CollectionState = { owned: {}, unseenSince: {} }
 
 interface CollectionStore extends CollectionState {
   count: (cardId: string) => number
@@ -34,13 +40,23 @@ interface CollectionStore extends CollectionState {
   hydrate: (data: CollectionState) => void
 }
 
-const snapshot = (s: CollectionStore): CollectionState => ({ owned: s.owned, unseen: s.unseen })
+const snapshot = (s: CollectionStore): CollectionState => ({
+  owned: s.owned,
+  unseenSince: s.unseenSince,
+})
 
 export const useCollection = create<CollectionStore>((set, get) => {
   const persist = () => save('collection', snapshot(get()))
 
+  // A save from before `unseenSince` existed carries the old `unseen` array
+  // (or nothing at all) instead — falling back field by field, rather than
+  // trusting the loaded object whole, is what keeps that save from booting
+  // with `unseenSince` missing and every "new" check throwing.
+  const loaded = load('collection', initial)
+
   return {
-    ...load('collection', initial),
+    owned: loaded.owned ?? initial.owned,
+    unseenSince: loaded.unseenSince ?? initial.unseenSince,
 
     count: (cardId) => get().owned[cardId] ?? 0,
     has: (cardId) => (get().owned[cardId] ?? 0) > 0,
@@ -54,15 +70,27 @@ export const useCollection = create<CollectionStore>((set, get) => {
         owned[id] = (owned[id] ?? 0) + 1
       }
 
-      const unseen = [...new Set([...get().unseen, ...cardIds])]
-      set({ owned, unseen })
+      // Stamped fresh for every id in the pull, a duplicate included — a
+      // second copy of a card you already own is still a new pull, and
+      // deserves its own full 12 hours rather than inheriting however much
+      // of the first copy's window happened to be left.
+      const now = Date.now()
+      const unseenSince = { ...get().unseenSince }
+      for (const id of cardIds) unseenSince[id] = now
+      set({ owned, unseenSince })
       persist()
       return newIds
     },
 
     markSeen: (cardIds) => {
-      const unseen = cardIds ? get().unseen.filter((id) => !cardIds.includes(id)) : []
-      set({ unseen })
+      let unseenSince: Record<string, number>
+      if (cardIds) {
+        unseenSince = { ...get().unseenSince }
+        for (const id of cardIds) delete unseenSince[id]
+      } else {
+        unseenSince = {}
+      }
+      set({ unseenSince })
       persist()
     },
 
@@ -75,12 +103,15 @@ export const useCollection = create<CollectionStore>((set, get) => {
     },
 
     reset: () => {
-      set({ owned: {}, unseen: [] })
+      set({ owned: {}, unseenSince: {} })
       persist()
     },
 
     hydrate: (data) => {
-      set({ ...initial, ...data })
+      set({
+        owned: data.owned ?? initial.owned,
+        unseenSince: data.unseenSince ?? initial.unseenSince,
+      })
       persist()
     },
   }

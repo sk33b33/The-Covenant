@@ -463,7 +463,7 @@ function PackCarousel({
         </div>
       </div>
 
-      <p className="text-center text-xs text-ink-muted mt-2.5 px-2 min-h-[2.4em]">
+      <p className="text-center text-xs text-ink-muted mt-4 px-2 min-h-[2.4em]">
         {packs[active]?.tagline}
       </p>
 

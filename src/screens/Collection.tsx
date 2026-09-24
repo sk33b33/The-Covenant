@@ -14,7 +14,8 @@ import {
   type Card as CardData,
   type EnergyType,
 } from '@/game/types'
-import { useCollection } from '@/store/collection'
+import { UNSEEN_WINDOW_MS, useCollection } from '@/store/collection'
+import { useNow } from '@/hooks/useNow'
 import { cx } from '@/lib/cx'
 
 /**
@@ -29,7 +30,14 @@ export function Collection() {
   const owned = useCollection((s) => s.owned)
   const markSeen = useCollection((s) => s.markSeen)
   const peek = usePeek((s) => s.peek)
-  const unseen = useCollection((s) => s.unseen)
+  const unseenSince = useCollection((s) => s.unseenSince)
+  // A minute is plenty fine-grained for a 12-hour window, and cheap enough
+  // to tick in the background the whole time the binder is open.
+  const now = useNow(60_000)
+  const isUnseen = (cardId: string) => {
+    const since = unseenSince[cardId]
+    return since !== undefined && now - since < UNSEEN_WINDOW_MS
+  }
 
   const [query, setQuery] = useState('')
   const [types, setTypes] = useState<EnergyType[]>([])
@@ -163,7 +171,7 @@ export function Collection() {
                   key={card.id}
                   card={card}
                   count={count}
-                  isNew={unseen.includes(card.id)}
+                  isNew={isUnseen(card.id)}
                   onOpen={() => {
                     peek(card, {
                       count,
