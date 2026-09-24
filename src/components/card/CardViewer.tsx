@@ -28,8 +28,8 @@ import { useSettings } from '@/store/settings'
  * your Active Figure mid-match, which also carries its attacks underneath, so
  * one tap still both inspects and acts.
  *
- * The card presses away from your thumb, as though pushed flat against a
- * table, and both the holo sheen and the metal rim track that lean: the
+ * The card lifts toward your thumb, as though it were being tilted up to
+ * meet it, and both the holo sheen and the metal rim track that lean: the
  * pairing is what makes a rare card feel like a physical foil rather than a
  * picture of one. Release and it springs back level. Motion is dropped
  * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
@@ -163,15 +163,17 @@ function Viewer({
   const sy = useSpring(py, TILT_SPRING)
 
   /*
-   * The card presses away from the finger: touch the right edge and that edge
-   * goes down, as though you were pushing a card flat against a table.
+   * The card lifts toward the finger: touch the right edge and that edge
+   * rises toward you, as though the card were tilting up to meet the touch
+   * rather than pressing flat away from it.
    *
-   * A positive rotateY already sends the right edge away from the viewer and a
-   * positive rotateX already sends the top edge away, so this convention is
-   * the one that needs no negation on either axis.
+   * A positive rotateY sends the right edge away from the viewer and a
+   * positive rotateX sends the top edge away, so lifting the touched edge
+   * toward the viewer instead means negating both from what a plain
+   * `(px, py)` reading would otherwise give.
    */
-  const rotateY = useTransform(sx, (v) => v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
+  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
 
   /*
    * The light is derived from the rotation, not from the pointer.
