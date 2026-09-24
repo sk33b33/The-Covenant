@@ -947,7 +947,21 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
 
     if (!cue && draws.length === 0 && heads === null) return
 
-    if (fxInFlight.current) {
+    // `fxInFlight.current` is raised by the attack effect below — a plain
+    // `useEffect`, which React only runs *after* every layout effect in the
+    // same commit, this one included, regardless of which is declared
+    // first in the file. An attack that also ends the turn lands both in
+    // one `dispatch`, so on exactly that commit — the common case, since
+    // most attacks end a turn — this effect runs while the flag is still
+    // whatever it was left at, before the strike has raised it at all. The
+    // hand-off would then present at once, on its own fixed beat, racing
+    // ahead of a strike animation that hasn't even started yet. `added` is
+    // this same commit's own freshly-appended log rows, so a fresh 'attack'
+    // entry among them is watching the strike itself land rather than a
+    // flag that hasn't caught up to it yet.
+    const attackJustLanded = added.some((entry) => entry.event?.kind === 'attack')
+
+    if (fxInFlight.current || attackJustLanded) {
       // Accumulated, not overwritten: a second commit landing while the
       // first is still queued (say, a mid-turn Miracle draw right before
       // the turn's own hand-off draw) would otherwise wipe the first draw's
