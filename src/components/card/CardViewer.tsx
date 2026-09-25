@@ -51,6 +51,16 @@ import { useSettings } from '@/store/settings'
  *  in space and the rim sweeps light across its whole travel. */
 const MAX_TILT = 18
 
+/** A small, constant clockwise roll the card sits at all the time, touched
+ *  or not — measured off a reference clip of a similar tilt-card effect,
+ *  where the card was tilted by this same few degrees no matter where the
+ *  touch was, the whole time: not a reaction to the gesture, just how the
+ *  card is propped. `rotateZ` rather than a rest offset on `rotateX`/
+ *  `rotateY`, so it only ever spins the card in the screen's own plane —
+ *  it cannot keystone the way a resting tilt on the other two axes could
+ *  once a real touch adds its own rotation on top. */
+const RESTING_TILT = 6
+
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
 const TILT_SPRING = { stiffness: 420, damping: 34, mass: 0.5 }
@@ -481,6 +491,7 @@ function Viewer({
                     inset: 0,
                     rotateX,
                     rotateY,
+                    rotateZ: RESTING_TILT,
                     transformStyle: 'preserve-3d',
                     '--holo-angle': holoAngle,
                     '--holo-opacity': holoOpacity,
