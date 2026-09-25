@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AnimatePresence,
   motion,
+  useAnimationFrame,
   useMotionTemplate,
   useMotionValue,
-  useSpring,
   useTransform,
 } from 'framer-motion'
 import { RarityMark } from '@/art/RarityMark'
@@ -47,32 +47,15 @@ import { useSettings } from '@/store/settings'
  * Mounted once, in App. Everything else opens it through the peek store.
  */
 
-/** Degrees at the card's edge for a left/right drag. Pronounced enough that
- *  the card visibly turns in space and the rim sweeps light across its
- *  whole travel. */
-const MAX_TILT_Y = 22
+/** Degrees at the card's edge, same cap on both axes. */
+const MAX_TILT = 25
 
-/**
- * Degrees at the card's edge for an up/down drag — smaller than
- * `MAX_TILT_Y`, in the card's own 63:88 ratio, not the same angle.
- *
- * The two axes don't produce the same amount of foreshortening for the
- * same angle: rotateX swings the card's far *height* toward and away from
- * the viewer, rotateY its far *width*, and the card is taller than it is
- * wide. The same angle on the taller dimension moves its corners through
- * more depth, so it was projecting a visibly bigger, wider-looking card at
- * a pure up/down drag than the same-strength left/right drag did — the
- * whole card's silhouette pulsing in size as a drag swept around it in a
- * circle, not just the usual near/far corner difference. Scaling this axis
- * down by the card's own width/height ratio (63/88) equalizes how much
- * depth either axis reaches at its own full tilt, so the outline stays
- * close to the same size whichever direction the drag comes from.
- */
-const MAX_TILT_X = MAX_TILT_Y * (63 / 88)
-
-/** Tight and fast: a smoothing filter on a value that already tracks the
- *  thumb, not an animation chasing it. */
-const TILT_SPRING = { stiffness: 420, damping: 34, mass: 0.5 }
+/** Fraction of the remaining distance to the target closed each frame —
+ *  `cur += (target - cur) * TILT_SMOOTHING`, run every animation frame in
+ *  `useAnimationFrame` below. A plain exponential lerp rather than a
+ *  physically-modelled spring: no overshoot, no bounce, just a fixed
+ *  fraction of catch-up per frame. */
+const TILT_SMOOTHING = 0.12
 
 /** How far sideways a release has to land from where the finger went down
  *  before it reads as a swipe to the next or previous card rather than a
@@ -170,16 +153,19 @@ function Viewer({
    * rotation was a spring `animate` target, so each move re-aimed a spring that
    * was already in flight: it chased the thumb and never arrived.
    *
-   * Now the pointer writes a raw value, a spring smooths it, and the result is
-   * applied straight to the element. React does not re-render at all while the
-   * card is turning, and the spring damps a value that already tracks the
-   * pointer rather than pursuing a moving target.
+   * Now the pointer writes a raw target value and a per-frame lerp (below)
+   * closes a fixed fraction of the gap to it every frame, writing straight to
+   * `sx`/`sy`. React does not re-render at all while the card is turning.
    */
   const px = useMotionValue(0)
   const py = useMotionValue(0)
+  const sx = useMotionValue(0)
+  const sy = useMotionValue(0)
 
-  const sx = useSpring(px, TILT_SPRING)
-  const sy = useSpring(py, TILT_SPRING)
+  useAnimationFrame(() => {
+    sx.set(sx.get() + (px.get() - sx.get()) * TILT_SMOOTHING)
+    sy.set(sy.get() + (py.get() - sy.get()) * TILT_SMOOTHING)
+  })
 
   /*
    * The card lifts toward the finger: touch the right edge and that edge
@@ -191,8 +177,8 @@ function Viewer({
    * toward the viewer instead means negating both from what a plain
    * `(px, py)` reading would otherwise give.
    */
-  const rotateY = useTransform(sx, (v) => -v * MAX_TILT_Y)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT_X)
+  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
 
   /*
    * The light is derived from the rotation, not from the pointer.
@@ -314,31 +300,15 @@ function Viewer({
     if (reduced.current || !dragging.current) return
     const r = rectRef.current
     if (!r) return
-    // -1 to 1 across the card, so each axis's own max reads as degrees at
-    // the edge.
-    const x = ((e.clientX - r.left) / r.width - 0.5) * 2
-    const y = ((e.clientY - r.top) / r.height - 0.5) * 2
-    // Clamped as one vector, not as two independent axes: rotateX and
-    // rotateY are each driven straight off this pair and composed by
-    // framer as two separate CSS rotations, so a corner — where both
-    // components are near their own max at once — was quietly getting a
-    // full tilt on *both* axes together, one on top of the
-    // other. Every horizontal plate on the card's own face (the
-    // nameplate, each attack row, the footer) is a straight line running
-    // through that rotateX turn, and stacking it under a near-full
-    // rotateY on top read as those lines bowing — the card's face itself
-    // looking bent — rather than as a corner leaning harder than an edge.
-    // Scaling the vector down to length 1 keeps a corner drag reading as
-    // more dramatic than a pure edge drag (it is still a full diagonal
-    // lean), without ever handing both axes their full degrees at once.
-    // Pointer capture is what lets the finger carry on past the card's
-    // own edge and simply hold the tilt at its maximum instead of reading
-    // some undefined, ever-growing value out past the card — this still
-    // does that, just measured as one vector's length instead of two.
-    const mag = Math.hypot(x, y)
-    const scale = mag > 1 ? 1 / mag : 1
-    px.set(x * scale)
-    py.set(y * scale)
+    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge —
+    // each axis clamped independently, so a corner drag (both near their
+    // own ±1 at once) reaches close to MAX_TILT on rotateX *and* rotateY
+    // together rather than sharing one combined budget. Pointer capture is
+    // what lets the finger carry on past the card's own edge and simply
+    // hold each axis at its own ±1 instead of reading some undefined,
+    // ever-growing value out past the card.
+    px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
+    py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
   }
 
   const level = () => {
@@ -430,23 +400,18 @@ function Viewer({
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // Deliberately no `perspective` here, again, and this time for
-            // good — see git history for the several rounds of tuning a
-            // vanishing point (1100px, 700px, 600px, 520px) in between. The
-            // near corner of a tilted card growing and the far corner
-            // shrinking are not two effects, they're the *same* effect —
-            // perspective foreshortening — and it's also exactly what
-            // "stretching" means. Every non-zero perspective this shipped
-            // with eventually drew that complaint, at every strength tried;
-            // there's no distance where the card visibly turns in 3D and
-            // the far corner *doesn't* look smaller than the near one. With
-            // no perspective, the browser projects the rotation
-            // orthographically: every point scales by the same cos(angle)
-            // regardless of depth, so the card is a rectangle at every
-            // angle, guaranteed by the projection math rather than tuned
-            // small enough not to notice. The sheen and rim highlight below
-            // (already reading both axes) carry the "this is turning, not
-            // just scaling" read instead of the geometry doing it.
+            // Perspective is back, on request, matching a reference
+            // implementation's settings: MAX_TILT 25° on both axes with no
+            // shared corner budget, real keystone included. This reopens
+            // exactly the "opposite corners stretch" failure mode the last
+            // several fixes existed to close — a corner drag can now reach
+            // close to 25° on rotateX *and* rotateY at once, pushed through
+            // a real vanishing point, which is a materially stronger
+            // distortion than anything that drew that complaint before. The
+            // reference didn't specify a distance (its own perspective lives
+            // on a CSS rule this session never saw); 650px is a middle
+            // value, not a verified-safe one.
+            perspective: '650px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
@@ -611,3 +576,5 @@ function Viewer({
     </motion.div>
   )
 }
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
