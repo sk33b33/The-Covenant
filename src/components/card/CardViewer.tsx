@@ -401,19 +401,23 @@ function Viewer({
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
             // Perspective foreshortening — the near edge of the rotated card
-            // projecting a little wider than the far edge — is what actually
+            // projecting taller/wider than the far edge — is what actually
             // reads as "a solid card leaning toward you" rather than "a flat
             // picture getting narrower". It was dropped for a stretch in this
             // feature's history to guarantee zero keystone, but that traded
             // away the one cue that makes the tilt look three-dimensional at
             // all: with no perspective the card only ever scales, it never
-            // convincingly leans. Back at 1100px, the same distance this
-            // shipped at for its longest untroubled stretch — now paired with
-            // the corner fix below (a diagonal drag no longer reaches a full
-            // MAX_TILT on *both* axes at once), the keystone at any angle
-            // this can actually reach stays visibly a card turning, not a
-            // trapezoid.
-            perspective: '1100px',
+            // convincingly leans. 1100px (this feature's longest-standing
+            // value) turned out to be too far out to read as depth at all —
+            // at MAX_TILT's full 18°, the near and far edges only differ by
+            // about 9%, easy to not consciously register as "this is turning
+            // in space" rather than "this got narrower". Closer at 700px, the
+            // same 18° produces roughly double that difference: still short
+            // of the exaggerated look that read as warping earlier in this
+            // feature's history, because the corner fix below caps a
+            // diagonal drag's combined rotation at that same 18° instead of
+            // letting a corner reach both axes' full angle at once.
+            perspective: '700px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
