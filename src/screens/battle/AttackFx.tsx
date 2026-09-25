@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { AttackEvent } from '@/engine/types'
 import type { EnergyType } from '@/game/types'
@@ -170,6 +170,17 @@ const THEME: Record<EnergyType, ElementTheme> = {
     ],
   },
 }
+
+/**
+ * A design review switch, not a real setting: every element's projectile
+ * temporarily replaced by a lightning bolt (still in that element's own
+ * colours) so it can be judged live, on every attack, without touching a
+ * single card or ability. To go back to each element's own comet/droplet/
+ * star/etc: set this back to `false` (the only line this whole experiment
+ * needs to undo — `Bolt` and everything it uses are additive, nothing
+ * about the original per-element heads was changed).
+ */
+const LIGHTNING_PREVIEW = true
 
 /** Overall size/glow multiplier for the whole effect — the "how amplified"
  *  dial. Tier multiplies on top of this, so a knockout is bigger still. */
@@ -365,19 +376,32 @@ export function AttackFx({ trigger, onDone }: Props) {
           />
         )}
 
-        {show.projectile && (
-          <Projectile
-            key="projectile"
-            theme={theme}
-            scale={scale}
-            fromX={fromX}
-            fromY={fromY}
-            dx={dx}
-            dy={dy}
-            angle={angle}
-            missed={event.missed}
-          />
-        )}
+        {show.projectile &&
+          (LIGHTNING_PREVIEW ? (
+            <Bolt
+              key="bolt"
+              theme={theme}
+              scale={scale}
+              fromX={fromX}
+              fromY={fromY}
+              toX={fromX + dx}
+              toY={fromY + dy}
+              seconds={theme.travel}
+              seed={event.id}
+            />
+          ) : (
+            <Projectile
+              key="projectile"
+              theme={theme}
+              scale={scale}
+              fromX={fromX}
+              fromY={fromY}
+              dx={dx}
+              dy={dy}
+              angle={angle}
+              missed={event.missed}
+            />
+          ))}
 
         {/* The hit-stop hold: contact has been made, but nothing has "landed"
             yet — a bright, near-static point sitting right where the impact
@@ -529,6 +553,143 @@ function Charge({
         transition={{ duration: seconds, ease: 'easeIn' }}
       />
     </span>
+  )
+}
+
+/* --------------------------------------------------------------------- bolt */
+
+/**
+ * A lightning bolt spanning attacker to defender directly, in place of a
+ * projectile that travels between them — see `LIGHTNING_PREVIEW` above.
+ *
+ * Real lightning doesn't cross a distance over time, it discharges across
+ * the whole gap at once, so this renders the entire jagged path immediately
+ * and flickers its opacity rather than translating a head along it. Built
+ * from straight segments repeatedly split at their midpoint and kicked
+ * *perpendicular* to their own direction (never independently in x/y, which
+ * reads as a smooth diagonal wave instead of a sharp zigzag), with a
+ * shrinking kick each pass — real lightning stays jagged its whole length,
+ * a naive midpoint displacement smooths out toward a straight line instead.
+ * A couple of forks split off the main channel partway along, the same way
+ * a real strike's current forks before it grounds.
+ *
+ * The "glow" is three stacked strokes of the same colour at decreasing
+ * width and increasing brightness, the SVG analogue of the radial-gradient
+ * soft shapes used everywhere else in this file — not a blur filter, which
+ * this file's own header explains is what turns a handheld's compositor
+ * into a re-rasteriser once there are more than a couple on screen at once.
+ */
+interface BoltPoint {
+  x: number
+  y: number
+}
+
+function jaggedSegment(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  passes: number,
+  amp: number,
+  next: () => number,
+): BoltPoint[] {
+  let pts: BoltPoint[] = [
+    { x: x0, y: y0 },
+    { x: x1, y: y1 },
+  ]
+  for (let p = 0; p < passes; p++) {
+    const out: BoltPoint[] = [pts[0]!]
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!, b = pts[i + 1]!
+      const dx = b.x - a.x, dy = b.y - a.y
+      const len = Math.hypot(dx, dy) || 1
+      const nx = -dy / len, ny = dx / len
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2
+      const kick = (next() * 2 - 1) * amp
+      out.push({ x: mx + nx * kick, y: my + ny * kick })
+      out.push(b)
+    }
+    pts = out
+    amp *= 0.68
+  }
+  return pts
+}
+
+/** Stable per-attack randomness, the same trick `rand`/`signed` already use
+ *  elsewhere in this file: seeded by the event's own id, so a bolt's shape
+ *  doesn't reshuffle on every re-render but differs from the last attack. */
+function buildBolt(fromX: number, fromY: number, toX: number, toY: number, seed: number) {
+  let n = 0
+  const next = () => rand(n++, seed)
+  const dist = Math.hypot(toX - fromX, toY - fromY)
+  const spine = jaggedSegment(fromX, fromY, toX, toY, 4, dist * 0.06, next)
+
+  const forks: BoltPoint[][] = []
+  for (let f = 0; f < 2; f++) {
+    const t = 0.3 + next() * 0.4
+    const idx = Math.min(spine.length - 2, Math.max(0, Math.floor(t * spine.length)))
+    const a = spine[idx]!, b = spine[idx + 1]!
+    const dx = b.x - a.x, dy = b.y - a.y
+    const len = Math.hypot(dx, dy) || 1
+    const ux = dx / len, uy = dy / len
+    const spread = (0.4 + next() * 0.5) * (next() < 0.5 ? -1 : 1)
+    const forkLen = dist * (0.18 + next() * 0.22)
+    const fx = a.x + (ux * Math.cos(spread) - uy * Math.sin(spread)) * forkLen
+    const fy = a.y + (ux * Math.sin(spread) + uy * Math.cos(spread)) * forkLen
+    forks.push(jaggedSegment(a.x, a.y, fx, fy, 3, dist * 0.035, next))
+  }
+  return { spine, forks }
+}
+
+const boltPoints = (pts: BoltPoint[]) => pts.map((p) => `${p.x},${p.y}`).join(' ')
+
+function BoltStrand({ points, glow, core, width }: { points: string; glow: string; core: string; width: number }) {
+  return (
+    <>
+      <polyline points={points} fill="none" stroke={glow} strokeWidth={width * 3.4} strokeOpacity={0.28} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={points} fill="none" stroke={glow} strokeWidth={width * 1.8} strokeOpacity={0.65} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={points} fill="none" stroke={core} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  )
+}
+
+function Bolt({
+  theme,
+  scale,
+  fromX,
+  fromY,
+  toX,
+  toY,
+  seconds,
+  seed,
+}: {
+  theme: ElementTheme
+  scale: number
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  seconds: number
+  seed: number
+}) {
+  const { spine, forks } = useMemo(() => buildBolt(fromX, fromY, toX, toY, seed), [fromX, fromY, toX, toY, seed])
+
+  return (
+    <motion.svg
+      className="absolute inset-0 w-full h-full"
+      style={{ overflow: 'visible' }}
+      initial={{ opacity: 0 }}
+      // The same leader-stroke / gap / return-stroke double pulse a real
+      // strike photographs as, rather than a single fade-in.
+      animate={{ opacity: [0, 0.3, 0.05, 1, 0.55, 1] }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: seconds, times: [0, 0.18, 0.28, 0.5, 0.66, 1], ease: 'linear' }}
+    >
+      <BoltStrand points={boltPoints(spine)} glow={theme.glow} core={theme.core} width={2.2 * scale} />
+      {forks.map((fork, i) => (
+        <BoltStrand key={i} points={boltPoints(fork)} glow={theme.glow} core={theme.core} width={1.3 * scale} />
+      ))}
+    </motion.svg>
   )
 }
 
