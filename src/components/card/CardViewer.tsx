@@ -49,7 +49,7 @@ import { useSettings } from '@/store/settings'
 
 /** Degrees at the card's edge. Pronounced enough that the card visibly turns
  *  in space and the rim sweeps light across its whole travel. */
-const MAX_TILT = 18
+const MAX_TILT = 22
 
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
@@ -417,17 +417,15 @@ function Viewer({
             // feature's history to guarantee zero keystone, but that traded
             // away the one cue that makes the tilt look three-dimensional at
             // all: with no perspective the card only ever scales, it never
-            // convincingly leans. 1100px (this feature's longest-standing
-            // value) turned out to be too far out to read as depth at all —
-            // at MAX_TILT's full 18°, the near and far edges only differ by
-            // about 9%, easy to not consciously register as "this is turning
-            // in space" rather than "this got narrower". Closer at 700px, the
-            // same 18° produces roughly double that difference: still short
-            // of the exaggerated look that read as warping earlier in this
-            // feature's history, because the corner fix below caps a
-            // diagonal drag's combined rotation at that same 18° instead of
-            // letting a corner reach both axes' full angle at once.
-            perspective: '700px',
+            // convincingly leans. 600px plus MAX_TILT's 22° gives the near
+            // and far edges roughly a 19% difference at full tilt — visibly a
+            // card turning, not merely narrowing — while the corner fix below
+            // still caps a diagonal drag's combined rotation at that same
+            // 22° instead of letting a corner reach both axes' full angle at
+            // once, which is what kept this from reading as exaggerated or
+            // warped at the smaller, less dramatic settings this shipped
+            // with before.
+            perspective: '600px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
