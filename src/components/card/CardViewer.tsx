@@ -375,15 +375,28 @@ function Viewer({
          * screen and nothing scrolling. 63/88 is the card's own ratio, so the
          * height bound converts cleanly into a width.
          *
-         * The padding is tilt clearance: turned in 3D the near corners project
-         * outward and the lifted shadow reaches 48px further still.
+         * The padding is tilt clearance: the lifted shadow reaches 48px
+         * further out than the card itself.
          */}
         <motion.div
           ref={frameRef}
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            perspective: '1100px',
+            // Deliberately no `perspective` here. A perspective context is
+            // what makes rotateX/rotateY foreshorten — the near edge of the
+            // rotated plane projects wider than the far one, which is what
+            // every round of "the card is warping" in this feature's history
+            // turned out to be, no matter how far out the vanishing point was
+            // pushed: keystoning at 1100px, keystoning (just less of it) at
+            // 4800px. Without a perspective, the browser projects the
+            // rotation orthographically instead — every point's screen
+            // position scales by the same cos(angle) regardless of depth, so
+            // the card can only ever come out as a rectangle, uniformly
+            // narrower at a steeper angle, never a trapezoid. That is a
+            // guarantee from how the projection math works, not a matter of
+            // tuning a distance far enough away that the warp becomes too
+            // small to see.
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
