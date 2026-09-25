@@ -49,7 +49,7 @@ import { useSettings } from '@/store/settings'
 
 /** Degrees at the card's edge. Pronounced enough that the card visibly turns
  *  in space and the rim sweeps light across its whole travel. */
-const MAX_TILT = 26
+const MAX_TILT = 22
 
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
@@ -417,15 +417,21 @@ function Viewer({
             // feature's history to guarantee zero keystone, but that traded
             // away the one cue that makes the tilt look three-dimensional at
             // all: with no perspective the card only ever scales, it never
-            // convincingly leans. 520px plus MAX_TILT's 26° gives the near
-            // and far edges roughly a 27% difference at full tilt — visibly a
-            // card turning, not merely narrowing — while the corner fix below
-            // still caps a diagonal drag's combined rotation at that same
-            // 26° instead of letting a corner reach both axes' full angle at
-            // once, which is what kept this from reading as exaggerated or
-            // warped at the smaller, less dramatic settings this shipped
-            // with before.
-            perspective: '520px',
+            // convincingly leans. 600px plus MAX_TILT's 22° gives the near
+            // and far edges roughly a 19% difference at full tilt — visibly a
+            // card turning, not merely narrowing.
+            //
+            // This was pushed further twice (26°/520px, then briefly even
+            // closer) chasing "more 3D", but that direction has a hard
+            // ceiling: the near corner growing and the far corner shrinking
+            // are the same effect, not two separate knobs, so more of one is
+            // always more of the other. Past roughly this point the far
+            // corner stops reading as "further away" and starts reading as
+            // "stretched" — which is exactly what got reported once it went
+            // past ~27% — while the corner fix below still caps a diagonal
+            // drag's combined rotation at MAX_TILT rather than letting it
+            // reach that angle on both axes at once.
+            perspective: '600px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
