@@ -260,13 +260,30 @@ function Viewer({
     const el = frameRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
-    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge —
-    // clamped, not just measured, which is what lets the finger carry on
-    // past the card's own edge (pointer capture keeps `track` receiving
-    // its moves) and simply hold the tilt at its maximum rather than
-    // reading some undefined, ever-growing value out past the card.
-    px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
-    py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
+    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge.
+    const x = ((e.clientX - r.left) / r.width - 0.5) * 2
+    const y = ((e.clientY - r.top) / r.height - 0.5) * 2
+    // Clamped as one vector, not as two independent axes: rotateX and
+    // rotateY are each driven straight off this pair and composed by
+    // framer as two separate CSS rotations, so a corner — where both
+    // components are near their own max at once — was quietly getting a
+    // full MAX_TILT turn on *both* axes together, one on top of the
+    // other. Every horizontal plate on the card's own face (the
+    // nameplate, each attack row, the footer) is a straight line running
+    // through that rotateX turn, and stacking it under a near-full
+    // rotateY on top read as those lines bowing — the card's face itself
+    // looking bent — rather than as a corner leaning harder than an edge.
+    // Scaling the vector down to length 1 keeps a corner drag reading as
+    // more dramatic than a pure edge drag (it is still a full diagonal
+    // lean), without ever handing both axes their full degrees at once.
+    // Pointer capture is what lets the finger carry on past the card's
+    // own edge and simply hold the tilt at its maximum instead of reading
+    // some undefined, ever-growing value out past the card — this still
+    // does that, just measured as one vector's length instead of two.
+    const mag = Math.hypot(x, y)
+    const scale = mag > 1 ? 1 / mag : 1
+    px.set(x * scale)
+    py.set(y * scale)
   }
 
   const level = () => {
@@ -522,5 +539,3 @@ function Viewer({
     </motion.div>
   )
 }
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
