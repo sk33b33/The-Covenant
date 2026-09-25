@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  AnimatePresence,
-  motion,
-  useAnimationFrame,
-  useMotionTemplate,
-  useMotionValue,
-  useTransform,
-} from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { RarityMark } from '@/art/RarityMark'
 import { cx } from '@/lib/cx'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
@@ -19,7 +12,6 @@ import {
   type Card as CardData,
 } from '@/game/types'
 import { usePeek } from '@/store/peek'
-import { useSettings } from '@/store/settings'
 
 /**
  * The card, held up to the light.
@@ -28,34 +20,18 @@ import { useSettings } from '@/store/settings'
  * your Active Figure mid-match, which also carries its attacks underneath, so
  * one tap still both inspects and acts.
  *
- * The card lifts toward your thumb, as though it were being tilted up to
- * meet it, and both the holo sheen and the metal rim track that lean: the
- * pairing is what makes a rare card feel like a physical foil rather than a
- * picture of one. Release and it springs back level. Motion is dropped
- * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
- * "Simplify effects" switch in Menu → Graphics.
- *
- * A held touch or mouse press is the only input — a mouse merely hovering
- * does nothing, the same as a finger that isn't down does nothing. The
- * gyroscope drove this too once, which meant a card turned on its own
- * while you were reading it.
+ * The card renders exactly as it does everywhere else in the game — the
+ * same static holo sheen and metal rim, at their resting angle. The
+ * interactive tilt-to-the-touch this viewer once drove is on hold for now
+ * (see git history for the pointer-tracking version this replaced) rather
+ * than removed for good.
  *
  * The overlay never scrolls. Everything is sized to fit the viewport instead,
- * because a screen that shifts under the gesture turning it is worse than a
- * card rendered slightly smaller.
+ * because a screen that shifts under a gesture is worse than a card rendered
+ * slightly smaller.
  *
  * Mounted once, in App. Everything else opens it through the peek store.
  */
-
-/** Degrees at the card's edge, same cap on both axes. */
-const MAX_TILT = 25
-
-/** Fraction of the remaining distance to the target closed each frame —
- *  `cur += (target - cur) * TILT_SMOOTHING`, run every animation frame in
- *  `useAnimationFrame` below. A plain exponential lerp rather than a
- *  physically-modelled spring: no overshoot, no bounce, just a fixed
- *  fraction of catch-up per frame. */
-const TILT_SMOOTHING = 0.12
 
 /** How far sideways a release has to land from where the finger went down
  *  before it reads as a swipe to the next or previous card rather than a
@@ -131,9 +107,6 @@ function Viewer({
   step: (delta: number) => void
   close: () => void
 }) {
-  const frameRef = useRef<HTMLDivElement>(null)
-  const reduced = useRef(false)
-
   // Which way the card most recently moved — the one thing about a swipe
   // that state actually has to remember, since it decides which side the
   // next card enters from below. Read once per swipe, at the moment it
@@ -143,103 +116,6 @@ function Viewer({
     setSwipeDir(delta > 0 ? 1 : -1)
     step(delta)
   }
-
-  /*
-   * The tilt runs entirely on motion values, never on React state.
-   *
-   * It used to setState on every pointermove, which re-rendered this component
-   * and the whole Card tree beneath it — nameplate, artwork, orb, every attack
-   * row, the footer's SVGs — sixty times a second. That was the jank. And the
-   * rotation was a spring `animate` target, so each move re-aimed a spring that
-   * was already in flight: it chased the thumb and never arrived.
-   *
-   * Now the pointer writes a raw target value and a per-frame lerp (below)
-   * closes a fixed fraction of the gap to it every frame, writing straight to
-   * `sx`/`sy`. React does not re-render at all while the card is turning.
-   */
-  const px = useMotionValue(0)
-  const py = useMotionValue(0)
-  const sx = useMotionValue(0)
-  const sy = useMotionValue(0)
-
-  useAnimationFrame(() => {
-    sx.set(sx.get() + (px.get() - sx.get()) * TILT_SMOOTHING)
-    sy.set(sy.get() + (py.get() - sy.get()) * TILT_SMOOTHING)
-  })
-
-  /*
-   * The card lifts toward the finger: touch the right edge and that edge
-   * rises toward you, as though the card were tilting up to meet the touch
-   * rather than pressing flat away from it.
-   *
-   * A positive rotateY sends the right edge away from the viewer and a
-   * positive rotateX sends the top edge away, so lifting the touched edge
-   * toward the viewer instead means negating both from what a plain
-   * `(px, py)` reading would otherwise give.
-   */
-  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
-
-  /*
-   * The light is derived from the rotation, not from the pointer.
-   *
-   * Both were driven off the pointer before, which meant flipping the tilt
-   * silently sent the highlight sweeping against the surface instead of across
-   * it — the sort of mismatch that reads as "wrong" without being nameable.
-   * Taking the rotation as the input makes the two impossible to desynchronise:
-   * whichever way the card faces, the sheen and the rim's specular follow it.
-   */
-  // Both axes feed the angle, not just rotateY — a pure up/down drag used to
-  // leave this untouched, so tilting the card toward or away from you swept
-  // no sheen at all and read as no different from the resting card. The
-  // rim's own highlight (below) already took both axes; the sheen just
-  // hadn't caught up.
-  //
-  // Equal weight on both axes (2.6 and 2.6) was the wrong way to fix that:
-  // rotateY and rotateX can carry opposite signs — a bottom-right or
-  // top-left corner drag is exactly that — and with matching coefficients
-  // the two terms partially cancel instead of adding, so the corners along
-  // that diagonal barely moved the sheen at all while the other diagonal
-  // (top-right, bottom-left) swept twice as far as intended. Uneven
-  // coefficients, the same idea rimBase already uses below, mean no
-  // direction cancels: every corner still gets a real, visible sweep, just
-  // not identical in size to its neighbor.
-  const holoAngle = useMotionTemplate`${useTransform(
-    [rotateY, rotateX] as const,
-    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 1,
-  )}deg`
-  const rimBase = useMotionTemplate`${useTransform(
-    [rotateY, rotateX] as const,
-    ([y = 0, x = 0]: number[]) => 218 + y * 1.9 + x,
-  )}deg`
-  const lit = useTransform([sx, sy] as const, ([x = 0, y = 0]: number[]) =>
-    Math.min(1, Math.hypot(x, y)),
-  )
-  const holoOpacity = useTransform(lit, (v) => 0.5 + v * 0.45)
-  // A high resting floor on purpose. At 0.15 a card sitting still carried
-  // almost no highlight and read closer to matte than to metal — polished metal
-  // is bright before you move it, and only *changes* when you do.
-  const glint = useTransform(lit, (v) => 0.38 + v * 0.62)
-
-  // Two sources feed the same flag: the OS's own prefers-reduced-motion, and
-  // the player's "Simplify effects" switch in Menu → Graphics. Read directly
-  // rather than through the `useReducedMotion` hook because this is consulted
-  // from `track`, which runs on every pointermove and cannot afford a
-  // re-render — so the media query and the store are both subscribed to once,
-  // outside React, and only the ref they write is read on the hot path.
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const sync = () => {
-      reduced.current = mq.matches || useSettings.getState().reducedMotion
-    }
-    sync()
-    mq.addEventListener('change', sync)
-    const unsubscribe = useSettings.subscribe(sync)
-    return () => {
-      mq.removeEventListener('change', sync)
-      unsubscribe()
-    }
-  }, [])
 
   // Escape closes; the arrow keys step, when there's a list to step through
   // at all — the keyboard's own equivalent of the swipe below, for whatever
@@ -260,61 +136,6 @@ function Viewer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [close])
-
-  // Whether a press is actually down right now — the one thing standing
-  // between "turn the card" and "the pointer merely passed over it". A
-  // mouse fires `pointermove` continuously just from hovering, with no
-  // button held at all; without this gate, moving the mouse anywhere near
-  // the card tilted it, and moving it away snapped things level again
-  // (see `onPointerLeave` below, now gone) — a card that never actually
-  // held still. Touch never had the hover half of that problem (a touch
-  // pointer only exists while the finger is down), but it still isn't
-  // "smooth" for a *held* drag to reset the instant a finger drifts a few
-  // pixels past the card's own edge, which is exactly what a real touch on
-  // a card this size does often enough to notice.
-  const dragging = useRef(false)
-
-  // The frame's own box, read once per drag rather than on every single
-  // pointermove. A rect this size only ever changes from a resize/rotate or
-  // the one-time enter animation settling, never from the drag itself — the
-  // frame doesn't move or resize while being tilted — so caching it and only
-  // refreshing on `resize` (plus once more at the moment a drag starts, to
-  // catch anything a resize event alone wouldn't, like the enter transition
-  // still finishing) trades a `getBoundingClientRect` forced layout on every
-  // move for one on resize and one per drag.
-  const rectRef = useRef<DOMRect | null>(null)
-  const refreshRect = () => {
-    rectRef.current = frameRef.current?.getBoundingClientRect() ?? null
-  }
-  useEffect(() => {
-    refreshRect()
-    window.addEventListener('resize', refreshRect)
-    return () => window.removeEventListener('resize', refreshRect)
-  }, [])
-
-  // Touch and a held mouse button are the only things that turn the card.
-  // There is deliberately no `deviceorientation` listener: driving the same
-  // tilt from the gyroscope meant a card could turn on its own while you
-  // were looking at it.
-  const track = (e: React.PointerEvent) => {
-    if (reduced.current || !dragging.current) return
-    const r = rectRef.current
-    if (!r) return
-    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge —
-    // each axis clamped independently, so a corner drag (both near their
-    // own ±1 at once) reaches close to MAX_TILT on rotateX *and* rotateY
-    // together rather than sharing one combined budget. Pointer capture is
-    // what lets the finger carry on past the card's own edge and simply
-    // hold each axis at its own ±1 instead of reading some undefined,
-    // ever-growing value out past the card.
-    px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
-    py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
-  }
-
-  const level = () => {
-    px.set(0)
-    py.set(0)
-  }
 
   /*
    * The scrim closes on a tap, not on any click.
@@ -371,17 +192,17 @@ function Viewer({
       aria-label={card.name}
     >
       {/*
-        Locked. This was a `.scroll-y`, and while the card itself carries
-        touch-action: none, a drag beginning on the padding beside it — or
-        continuing past its edge — still moved the whole screen. Tilting a card
-        should never shift the thing being tilted, so the column does not
-        scroll at all and the contents are sized to fit instead.
+        Locked. This was a `.scroll-y`, but a drag beginning on the padding
+        beside the card — or continuing past its edge — still moved the
+        whole screen. A swipe between cards should never shift the thing
+        being swiped, so the column does not scroll at all and the contents
+        are sized to fit instead.
 
         No `stopPropagation` here on purpose — closing on a tap anywhere,
         card included, is the whole point now that there's no close button.
-        It's still safe for the tilt gesture: `closeIfTap` on the scrim only
-        fires when the pointer barely moved, so a real drag that turns the
-        card in 3D never closes it, only a plain tap does.
+        It's still safe for the swipe gesture: `closeIfTap` on the scrim
+        only fires when the pointer barely moved, so a real drag never
+        closes it, only a plain tap does.
       */}
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pt-safe pb-6 gap-1 overflow-hidden">
         {/*
@@ -391,57 +212,30 @@ function Viewer({
          * full 300px; a short one gets a smaller card with everything still on
          * screen and nothing scrolling. 63/88 is the card's own ratio, so the
          * height bound converts cleanly into a width.
-         *
-         * The padding is tilt clearance: the lifted shadow reaches 48px
-         * further out than the card itself.
          */}
         <motion.div
-          ref={frameRef}
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // Perspective is back, on request, matching a reference
-            // implementation's settings: MAX_TILT 25° on both axes with no
-            // shared corner budget, real keystone included. This reopens
-            // exactly the "opposite corners stretch" failure mode the last
-            // several fixes existed to close — a corner drag can now reach
-            // close to 25° on rotateX *and* rotateY at once, pushed through
-            // a real vanishing point, which is a materially stronger
-            // distortion than anything that drew that complaint before. The
-            // reference didn't specify a distance (its own perspective lives
-            // on a CSS rule this session never saw); 650px is a middle
-            // value, not a verified-safe one.
-            perspective: '650px',
             // Without this a vertical drag on the card would scroll an ancestor
-            // instead of turning the card.
+            // instead of registering as a swipe.
             touchAction: 'none',
           }}
           initial={{ scale: 0.82, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-          onPointerMove={track}
-          // Capture, so a drag keeps turning the card after it leaves the
-          // card's own bounds instead of stopping dead at the edge.
-          onPointerDown={(e) => {
-            dragging.current = true
-            refreshRect()
-            e.currentTarget.setPointerCapture(e.pointerId)
-            track(e)
-          }}
+          // Capture, so a drag that ends past the card's own bounds still
+          // fires this element's own `onPointerUp` rather than nothing.
+          onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
           onPointerUp={(e) => {
-            dragging.current = false
             e.currentTarget.releasePointerCapture(e.pointerId)
-            level()
             // A swipe is read from where the finger ended up relative to
             // where it went down (`down`, set by the scrim's own
             // `onPointerDown` below, which this bubbles up to before this
             // handler ever runs) — not a drag translation followed the
-            // whole way, the same "read the gesture at the end" shape the
-            // tilt's own tap-vs-turn split already uses. Clearly sideways
-            // (never mind a diagonal tilt-drag) and past a real travel
-            // distance is what tells a swipe from a tilt that happened to
-            // end near an edge.
+            // whole way. Clearly sideways and past a real travel distance is
+            // what tells a swipe from an incidental drag.
             if (!canStepBack && !canStepForward) return
             const dx = e.clientX - down.current.x
             const dy = e.clientY - down.current.y
@@ -450,15 +244,6 @@ function Viewer({
               // the same direction a photo gallery or a page-turn reads in.
               stepWithDirection(dx < 0 ? 1 : -1)
             }
-          }}
-          // No `onPointerLeave` any more — see `dragging` above for why a
-          // drag that carries past the card's edge should hold its tilt
-          // rather than reset it. `onPointerCancel` is the one genuine
-          // interruption left (the OS taking the gesture for its own
-          // purposes mid-drag), and that still snaps back to level.
-          onPointerCancel={() => {
-            dragging.current = false
-            level()
           }}
         >
           {/*
@@ -471,14 +256,6 @@ function Viewer({
           */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '63 / 88' }}>
             {/*
-              The custom properties ride the motion element, not the Card.
-              framer-motion only subscribes a motion value on a component it
-              owns, and Card is a plain function that spreads `style` onto an
-              article — handed motion values there, React stringified them and
-              the rim sat frozen at its rest angle. Set here they inherit down
-              to the rim and the sheen, which is what `inherits: true` on each
-              @property is for.
-
               Keyed on the card's own id: framer only plays enter/exit for an
               element it sees replaced, not one that merely got new props, so
               swapping the id is what turns "the card changed" into an actual
@@ -491,19 +268,7 @@ function Viewer({
               <motion.div
                 key={card.id}
                 custom={swipeDir}
-                style={
-                  {
-                    position: 'absolute',
-                    inset: 0,
-                    rotateX,
-                    rotateY,
-                    transformStyle: 'preserve-3d',
-                    '--holo-angle': holoAngle,
-                    '--holo-opacity': holoOpacity,
-                    '--rim-base': rimBase,
-                    '--rim-glint': glint,
-                  } as React.ComponentProps<typeof motion.div>['style']
-                }
+                style={{ position: 'absolute', inset: 0 }}
                 variants={SWIPE_VARIANTS}
                 initial="enter"
                 animate="center"
@@ -576,5 +341,3 @@ function Viewer({
     </motion.div>
   )
 }
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
