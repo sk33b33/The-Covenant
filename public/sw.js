@@ -36,7 +36,7 @@
  * is what removing the art was supposed to do.
  */
 
-const VERSION = 'covenant-v5'
+const VERSION = 'covenant-v6'
 const SHELL = `${VERSION}-shell`
 
 /*
