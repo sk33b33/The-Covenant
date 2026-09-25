@@ -1,13 +1,12 @@
 /*
  * The booster pack wrapper.
  *
- * One photograph, shared by every Genesis pack, rather than three procedurally
- * drawn variants. What told the packs apart on a real shelf was never the
- * wrapper stock — it was the name struck across the middle of it. The name
- * here lands in the exact band the photograph already left plain for it,
- * measured off the source image: 63.2% to 68.4% of the height clears the tree
- * medallion's finial above it and the stat panel's border below it, on every
- * pack, at every size.
+ * Each pack has its own dedicated photograph now, but all three come from
+ * the same shoot and leave the same band blank for a name to land in. What
+ * tells the packs apart is that name, not the wrapper stock underneath it.
+ * The band is measured off the source art: 67% to 77% of the height clears
+ * "Card Pack" above it and the "Collect · Battle · Trade · Win" line below
+ * it, on every pack, at every size.
  *
  * The photo's studio backdrop is cut out (see scripts/cutout-pack.py), so the
  * wrapper is a real silhouette rather than a rectangle — there is nothing
@@ -43,29 +42,28 @@
   z-index: 0;
   left: 8%;
   right: 8%;
-  top: 63.2%;
-  height: 5.2%;
+  top: 67%;
+  height: 10%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1.8cqw;
 }
 
-/* A faint pool of colour under the name, tinted per pack theme — the same
+/* A faint wash of colour under the name, tinted per pack theme — the same
    role a coloured foil stamp would play on a real wrapper shared across a
-   set. It sits behind the gems and the name, not tinting the photo itself. */
+   set. It sits behind the gems and the name, not tinting the photo itself.
+   Light on purpose: the band it sits in is genuinely blank leather now (no
+   baked label to cover the way an earlier shared shot had), so this only
+   ever needs to add a little colour, never to darken the band enough to
+   hide something underneath it — that darkening was what read as a flat
+   grey smudge on a light colourway. Legibility for the name itself comes
+   from its own drop-shadow below, not from pooling shadow behind it. */
 .cov-pack__glow {
   position: absolute;
   z-index: -1;
   inset: 0;
-  background:
-    radial-gradient(ellipse 58% 130% at 50% 50%, var(--pack-glow, transparent) 0%, transparent 75%),
-    radial-gradient(
-      ellipse 60% 100% at 50% 50%,
-      rgba(10, 7, 4, 0.88) 0%,
-      rgba(10, 7, 4, 0.58) 58%,
-      transparent 100%
-    );
+  background: radial-gradient(ellipse 58% 130% at 50% 50%, var(--pack-glow, transparent) 0%, transparent 75%);
 }
 
 .cov-pack__name {
@@ -74,6 +72,12 @@
   font-size: 7.6cqw;
   letter-spacing: 0.1em;
   white-space: nowrap;
+  /* The baked "Card Pack" above it is struck with a real bevel and shadow;
+     the gold-leaf clip this shares with it is flat by comparison without
+     some lift of its own. A drop-shadow (not a text-shadow, which can't
+     cross a background-clip) is what the same trick elsewhere in the game
+     — the turn banner's own gold-leaf plate — already uses for this. */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .cov-pack__gem {
