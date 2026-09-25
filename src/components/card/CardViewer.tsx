@@ -47,9 +47,28 @@ import { useSettings } from '@/store/settings'
  * Mounted once, in App. Everything else opens it through the peek store.
  */
 
-/** Degrees at the card's edge. Pronounced enough that the card visibly turns
- *  in space and the rim sweeps light across its whole travel. */
-const MAX_TILT = 22
+/** Degrees at the card's edge for a left/right drag. Pronounced enough that
+ *  the card visibly turns in space and the rim sweeps light across its
+ *  whole travel. */
+const MAX_TILT_Y = 22
+
+/**
+ * Degrees at the card's edge for an up/down drag — smaller than
+ * `MAX_TILT_Y`, in the card's own 63:88 ratio, not the same angle.
+ *
+ * The two axes don't produce the same amount of foreshortening for the
+ * same angle: rotateX swings the card's far *height* toward and away from
+ * the viewer, rotateY its far *width*, and the card is taller than it is
+ * wide. The same angle on the taller dimension moves its corners through
+ * more depth, so it was projecting a visibly bigger, wider-looking card at
+ * a pure up/down drag than the same-strength left/right drag did — the
+ * whole card's silhouette pulsing in size as a drag swept around it in a
+ * circle, not just the usual near/far corner difference. Scaling this axis
+ * down by the card's own width/height ratio (63/88) equalizes how much
+ * depth either axis reaches at its own full tilt, so the outline stays
+ * close to the same size whichever direction the drag comes from.
+ */
+const MAX_TILT_X = MAX_TILT_Y * (63 / 88)
 
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
@@ -172,8 +191,8 @@ function Viewer({
    * toward the viewer instead means negating both from what a plain
    * `(px, py)` reading would otherwise give.
    */
-  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
+  const rotateY = useTransform(sx, (v) => -v * MAX_TILT_Y)
+  const rotateX = useTransform(sy, (v) => v * MAX_TILT_X)
 
   /*
    * The light is derived from the rotation, not from the pointer.
@@ -295,14 +314,15 @@ function Viewer({
     if (reduced.current || !dragging.current) return
     const r = rectRef.current
     if (!r) return
-    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge.
+    // -1 to 1 across the card, so each axis's own max reads as degrees at
+    // the edge.
     const x = ((e.clientX - r.left) / r.width - 0.5) * 2
     const y = ((e.clientY - r.top) / r.height - 0.5) * 2
     // Clamped as one vector, not as two independent axes: rotateX and
     // rotateY are each driven straight off this pair and composed by
     // framer as two separate CSS rotations, so a corner — where both
     // components are near their own max at once — was quietly getting a
-    // full MAX_TILT turn on *both* axes together, one on top of the
+    // full tilt on *both* axes together, one on top of the
     // other. Every horizontal plate on the card's own face (the
     // nameplate, each attack row, the footer) is a straight line running
     // through that rotateX turn, and stacking it under a near-full
@@ -417,7 +437,7 @@ function Viewer({
             // feature's history to guarantee zero keystone, but that traded
             // away the one cue that makes the tilt look three-dimensional at
             // all: with no perspective the card only ever scales, it never
-            // convincingly leans. 600px plus MAX_TILT's 22° gives the near
+            // convincingly leans. 600px plus MAX_TILT_Y's 22° gives the near
             // and far edges roughly a 19% difference at full tilt — visibly a
             // card turning, not merely narrowing.
             //
@@ -429,8 +449,8 @@ function Viewer({
             // corner stops reading as "further away" and starts reading as
             // "stretched" — which is exactly what got reported once it went
             // past ~27% — while the corner fix below still caps a diagonal
-            // drag's combined rotation at MAX_TILT rather than letting it
-            // reach that angle on both axes at once.
+            // drag's combined rotation at each axis's own max rather than
+            // letting it reach that angle on both axes at once.
             perspective: '600px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
