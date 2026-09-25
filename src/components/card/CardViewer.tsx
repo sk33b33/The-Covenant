@@ -400,20 +400,20 @@ function Viewer({
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // Deliberately no `perspective` here. A perspective context is
-            // what makes rotateX/rotateY foreshorten — the near edge of the
-            // rotated plane projects wider than the far one, which is what
-            // every round of "the card is warping" in this feature's history
-            // turned out to be, no matter how far out the vanishing point was
-            // pushed: keystoning at 1100px, keystoning (just less of it) at
-            // 4800px. Without a perspective, the browser projects the
-            // rotation orthographically instead — every point's screen
-            // position scales by the same cos(angle) regardless of depth, so
-            // the card can only ever come out as a rectangle, uniformly
-            // narrower at a steeper angle, never a trapezoid. That is a
-            // guarantee from how the projection math works, not a matter of
-            // tuning a distance far enough away that the warp becomes too
-            // small to see.
+            // Perspective foreshortening — the near edge of the rotated card
+            // projecting a little wider than the far edge — is what actually
+            // reads as "a solid card leaning toward you" rather than "a flat
+            // picture getting narrower". It was dropped for a stretch in this
+            // feature's history to guarantee zero keystone, but that traded
+            // away the one cue that makes the tilt look three-dimensional at
+            // all: with no perspective the card only ever scales, it never
+            // convincingly leans. Back at 1100px, the same distance this
+            // shipped at for its longest untroubled stretch — now paired with
+            // the corner fix below (a diagonal drag no longer reaches a full
+            // MAX_TILT on *both* axes at once), the keystone at any angle
+            // this can actually reach stays visibly a card turning, not a
+            // trapezoid.
+            perspective: '1100px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
