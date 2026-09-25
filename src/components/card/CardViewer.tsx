@@ -189,9 +189,19 @@ function Viewer({
   // no sheen at all and read as no different from the resting card. The
   // rim's own highlight (below) already took both axes; the sheen just
   // hadn't caught up.
+  //
+  // Equal weight on both axes (2.6 and 2.6) was the wrong way to fix that:
+  // rotateY and rotateX can carry opposite signs — a bottom-right or
+  // top-left corner drag is exactly that — and with matching coefficients
+  // the two terms partially cancel instead of adding, so the corners along
+  // that diagonal barely moved the sheen at all while the other diagonal
+  // (top-right, bottom-left) swept twice as far as intended. Uneven
+  // coefficients, the same idea rimBase already uses below, mean no
+  // direction cancels: every corner still gets a real, visible sweep, just
+  // not identical in size to its neighbor.
   const holoAngle = useMotionTemplate`${useTransform(
     [rotateY, rotateX] as const,
-    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 2.6,
+    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 1,
   )}deg`
   const rimBase = useMotionTemplate`${useTransform(
     [rotateY, rotateX] as const,
