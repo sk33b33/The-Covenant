@@ -184,7 +184,15 @@ function Viewer({
    * Taking the rotation as the input makes the two impossible to desynchronise:
    * whichever way the card faces, the sheen and the rim's specular follow it.
    */
-  const holoAngle = useMotionTemplate`${useTransform(rotateY, (v) => 115 + v * 2.6)}deg`
+  // Both axes feed the angle, not just rotateY — a pure up/down drag used to
+  // leave this untouched, so tilting the card toward or away from you swept
+  // no sheen at all and read as no different from the resting card. The
+  // rim's own highlight (below) already took both axes; the sheen just
+  // hadn't caught up.
+  const holoAngle = useMotionTemplate`${useTransform(
+    [rotateY, rotateX] as const,
+    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 2.6,
+  )}deg`
   const rimBase = useMotionTemplate`${useTransform(
     [rotateY, rotateX] as const,
     ([y = 0, x = 0]: number[]) => 218 + y * 1.9 + x,
