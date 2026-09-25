@@ -27,6 +27,8 @@ export function Menu() {
 
   const [theme, setTheme] = useState<Theme>(resolveTheme)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmExit, setConfirmExit] = useState(false)
+  const [exitBlocked, setExitBlocked] = useState(false)
   const reducedMotion = useSettings((s) => s.reducedMotion)
   const setReducedMotion = useSettings((s) => s.setReducedMotion)
   const sfxMuted = useSettings((s) => s.sfxMuted)
@@ -45,6 +47,18 @@ export function Menu() {
     // A full reload is the only way to be sure every store is rebuilt from
     // the now-empty save rather than keeping stale state in memory.
     location.reload()
+  }
+
+  // There is no real "quit" for a page running in a browser tab —
+  // window.close() only succeeds on a window script opened itself, which a
+  // tab the player navigated to (or a PWA launched from a home-screen icon)
+  // never is. Calling it anyway is harmless (browsers just ignore it rather
+  // than throwing), so it's tried on the chance this happens to be one of
+  // the contexts that allows it, and the fallback message covers every case
+  // where it silently didn't.
+  const exit = () => {
+    window.close()
+    setExitBlocked(true)
   }
 
   return (
@@ -227,6 +241,28 @@ export function Menu() {
           ) : (
             <Button variant="sunk" className="mt-3 !py-2.5 text-sm" onClick={() => setConfirmReset(true)}>
               Erase all progress
+            </Button>
+          )}
+        </Panel>
+
+        {/* ------------------------------------------------------------ exit */}
+        <Panel className="p-4 mt-3">
+          {exitBlocked ? (
+            <p className="text-xs text-ink-muted leading-snug text-center">
+              Your progress is saved — you can close this tab or app now.
+            </p>
+          ) : confirmExit ? (
+            <div className="flex gap-2">
+              <Button className="flex-1 !py-2.5 text-sm" onClick={() => setConfirmExit(false)}>
+                Stay
+              </Button>
+              <Button className="flex-1 !py-2.5 text-sm" onClick={exit}>
+                Exit Game
+              </Button>
+            </div>
+          ) : (
+            <Button variant="sunk" className="!py-2.5 text-sm" onClick={() => setConfirmExit(true)}>
+              Exit Game
             </Button>
           )}
         </Panel>
