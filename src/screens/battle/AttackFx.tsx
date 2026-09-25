@@ -180,7 +180,7 @@ const THEME: Record<EnergyType, ElementTheme> = {
  * needs to undo — `Bolt` and everything it uses are additive, nothing
  * about the original per-element heads was changed).
  */
-const LIGHTNING_PREVIEW = true
+const LIGHTNING_PREVIEW = false
 
 /** Overall size/glow multiplier for the whole effect — the "how amplified"
  *  dial. Tier multiplies on top of this, so a knockout is bigger still. */
