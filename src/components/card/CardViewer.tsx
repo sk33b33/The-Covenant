@@ -49,7 +49,7 @@ import { useSettings } from '@/store/settings'
 
 /** Degrees at the card's edge. Pronounced enough that the card visibly turns
  *  in space and the rim sweeps light across its whole travel. */
-const MAX_TILT = 22
+const MAX_TILT = 26
 
 /** Tight and fast: a smoothing filter on a value that already tracks the
  *  thumb, not an animation chasing it. */
@@ -417,15 +417,15 @@ function Viewer({
             // feature's history to guarantee zero keystone, but that traded
             // away the one cue that makes the tilt look three-dimensional at
             // all: with no perspective the card only ever scales, it never
-            // convincingly leans. 600px plus MAX_TILT's 22° gives the near
-            // and far edges roughly a 19% difference at full tilt — visibly a
+            // convincingly leans. 520px plus MAX_TILT's 26° gives the near
+            // and far edges roughly a 27% difference at full tilt — visibly a
             // card turning, not merely narrowing — while the corner fix below
             // still caps a diagonal drag's combined rotation at that same
-            // 22° instead of letting a corner reach both axes' full angle at
+            // 26° instead of letting a corner reach both axes' full angle at
             // once, which is what kept this from reading as exaggerated or
             // warped at the smaller, less dramatic settings this shipped
             // with before.
-            perspective: '600px',
+            perspective: '520px',
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
