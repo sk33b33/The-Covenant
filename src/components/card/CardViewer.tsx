@@ -430,28 +430,23 @@ function Viewer({
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // Perspective foreshortening — the near edge of the rotated card
-            // projecting taller/wider than the far edge — is what actually
-            // reads as "a solid card leaning toward you" rather than "a flat
-            // picture getting narrower". It was dropped for a stretch in this
-            // feature's history to guarantee zero keystone, but that traded
-            // away the one cue that makes the tilt look three-dimensional at
-            // all: with no perspective the card only ever scales, it never
-            // convincingly leans. 600px plus MAX_TILT_Y's 22° gives the near
-            // and far edges roughly a 19% difference at full tilt — visibly a
-            // card turning, not merely narrowing.
-            //
-            // This was pushed further twice (26°/520px, then briefly even
-            // closer) chasing "more 3D", but that direction has a hard
-            // ceiling: the near corner growing and the far corner shrinking
-            // are the same effect, not two separate knobs, so more of one is
-            // always more of the other. Past roughly this point the far
-            // corner stops reading as "further away" and starts reading as
-            // "stretched" — which is exactly what got reported once it went
-            // past ~27% — while the corner fix below still caps a diagonal
-            // drag's combined rotation at each axis's own max rather than
-            // letting it reach that angle on both axes at once.
-            perspective: '600px',
+            // Deliberately no `perspective` here, again, and this time for
+            // good — see git history for the several rounds of tuning a
+            // vanishing point (1100px, 700px, 600px, 520px) in between. The
+            // near corner of a tilted card growing and the far corner
+            // shrinking are not two effects, they're the *same* effect —
+            // perspective foreshortening — and it's also exactly what
+            // "stretching" means. Every non-zero perspective this shipped
+            // with eventually drew that complaint, at every strength tried;
+            // there's no distance where the card visibly turns in 3D and
+            // the far corner *doesn't* look smaller than the near one. With
+            // no perspective, the browser projects the rotation
+            // orthographically: every point scales by the same cos(angle)
+            // regardless of depth, so the card is a rectangle at every
+            // angle, guaranteed by the projection math rather than tuned
+            // small enough not to notice. The sheen and rim highlight below
+            // (already reading both axes) carry the "this is turning, not
+            // just scaling" read instead of the geometry doing it.
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
