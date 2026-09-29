@@ -300,13 +300,9 @@
 
 /*
  * Full art: the art fills the whole face instead of sitting in its own
- * inset window, the way a chase rarity's alternate print usually works.
- * Nothing else changes — the nameplate, rules box and footer are already
- * opaque parchment plates, so they stay perfectly legible floating
- * directly over the art exactly as they're drawn today; only the window's
- * own border and inset shadow (which would now cut a rectangle out of the
- * full-bleed art) go away, along with its own crop, which the art itself
- * calls the frame.
+ * inset window, and the nameplate and rules box lose their own parchment
+ * plates too — the text that was printed on them stays, floating directly
+ * on the art, the way an actual full-art chase print reads.
  *
  * `z-index: -1` rather than reordering the markup: the art still has to
  * paint under the nameplate above it and the rules box below it, both of
@@ -332,6 +328,66 @@
    placeholder earns being sized for that rather than left at window scale. */
 .cov-card--full-art .cov-card__placeholder-initial {
   font-size: 58cqw;
+}
+
+/*
+ * Every colour below the art window was chosen to sit on a light parchment
+ * plate — dark ink on cream. Drop the plates and that same ink disappears
+ * into whatever the art happens to be behind it, so full art gets the
+ * inverse: light gold-leaf ink with a dark contact shadow doing the work
+ * the parchment used to, close and tight so it holds up against a bright
+ * patch of art the way it already does against a dark one. One shared
+ * shadow recipe (a hard near-black edge, then a softer wider one) rather
+ * than one per element, so nothing here can drift out of sync with the
+ * rest as the set grows.
+ */
+.cov-card--full-art .cov-card__nameplate,
+.cov-card--full-art .cov-card__body {
+  background: none;
+  box-shadow: none;
+}
+
+.cov-card--full-art .cov-card__stage,
+.cov-card--full-art .cov-card__name,
+.cov-card--full-art .cov-card__hp,
+.cov-card--full-art .cov-card__attack-name,
+.cov-card--full-art .cov-card__attack-text,
+.cov-card--full-art .cov-card__attack-damage,
+.cov-card--full-art .cov-card__rules,
+.cov-card--full-art .cov-card__flavor,
+.cov-card--full-art .cov-card__miracle-text {
+  text-shadow:
+    0 0.15cqw 0.3cqw rgba(0, 0, 0, 0.9),
+    0 0.5cqw 1.4cqw rgba(0, 0, 0, 0.75);
+}
+
+.cov-card--full-art .cov-card__stage {
+  color: rgba(240, 220, 188, 0.85);
+}
+.cov-card--full-art .cov-card__name {
+  color: #f6e6bf;
+}
+.cov-card--full-art .cov-card__hp {
+  color: #f6e6bf;
+}
+.cov-card--full-art .cov-card__attack-name {
+  color: #f6e6bf;
+}
+.cov-card--full-art .cov-card__attack-text {
+  color: rgba(240, 220, 188, 0.85);
+}
+.cov-card--full-art .cov-card__attack-damage {
+  color: #f6e6bf;
+}
+.cov-card--full-art .cov-card__rules {
+  color: rgba(240, 220, 188, 0.92);
+}
+.cov-card--full-art .cov-card__flavor {
+  color: rgba(240, 220, 188, 0.72);
+  border-top-color: rgba(240, 220, 188, 0.3);
+}
+.cov-card--full-art .cov-card__miracle-text {
+  color: #f6e6bf;
 }
 
 .cov-card__art img {
