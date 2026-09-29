@@ -73,8 +73,17 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
   // Only Anointed Figures carry one; everything else gets null here.
   const miracle = miracleFor(card.id)
 
-  const nameClass =
-    card.name.length > 20
+  // A Figure's nameplate always carries the type orb now (see below), which
+  // eats into the name's own width, so a Figure needs to step down sooner
+  // than a Covenant or Relic — whose nameplate never carries one — does at
+  // the same name length.
+  const nameClass = figure
+    ? card.name.length > 17
+      ? 'cov-card__name--longer'
+      : card.name.length > 10
+        ? 'cov-card__name--long'
+        : ''
+    : card.name.length > 20
       ? 'cov-card__name--longer'
       : card.name.length > 13
         ? 'cov-card__name--long'
@@ -118,6 +127,17 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
             <span className="cov-card__hp-value">{figure.hp}</span>
           </span>
         )}
+
+        {/* Only a Figure has a type to show — a Covenant or Relic has none
+            of its own, and the fallback `type` above exists only so the
+            rest of the frame (the rim's metal, the placeholder's glow) has
+            something to read; showing an orb for it would claim an energy
+            type these cards don't actually have. */}
+        {figure && (
+          <span className="cov-card__orb">
+            <EnergyOrb type={type} size="7.4cqw" />
+          </span>
+        )}
       </header>
 
       {/* --------------------------------------------------------- artwork */}
@@ -140,11 +160,6 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
             onError={() => setArtFailed(true)}
           />
         )}
-      </div>
-
-      {/* -------------------------------------------------------- type orb */}
-      <div className="cov-card__orb">
-        <EnergyOrb type={type} size="11.5cqw" />
       </div>
 
       {/* --------------------------------------------------------- rules */}

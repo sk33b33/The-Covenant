@@ -453,22 +453,27 @@
 
 /* -------------------------------------------------------------- type orb */
 
+/*
+ * Used to straddle the art/text seam at 17cqw across — big enough to read
+ * as a second focal point competing with the art above it rather than a
+ * label. Moved into the nameplate, beside the HP it keeps company with,
+ * and sized to sit comfortably inside that row instead of dominating it —
+ * one ring, not the old double one, since a medallion-sized bevel has
+ * nothing to sit on at this scale. No separate positioning for a miracle
+ * card's taller body or a compact card's hidden one either: both still
+ * have the nameplate itself, which is all this now depends on.
+ */
 .cov-card__orb {
-  position: absolute;
-  top: 70.6cqw;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 17cqw;
-  height: 17cqw;
+  flex: none;
   display: grid;
   place-items: center;
+  width: 8.4cqw;
+  height: 8.4cqw;
   border-radius: 50%;
   background: radial-gradient(circle at 36% 30%, #3a3020, #15100a 78%);
   box-shadow:
-    0 0 0 0.55cqw rgba(176, 135, 81, 1),
-    0 0 0 0.95cqw rgba(20, 14, 8, 1),
-    0 0.8cqw 1.8cqw rgba(0, 0, 0, 0.6);
-  z-index: 2;
+    0 0 0 0.4cqw rgba(176, 135, 81, 1),
+    0 0.3cqw 0.7cqw rgba(0, 0, 0, 0.5);
 }
 
 /* ------------------------------------------------------------- text box */
@@ -491,10 +496,7 @@
   left: 5cqw;
   width: 90cqw;
   height: 42cqw;
-  /* Top padding clears the type orb, which straddles the art/text seam as it
-   * does on the supplied renders. Without it a long first attack name runs
-   * underneath the orb. */
-  padding: 5.4cqw 3cqw 2.2cqw;
+  padding: 3cqw 3cqw 2.2cqw;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -520,24 +522,13 @@
    * at the sizes above it did not fit: the block overflowed a centre-justified
    * box in both directions at once, printing the badge over the artwork and
    * the last attack through the footer. Neither the plate's gap nor the box's
-   * top padding can give any of that back — the first clears the badge's glow,
-   * the second the type orb — so the room comes half from the box growing
-   * further up into the art and half from the type below stepping down. */
+   * own top padding (which the badge's glow already needs, to avoid catching
+   * on the box's rounded corner) can give any of that back, so the room comes
+   * half from the box growing further up into the art and half from the type
+   * below stepping down. */
   gap: 1.25cqw;
   --atk-name: 4.5cqw;
   --atk-text: 3.15cqw;
-}
-
-/* The orb straddles the art/text seam, and the seam just moved: without this
- * it stays where the old one was and lands squarely on the badge, covering
- * the middle of the word. It travels exactly as far as the box's top edge
- * did, holding the same 10.9cqw above it, so the orb goes on sitting where
- * it always did relative to the box below — which is also what the body's
- * own top padding is sized to clear.
- * Declared above the compact rule further down, which needs to keep winning
- * for a compact card whose body is not rendered at all. */
-.cov-card--miracle .cov-card__orb {
-  top: 52.1cqw;
 }
 
 /*
@@ -777,10 +768,6 @@
 
 .cov-card--compact .cov-card__art {
   height: 104cqw;
-}
-
-.cov-card--compact .cov-card__orb {
-  top: 112.6cqw;
 }
 
 /* The rim is the one thing that gets proportionally *heavier* when small. At a
