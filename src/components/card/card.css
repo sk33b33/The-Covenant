@@ -342,7 +342,15 @@
  * rest as the set grows.
  */
 .cov-card--full-art .cov-card__nameplate,
-.cov-card--full-art .cov-card__body {
+.cov-card--full-art .cov-card__body,
+/* An Anointed card's own nameplate rule (further down, for the halo/frame
+   treatment every Anointed card gets) sets a background at this same
+   specificity and comes later in the sheet, so it was winning the cascade
+   and leaving the plate visible on Jesus Carrying Cross specifically,
+   which is Anointed. Three classes on one selector outranks that two-class
+   rule regardless of source order, rather than depending on staying below
+   it in the file. */
+.cov-card--full-art.cov-card--anointed .cov-card__nameplate {
   background: none;
   box-shadow: none;
 }
