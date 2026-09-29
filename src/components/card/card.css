@@ -298,6 +298,42 @@
     inset 0 0 3cqw rgba(0, 0, 0, 0.6);
 }
 
+/*
+ * Full art: the art fills the whole face instead of sitting in its own
+ * inset window, the way a chase rarity's alternate print usually works.
+ * Nothing else changes — the nameplate, rules box and footer are already
+ * opaque parchment plates, so they stay perfectly legible floating
+ * directly over the art exactly as they're drawn today; only the window's
+ * own border and inset shadow (which would now cut a rectangle out of the
+ * full-bleed art) go away, along with its own crop, which the art itself
+ * calls the frame.
+ *
+ * `z-index: -1` rather than reordering the markup: the art still has to
+ * paint under the nameplate above it and the rules box below it, both of
+ * which come earlier in source order once the art is no longer confined
+ * between them, and `.cov-card`'s own `isolation: isolate` keeps that
+ * negative index from ever leaking past this one card.
+ */
+.cov-card--full-art .cov-card__art {
+  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 4.5cqw;
+  box-shadow: none;
+  z-index: -1;
+}
+
+/* The placeholder's initial is sized off the card's own width (cqw), which
+   reads fine in the small art window but leaves it looking lost once that
+   window is the entire, much taller face. Full art is the one context
+   where a card is genuinely expected to be judged on its art alone, so the
+   placeholder earns being sized for that rather than left at window scale. */
+.cov-card--full-art .cov-card__placeholder-initial {
+  font-size: 58cqw;
+}
+
 .cov-card__art img {
   width: 100%;
   height: 100%;

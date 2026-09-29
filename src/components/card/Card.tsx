@@ -51,12 +51,17 @@ interface Props {
   noHolo?: boolean
   /** On the battle mat: hides the printed HP, which the board draws live. */
   inPlay?: boolean
+  /** The art fills the whole face instead of its own inset window — an
+   *  alternate print for a rarity worth one, not a different card. Every
+   *  other rule (HP, attacks, rarity, holo) stays exactly what the data
+   *  says; only the art's own frame goes away. */
+  fullArt?: boolean
   className?: string
   /** Inline style hook, used by the detail view's tilt. */
   style?: React.CSSProperties
 }
 
-export function Card({ card, compact, noHolo, inPlay, className, style }: Props) {
+export function Card({ card, compact, noHolo, inPlay, fullArt, className, style }: Props) {
   const [artFailed, setArtFailed] = useState(false)
 
   const figure = isFigure(card) ? card : null
@@ -84,6 +89,7 @@ export function Card({ card, compact, noHolo, inPlay, className, style }: Props)
         holo && 'cov-card--holo',
         compact && 'cov-card--compact',
         inPlay && 'cov-card--in-play',
+        fullArt && 'cov-card--full-art',
         className,
       )}
       style={style}
