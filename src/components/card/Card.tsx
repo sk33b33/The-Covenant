@@ -54,7 +54,13 @@ interface Props {
   /** The art fills the whole face instead of its own inset window — an
    *  alternate print for a rarity worth one, not a different card. Every
    *  other rule (HP, attacks, rarity, holo) stays exactly what the data
-   *  says; only the art's own frame goes away. */
+   *  says; only the art's own frame goes away.
+   *
+   *  Defaults to whether the card is Anointed — every Anointed Figure gets
+   *  the full-art print everywhere in the app with no per-caller wiring,
+   *  the same way `holo` already follows rarity on its own. Only pass this
+   *  to override that default (a preview, a future non-Anointed alt print),
+   *  not to turn it on for an Anointed card, which already gets it. */
   fullArt?: boolean
   className?: string
   /** Inline style hook, used by the detail view's tilt. */
@@ -67,6 +73,7 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
   const figure = isFigure(card) ? card : null
   const anointed = figure?.anointed ?? false
   const holo = !noHolo && HOLO_RARITIES.has(card.rarity)
+  const fullArtCard = fullArt ?? anointed
 
   // Non-figures have no energy type of their own; they take the frame's gold.
   const type = figure?.type ?? 'light'
@@ -74,15 +81,20 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
   const miracle = miracleFor(card.id)
 
   // A Figure's nameplate always carries the type orb now (see below), which
-  // eats into the name's own width, so a Figure needs to step down sooner
-  // than a Covenant or Relic — whose nameplate never carries one — does at
-  // the same name length.
+  // eats into the name's own width, so a Figure needs to step down sooner —
+  // and further, for its own longest names — than a Covenant or Relic
+  // (whose nameplate never carries one) does at the same length. Archangel
+  // Michael (18) was still clipping at the old 'longer' tier once the orb
+  // took its share of the row, and The Four Living Creatures (25) is
+  // longer still, hence the third tier below.
   const nameClass = figure
-    ? card.name.length > 17
-      ? 'cov-card__name--longer'
-      : card.name.length > 10
-        ? 'cov-card__name--long'
-        : ''
+    ? card.name.length > 22
+      ? 'cov-card__name--longest'
+      : card.name.length > 15
+        ? 'cov-card__name--longer'
+        : card.name.length > 10
+          ? 'cov-card__name--long'
+          : ''
     : card.name.length > 20
       ? 'cov-card__name--longer'
       : card.name.length > 13
@@ -98,7 +110,7 @@ export function Card({ card, compact, noHolo, inPlay, fullArt, className, style 
         holo && 'cov-card--holo',
         compact && 'cov-card--compact',
         inPlay && 'cov-card--in-play',
-        fullArt && 'cov-card--full-art',
+        fullArtCard && 'cov-card--full-art',
         className,
       )}
       style={style}

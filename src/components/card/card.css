@@ -260,7 +260,13 @@
   font-size: 5.2cqw;
 }
 .cov-card__name--longer {
-  font-size: 4.3cqw;
+  font-size: 4cqw;
+}
+/* A Figure's own longest names (see Card.tsx) — Archangel Michael already
+   needed a size below the old 'longer' once the type orb joined the row,
+   and The Four Living Creatures is longer still. */
+.cov-card__name--longest {
+  font-size: 3.3cqw;
 }
 
 .cov-card__hp {
