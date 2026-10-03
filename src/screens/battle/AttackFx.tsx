@@ -481,6 +481,8 @@ function Charge({
 
   return (
     <span>
+      <Sigil theme={theme} scale={scale} x={fromX} y={fromY} seconds={seconds} />
+
       {theme.wake.map((layer, layerIndex) =>
         // A little sparser than the trail it mirrors — this is a beat, not
         // the main event, and the projectile is about to spend the same
@@ -553,6 +555,107 @@ function Charge({
         transition={{ duration: seconds, ease: 'easeIn' }}
       />
     </span>
+  )
+}
+
+/**
+ * A rotating geometric rune ring, drawn under the gathering particles — an
+ * outer notched hoop and two triangles turning against each other inside it,
+ * hard-edged where every other shape in this file is a soft radial gradient.
+ * This is what makes the charge read as something *invoked* — drawn from a
+ * fixed, rule-bound working — rather than only weather being gathered in;
+ * every element gets the same circle, in its own two colours, the same way
+ * every element's `Head` below is its own shape but shares this mechanism
+ * for drawing it in.
+ *
+ * Framer centres rotation on an SVG element's own bounding box by default
+ * (no `transform-origin` fiddling needed, unlike a plain div), which is why
+ * this is built from real SVG primitives rather than the CSS-box shapes the
+ * rest of the file uses — a `clip-path` triangle can't carry its own stroked
+ * outline, since the clip cuts the border along with everything else.
+ */
+function Sigil({
+  theme,
+  scale,
+  x,
+  y,
+  seconds,
+}: {
+  theme: ElementTheme
+  scale: number
+  x: number
+  y: number
+  seconds: number
+}) {
+  const r = 58 * scale
+  const triangle = (radius: number, rot: number) =>
+    [0, 120, 240]
+      .map((a) => {
+        const rad = ((a + rot - 90) * Math.PI) / 180
+        return `${Math.cos(rad) * radius},${Math.sin(rad) * radius}`
+      })
+      .join(' ')
+  const ticks = Array.from({ length: 12 }, (_, i) => i * 30)
+
+  return (
+    <motion.svg
+      className="absolute"
+      style={{ left: x - r * 1.35, top: y - r * 1.35, width: r * 2.7, height: r * 2.7, overflow: 'visible' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: [0, 0.85, 0.7, 0] }}
+      transition={{ duration: seconds, ease: 'easeOut' }}
+    >
+      <g transform={`translate(${r * 1.35}, ${r * 1.35})`}>
+        {/* The outer ring, notched like a dial, turning one way... */}
+        <motion.g
+          initial={{ rotate: -40, scale: 0.6 }}
+          animate={{ rotate: 55, scale: 1 }}
+          transition={{ duration: seconds, ease: 'easeOut' }}
+        >
+          <circle r={r} fill="none" stroke={theme.glow} strokeWidth={1.4 * scale} opacity={0.55} />
+          {ticks.map((a) => {
+            const rad = (a * Math.PI) / 180
+            const inner = r - 6 * scale
+            const outer = r + 4 * scale
+            return (
+              <line
+                key={a}
+                x1={Math.cos(rad) * inner}
+                y1={Math.sin(rad) * inner}
+                x2={Math.cos(rad) * outer}
+                y2={Math.sin(rad) * outer}
+                stroke={theme.core}
+                strokeWidth={1.2 * scale}
+              />
+            )
+          })}
+        </motion.g>
+
+        {/* ...and two triangles turning against each other and against the
+            ring, so nothing in the whole circle shares a single axis — the
+            thing that sells it as mechanism rather than one shape spinning. */}
+        <motion.polygon
+          points={triangle(r * 0.66, 0)}
+          fill="none"
+          stroke={theme.core}
+          strokeWidth={1.6 * scale}
+          strokeLinejoin="round"
+          initial={{ rotate: -60, opacity: 0 }}
+          animate={{ rotate: 70, opacity: [0, 0.9, 0.9, 0] }}
+          transition={{ duration: seconds, ease: 'easeOut' }}
+        />
+        <motion.polygon
+          points={triangle(r * 0.66, 60)}
+          fill="none"
+          stroke={theme.glow}
+          strokeWidth={1.6 * scale}
+          strokeLinejoin="round"
+          initial={{ rotate: 60, opacity: 0 }}
+          animate={{ rotate: -70, opacity: [0, 0.9, 0.9, 0] }}
+          transition={{ duration: seconds, ease: 'easeOut' }}
+        />
+      </g>
+    </motion.svg>
   )
 }
 
