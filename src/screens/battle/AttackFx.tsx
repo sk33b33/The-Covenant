@@ -612,28 +612,47 @@ function Sigil({
           animate={{ rotate: 55, scale: 1 }}
           transition={{ duration: seconds, ease: 'easeOut' }}
         >
+          {/* Each stroke below gets an under-pass in the same colour, wider
+              and faint, the way `BoltStrand` glows a lightning strand — a
+              second, blurless halo rather than a `filter: blur`, which this
+              file's own header already explains is the thing that turns a
+              handheld's compositor into a re-rasteriser once there is more
+              than a couple on screen. There is only ever one Sigil live at a
+              time, so the doubled stroke count here costs nothing. */}
+          <circle r={r} fill="none" stroke={theme.glow} strokeWidth={5 * scale} opacity={0.35} />
           <circle r={r} fill="none" stroke={theme.glow} strokeWidth={1.4 * scale} opacity={0.55} />
           {ticks.map((a) => {
             const rad = (a * Math.PI) / 180
             const inner = r - 6 * scale
             const outer = r + 4 * scale
+            const x1 = Math.cos(rad) * inner
+            const y1 = Math.sin(rad) * inner
+            const x2 = Math.cos(rad) * outer
+            const y2 = Math.sin(rad) * outer
             return (
-              <line
-                key={a}
-                x1={Math.cos(rad) * inner}
-                y1={Math.sin(rad) * inner}
-                x2={Math.cos(rad) * outer}
-                y2={Math.sin(rad) * outer}
-                stroke={theme.core}
-                strokeWidth={1.2 * scale}
-              />
+              <g key={a}>
+                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={theme.core} strokeWidth={4 * scale} opacity={0.3} />
+                <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={theme.core} strokeWidth={1.2 * scale} />
+              </g>
             )
           })}
         </motion.g>
 
         {/* ...and two triangles turning against each other and against the
             ring, so nothing in the whole circle shares a single axis — the
-            thing that sells it as mechanism rather than one shape spinning. */}
+            thing that sells it as mechanism rather than one shape spinning.
+            Each carries the same wide, faint under-stroke as the ring above. */}
+        <motion.polygon
+          points={triangle(r * 0.66, 0)}
+          fill="none"
+          stroke={theme.core}
+          strokeWidth={5 * scale}
+          strokeLinejoin="round"
+          opacity={0.3}
+          initial={{ rotate: -60, opacity: 0 }}
+          animate={{ rotate: 70, opacity: [0, 0.4, 0.4, 0] }}
+          transition={{ duration: seconds, ease: 'easeOut' }}
+        />
         <motion.polygon
           points={triangle(r * 0.66, 0)}
           fill="none"
@@ -642,6 +661,17 @@ function Sigil({
           strokeLinejoin="round"
           initial={{ rotate: -60, opacity: 0 }}
           animate={{ rotate: 70, opacity: [0, 0.9, 0.9, 0] }}
+          transition={{ duration: seconds, ease: 'easeOut' }}
+        />
+        <motion.polygon
+          points={triangle(r * 0.66, 60)}
+          fill="none"
+          stroke={theme.glow}
+          strokeWidth={5 * scale}
+          strokeLinejoin="round"
+          opacity={0.3}
+          initial={{ rotate: 60, opacity: 0 }}
+          animate={{ rotate: -70, opacity: [0, 0.4, 0.4, 0] }}
           transition={{ duration: seconds, ease: 'easeOut' }}
         />
         <motion.polygon
