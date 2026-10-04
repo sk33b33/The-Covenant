@@ -213,6 +213,25 @@ export const ResetIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** Grid view: four equal tiles. */
+export const GridIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.6" y="3.6" width="7.4" height="7.4" rx="1.4" />
+    <rect x="13" y="3.6" width="7.4" height="7.4" rx="1.4" />
+    <rect x="3.6" y="13" width="7.4" height="7.4" rx="1.4" />
+    <rect x="13" y="13" width="7.4" height="7.4" rx="1.4" />
+  </Icon>
+)
+
+/** List view: stacked rows, each a leading mark and a bar. */
+export const ListIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 6h1.6M9 6h10.6" />
+    <path d="M4 12h1.6M9 12h10.6" />
+    <path d="M4 18h1.6M9 18h10.6" />
+  </Icon>
+)
+
 
 /* ------------------------------------------------------------- currencies */
 

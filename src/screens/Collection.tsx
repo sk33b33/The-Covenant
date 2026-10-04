@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BinderIcon, CloseIcon, SearchIcon } from '@/art/icons'
+import { BinderIcon, CloseIcon, GridIcon, ListIcon, SearchIcon } from '@/art/icons'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { PressableCard } from '@/components/card/PressableCard'
 import { usePeek } from '@/store/peek'
@@ -10,6 +10,7 @@ import { GENESIS } from '@/data/sets'
 import {
   ENERGY_TYPES,
   RARITY_ORDER,
+  RARITY_LABEL,
   isFigure,
   type Card as CardData,
   type EnergyType,
@@ -17,6 +18,31 @@ import {
 import { UNSEEN_WINDOW_MS, useCollection } from '@/store/collection'
 import { useNow } from '@/hooks/useNow'
 import { cx } from '@/lib/cx'
+
+type ViewMode = 'grid' | 'list'
+
+const VIEW_KEY = 'covenant:cardsView'
+
+/** The stored choice, same read-it-once-then-trust-state pattern `theme.ts`
+ *  already uses — storage can throw (private mode, quota), and this is a
+ *  display preference, not state worth crashing the binder over. */
+function loadView(): ViewMode {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY)
+    if (saved === 'grid' || saved === 'list') return saved
+  } catch {
+    /* storage denied; default below still renders */
+  }
+  return 'grid'
+}
+
+function saveView(mode: ViewMode): void {
+  try {
+    localStorage.setItem(VIEW_KEY, mode)
+  } catch {
+    /* not worth surfacing — the toggle still works for this session */
+  }
+}
 
 /**
  * The binder.
@@ -45,6 +71,7 @@ export function Collection() {
   // as "you own nothing" before it reads as "here is what to chase". Showing
   // your own cards first, with a toggle to reveal the gaps, does both.
   const [ownedOnly, setOwnedOnly] = useState(true)
+  const [view, setView] = useState<ViewMode>(loadView)
 
   const ownedCount = Object.keys(owned).filter((id) => owned[id]! > 0).length
   const totalHeld = Object.values(owned).reduce((a, b) => a + b, 0)
@@ -83,6 +110,24 @@ export function Collection() {
 
   const toggleType = (t: EnergyType) =>
     setTypes((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
+
+  // Shared between the grid tile and the list row, so opening a card does the
+  // same thing — peek it, feed it the same swipe-through list, mark it seen —
+  // regardless of which layout it was tapped from.
+  const openCard = (card: CardData, count: number, index: number) => {
+    peek(card, {
+      count,
+      list: peekList,
+      index,
+      // Swiping to a card marks it seen too, same as tapping it directly
+      // already does — a card you paged past without pausing on it was
+      // still shown to you.
+      onStep: (item) => {
+        if (item.count) markSeen([item.card.id])
+      },
+    })
+    if (count) markSeen([card.id])
+  }
 
   return (
     <div className="scroll-y h-full">
@@ -152,17 +197,44 @@ export function Collection() {
             >
               Owned only
             </button>
+
+            {/* Grid and list share one pill rather than two separate toggles —
+                exactly one of the two is ever meaningful, so this reads as a
+                single choice instead of two independent switches that happen
+                to disagree when a player taps both. */}
+            <div className="flex rounded-pill p-0.5 shadow-raised-sm" style={{ background: 'var(--surface)' }}>
+              {(
+                [
+                  { mode: 'grid', Icon: GridIcon, label: 'Grid view' },
+                  { mode: 'list', Icon: ListIcon, label: 'List view' },
+                ] as const
+              ).map(({ mode, Icon, label }) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setView(mode)
+                    saveView(mode)
+                  }}
+                  aria-pressed={view === mode}
+                  aria-label={label}
+                  className={cx('rounded-pill p-1.5 transition-all duration-200', view === mode && 'shadow-pressed')}
+                  style={{ background: view === mode ? 'var(--bg-sunk)' : undefined }}
+                >
+                  <Icon size={16} className={view === mode ? 'text-ink' : 'text-ink-muted'} />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* ------------------------------------------------------------ grid */}
+        {/* -------------------------------------------------------- grid/list */}
         {visible.length === 0 ? (
           <EmptyState icon={<BinderIcon size={40} />} title="Nothing matches">
             {ownedOnly
               ? 'You do not own any cards matching these filters yet. Open a pack, or turn off "Owned only" to see what there is to find.'
               : 'No card in the Genesis set matches these filters.'}
           </EmptyState>
-        ) : (
+        ) : view === 'grid' ? (
           <div className="grid grid-cols-3 gap-2.5 mt-3">
             {visible.map((card, index) => {
               const count = owned[card.id] ?? 0
@@ -172,20 +244,22 @@ export function Collection() {
                   card={card}
                   count={count}
                   isNew={isUnseen(card.id)}
-                  onOpen={() => {
-                    peek(card, {
-                      count,
-                      list: peekList,
-                      index,
-                      // Swiping to a card marks it seen too, same as tapping
-                      // it directly already does — a card you paged past
-                      // without pausing on it was still shown to you.
-                      onStep: (item) => {
-                        if (item.count) markSeen([item.card.id])
-                      },
-                    })
-                    if (count) markSeen([card.id])
-                  }}
+                  onOpen={() => openCard(card, count, index)}
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 mt-3">
+            {visible.map((card, index) => {
+              const count = owned[card.id] ?? 0
+              return (
+                <CollectionRow
+                  key={card.id}
+                  card={card}
+                  count={count}
+                  isNew={isUnseen(card.id)}
+                  onOpen={() => openCard(card, count, index)}
                 />
               )
             })}
@@ -250,6 +324,75 @@ function CollectionTile({
           NEW
         </span>
       )}
+    </motion.button>
+  )
+}
+
+/**
+ * One card per row: a thumbnail the size of a grid tile's own art, name and
+ * rarity beside it, owned count trailing. Same tap target, same data, same
+ * `onOpen` — the whole point of a list view next to the grid is scanning many
+ * names at once rather than recognising many pictures at once, not a second
+ * way to pick a card.
+ */
+function CollectionRow({
+  card,
+  count,
+  isNew,
+  onOpen,
+}: {
+  card: CardData
+  count: number
+  isNew: boolean
+  onOpen: () => void
+}) {
+  const locked = count === 0
+  const figure = isFigure(card) ? card : null
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.98 }}
+      onClick={onOpen}
+      className="relative flex items-center gap-3 w-full text-left rounded-lg p-1.5"
+      style={{ background: 'var(--surface)' }}
+      aria-label={locked ? `${card.name}, not collected` : `${card.name}, ${count} owned`}
+    >
+      {/* Fixed width rather than a fraction of the row, so the thumbnail reads
+          at the same size on every row regardless of how long the name next
+          to it runs. */}
+      <div
+        className="w-12 shrink-0"
+        style={
+          locked
+            ? { filter: 'grayscale(1) contrast(0.85) brightness(1.15)', opacity: 0.34 }
+            : undefined
+        }
+      >
+        <PressableCard card={card} compact noHolo={locked} count={count} />
+      </div>
+
+      <span className="flex-1 min-w-0">
+        <span className="flex items-center gap-1.5">
+          <span className="font-display text-sm text-ink-strong truncate">{card.name}</span>
+          {isNew && !locked && (
+            <span
+              className="shrink-0 rounded-pill px-1.5 py-0.5 text-[9px] font-bold tracking-wide"
+              style={{ background: 'var(--negative)', color: '#fff' }}
+            >
+              NEW
+            </span>
+          )}
+        </span>
+        <span className="flex items-center gap-1 mt-0.5 text-xs text-ink-muted">
+          {figure && <EnergyOrb type={figure.type} size={13} />}
+          {figure ? `${figure.hp} HP · ` : ''}
+          {RARITY_LABEL[card.rarity]}
+        </span>
+      </span>
+
+      <span className="shrink-0 text-xs font-bold tabular-nums text-ink-muted">
+        {locked ? 'Not collected' : `×${count}`}
+      </span>
     </motion.button>
   )
 }
