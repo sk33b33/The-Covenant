@@ -305,11 +305,6 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A young priest standing at the entrance of a striped tent with a bronze-tipped spear levelled and still smoking at its point, chest heaving, camp fires and startled onlookers blurred in the background behind him. Zeal rather than anger in the set of his jaw.',
   },
-  moses: {
-    shape: 'portrait',
-    scene:
-      'An old man coming down a bare mountain with two stone tablets braced against one hip, sandals dusted white, his face lit from within rather than from above — bright enough that the fold of cloth over one shoulder is already half-raised to veil it.',
-  },
 
   /* --------------------------------------------------------------- Spirit */
 
@@ -546,4 +541,4 @@ export const ART_DIRECTION: Record<string, Direction> = {
  * of them needs direction. Add an id here — and delete its entry above — as
  * each card's artwork lands.
  */
-export const ALREADY_ILLUSTRATED: string[] = []
+export const ALREADY_ILLUSTRATED: string[] = ['moses']

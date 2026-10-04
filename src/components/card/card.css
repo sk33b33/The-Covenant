@@ -327,6 +327,33 @@
   z-index: -1;
 }
 
+/*
+ * `.cov-card__ground` is `position: absolute` with no `z-index` of its own,
+ * which in stacking-order terms is *not* "no z-index" but `z-index: 0` — a
+ * positioned descendant at stack level 0 paints after a negative-z-index one
+ * regardless of which comes first in the markup. That put the art's own
+ * `z-index: -1` above permanently behind ground's opaque fill: every full-art
+ * card was rendering as ground's plain dark-brown gradient with the stats
+ * floating on top, the art itself fully hidden the whole time. (Caught by
+ * screenshotting Moses's new art and noticing the "art" on screen never
+ * changed no matter what the file on disk held — the same bug was already
+ * sitting under Jesus Carrying Cross, just never caught because ground's own
+ * gradient reads enough like a moody sky to not look obviously wrong.)
+ * Dropping ground's background here is enough: full art already supplies
+ * everything ground was for.
+ *
+ * The anointed-only ground rule further down sets its own background at this
+ * same two-class specificity and comes later in the sheet, the identical
+ * cascade trap the nameplate rule above already has a fix for — so this
+ * needs the same three-class override to outrank it regardless of source
+ * order, or an Anointed full-art card (every one of them, so far) keeps its
+ * opaque halo tint and the art stays hidden under it.
+ */
+.cov-card--full-art .cov-card__ground,
+.cov-card--full-art.cov-card--anointed .cov-card__ground {
+  background: none;
+}
+
 /* The placeholder's initial is sized off the card's own width (cqw), which
    reads fine in the small art window but leaves it looking lost once that
    window is the entire, much taller face. Full art is the one context
