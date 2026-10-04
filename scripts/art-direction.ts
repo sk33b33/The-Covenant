@@ -91,11 +91,6 @@ export const ART_DIRECTION: Record<string, Direction> = {
     scene:
       'A priest-king in white linen with a plain gold circlet, holding out a round loaf in one hand and a shallow cup of dark wine in the other. City walls of Salem behind him. No genealogy in the face — he could be forty or four hundred.',
   },
-  'jesus-carrying-cross': {
-    shape: 'portrait',
-    scene:
-      'A man bent almost double beneath a rough crossbeam lashed across his shoulders, one hand gripping the wood, the other braced against the stones of a narrow street. Blood dried at the hairline, dust in the beard, breath held. The frame stays with him; no one in the crowd is given a face.',
-  },
   'the-garden-of-eden': {
     shape: 'scene',
     scene:
@@ -541,4 +536,4 @@ export const ART_DIRECTION: Record<string, Direction> = {
  * of them needs direction. Add an id here — and delete its entry above — as
  * each card's artwork lands.
  */
-export const ALREADY_ILLUSTRATED: string[] = ['moses']
+export const ALREADY_ILLUSTRATED: string[] = ['moses', 'jesus-carrying-cross']
