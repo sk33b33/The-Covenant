@@ -803,6 +803,18 @@
   height: 104cqw;
 }
 
+/* Full art has no body or footer for compact to hide, and already set this
+ * element to the whole card's own height — but that rule and the one above
+ * are the same two-class specificity, and this one comes later in the sheet,
+ * so a compact full-art card (every full-art card, in the collection grid)
+ * was getting 104cqw instead of 100%: short of the card's full ~139.68cqw
+ * height, leaving a bare gap at the bottom where no art, body or footer
+ * reaches. Same cascade trap as the ground and nameplate fixes above, same
+ * fix — a three-class override wins regardless of source order. */
+.cov-card--compact.cov-card--full-art .cov-card__art {
+  height: 100%;
+}
+
 /* The rim is the one thing that gets proportionally *heavier* when small. At a
  * 64px grid thumbnail 1.5cqw is under a pixel, and the metal — which is the
  * only rarity cue a compact card has — disappears into the edge. The two inner
