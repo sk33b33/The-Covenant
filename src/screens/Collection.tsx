@@ -18,31 +18,7 @@ import {
 import { UNSEEN_WINDOW_MS, useCollection } from '@/store/collection'
 import { useNow } from '@/hooks/useNow'
 import { cx } from '@/lib/cx'
-
-type ViewMode = 'grid' | 'list'
-
-const VIEW_KEY = 'covenant:cardsView'
-
-/** The stored choice, same read-it-once-then-trust-state pattern `theme.ts`
- *  already uses — storage can throw (private mode, quota), and this is a
- *  display preference, not state worth crashing the binder over. */
-function loadView(): ViewMode {
-  try {
-    const saved = localStorage.getItem(VIEW_KEY)
-    if (saved === 'grid' || saved === 'list') return saved
-  } catch {
-    /* storage denied; default below still renders */
-  }
-  return 'grid'
-}
-
-function saveView(mode: ViewMode): void {
-  try {
-    localStorage.setItem(VIEW_KEY, mode)
-  } catch {
-    /* not worth surfacing — the toggle still works for this session */
-  }
-}
+import { loadCardsView, saveCardsView, type ViewMode } from '@/lib/cardsView'
 
 /**
  * The binder.
@@ -71,7 +47,7 @@ export function Collection() {
   // as "you own nothing" before it reads as "here is what to chase". Showing
   // your own cards first, with a toggle to reveal the gaps, does both.
   const [ownedOnly, setOwnedOnly] = useState(true)
-  const [view, setView] = useState<ViewMode>(loadView)
+  const [view, setView] = useState<ViewMode>(loadCardsView)
 
   const ownedCount = Object.keys(owned).filter((id) => owned[id]! > 0).length
   const totalHeld = Object.values(owned).reduce((a, b) => a + b, 0)
@@ -176,7 +152,7 @@ export function Collection() {
                 aria-pressed={types.includes(t)}
                 className={cx(
                   'rounded-pill p-1 transition-all duration-200',
-                  types.includes(t) ? 'shadow-pressed scale-95' : 'shadow-raised-sm',
+                  types.includes(t) ? 'shadow-pressed scale-95 cov-toggle-glow' : 'shadow-raised-sm',
                 )}
                 style={{
                   background: types.includes(t) ? 'var(--bg-sunk)' : 'var(--surface)',
@@ -213,7 +189,7 @@ export function Collection() {
                   key={mode}
                   onClick={() => {
                     setView(mode)
-                    saveView(mode)
+                    saveCardsView(mode)
                   }}
                   aria-pressed={view === mode}
                   aria-label={label}

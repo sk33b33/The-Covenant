@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
-import { BackIcon, CheckIcon, CloseIcon, MinusIcon, PlusIcon, SearchIcon } from '@/art/icons'
+import { BackIcon, CheckIcon, CloseIcon, GridIcon, ListIcon, MinusIcon, PlusIcon, SearchIcon } from '@/art/icons'
 import { PressableCard } from '@/components/card/PressableCard'
 import { usePeek } from '@/store/peek'
 import { Button, Panel, Progress } from '@/components/ui'
@@ -9,6 +9,7 @@ import { CARDS, getCard, requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
 import {
   ENERGY_TYPES,
+  RARITY_LABEL,
   RARITY_ORDER,
   isFigure,
   type Card as CardData,
@@ -19,6 +20,7 @@ import { useCollection } from '@/store/collection'
 import { useDecks, validateDeck } from '@/store/decks'
 import { useNav } from '@/store/nav'
 import { cx } from '@/lib/cx'
+import { loadCardsView, saveCardsView, type ViewMode } from '@/lib/cardsView'
 
 /**
  * The deck builder.
@@ -45,6 +47,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   const [energy, setEnergy] = useState<EnergyType[]>(existing?.energy ?? [])
   const [query, setQuery] = useState('')
   const [autoMode, setAutoMode] = useState<'single' | 'multiple'>('single')
+  const [view, setView] = useState<ViewMode>(loadCardsView)
 
   const hasCollection = useMemo(() => Object.values(owned).some((n) => n > 0), [owned])
 
@@ -288,7 +291,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
                   aria-pressed={energy.includes(type)}
                   className={cx(
                     'rounded-pill p-1 transition-all duration-200',
-                    energy.includes(type) ? 'shadow-pressed scale-95' : 'shadow-raised-sm',
+                    energy.includes(type) ? 'shadow-pressed scale-95 cov-toggle-glow' : 'shadow-raised-sm',
                   )}
                   style={{
                     background: energy.includes(type) ? 'var(--gold-pale)' : 'var(--surface)',
@@ -334,35 +337,48 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
           </p>
         ) : (
           <div className="scroll-x flex gap-1.5 pb-1">
-            {[...inDeck.entries()].map(([cardId, count]) => (
-              <button
-                key={cardId}
-                onClick={() => remove(cardId)}
-                className="relative shrink-0 w-[52px]"
-                aria-label={`Remove ${requireCard(cardId).name}`}
-              >
-                <PressableCard card={requireCard(cardId)} compact noHolo />
-                <span
-                  className="absolute -top-1 -right-1 rounded-pill w-5 h-5 grid place-items-center text-[10px] font-bold"
-                  style={{ background: 'var(--gold)', color: '#241a0e' }}
-                >
-                  {count}
-                </span>
-                <span
-                  className="absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded-pill w-5 h-5 grid place-items-center"
-                  style={{ background: 'rgba(10,7,3,.85)', color: 'var(--gold-bright)' }}
-                >
-                  <MinusIcon size={12} />
-                </span>
-              </button>
-            ))}
+            {[...inDeck.entries()].map(([cardId, count]) => {
+              const card = requireCard(cardId)
+              return (
+                <div key={cardId} className="relative shrink-0 w-[52px]">
+                  {/* The card itself opens it — previously this whole tile was
+                      one button that removed a copy, so there was no way to
+                      just look at a card already in the deck without taking
+                      it out first. The minus below is now its own separate
+                      target for that. */}
+                  <button
+                    onClick={() => peek(card)}
+                    className="block w-full"
+                    aria-label={`${card.name}, ${count} in deck`}
+                  >
+                    <PressableCard card={card} compact noHolo />
+                  </button>
+
+                  <span
+                    className="absolute -top-1 -right-1 rounded-pill w-5 h-5 grid place-items-center text-[10px] font-bold pointer-events-none"
+                    style={{ background: 'var(--gold)', color: '#241a0e' }}
+                  >
+                    {count}
+                  </span>
+
+                  <button
+                    onClick={() => remove(cardId)}
+                    className="absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded-pill w-5 h-5 grid place-items-center"
+                    style={{ background: 'rgba(10,7,3,.85)', color: 'var(--gold-bright)' }}
+                    aria-label={`Remove one copy of ${card.name}`}
+                  >
+                    <MinusIcon size={12} />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
 
       {/* ------------------------------------------------------- collection */}
-      <div className="px-4 mt-3 shrink-0">
-        <label className="flex items-center gap-2.5 neu-sunk rounded-pill px-3.5 py-2">
+      <div className="px-4 mt-3 shrink-0 flex items-center gap-2">
+        <label className="flex-1 min-w-0 flex items-center gap-2.5 neu-sunk rounded-pill px-3.5 py-2">
           <SearchIcon size={16} className="text-ink-faint shrink-0" />
           <input
             value={query}
@@ -377,53 +393,100 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
             </button>
           )}
         </label>
+
+        {/* Same grid/list pill as the collection screen, and the same stored
+            preference — picking list there means list here too. */}
+        <div className="flex rounded-pill p-0.5 shadow-raised-sm shrink-0" style={{ background: 'var(--surface)' }}>
+          {(
+            [
+              { mode: 'grid', Icon: GridIcon, label: 'Grid view' },
+              { mode: 'list', Icon: ListIcon, label: 'List view' },
+            ] as const
+          ).map(({ mode, Icon, label }) => (
+            <button
+              key={mode}
+              onClick={() => {
+                setView(mode)
+                saveCardsView(mode)
+              }}
+              aria-pressed={view === mode}
+              aria-label={label}
+              className={cx('rounded-pill p-1.5 transition-all duration-200', view === mode && 'shadow-pressed')}
+              style={{ background: view === mode ? 'var(--bg-sunk)' : undefined }}
+            >
+              <Icon size={16} className={view === mode ? 'text-ink' : 'text-ink-muted'} />
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="scroll-y flex-1 px-4 pt-3 min-h-0 pb-tabbar">
-        <div className="grid grid-cols-4 gap-2 pb-4">
-          {collection.map((card) => {
-            const held = owned[card.id] ?? 0
-            const used = inDeck.get(card.id) ?? 0
-            const max = Math.min(RULES.MAX_COPIES, held)
-            const full = used >= max || cards.length >= RULES.DECK_SIZE
+        {view === 'grid' ? (
+          <div className="grid grid-cols-4 gap-2 pb-4">
+            {collection.map((card) => {
+              const held = owned[card.id] ?? 0
+              const used = inDeck.get(card.id) ?? 0
+              const max = Math.min(RULES.MAX_COPIES, held)
+              const full = used >= max || cards.length >= RULES.DECK_SIZE
 
-            return (
-              <motion.button
-                key={card.id}
-                whileTap={full ? undefined : { scale: 0.94 }}
-                // A full tile has nothing left to add, so tapping it shows the
-                // card instead of doing nothing. Holding any tile does the
-                // same, full or not.
-                onClick={() => (full ? peek(card) : add(card.id))}
-                className="relative"
-                aria-label={`${card.name}, ${used} of ${max} in deck`}
-              >
-                <div style={{ opacity: used >= max ? 0.4 : 1 }}>
-                  <PressableCard card={card} compact noHolo />
-                </div>
-
-                <span
-                  className="absolute -top-1 -right-1 rounded-pill px-1.5 h-5 grid place-items-center text-[10px] font-bold tabular-nums"
-                  style={{
-                    background: used > 0 ? 'var(--gold)' : 'rgba(10,7,3,.8)',
-                    color: used > 0 ? '#241a0e' : 'var(--gold-bright)',
-                  }}
+              return (
+                <motion.button
+                  key={card.id}
+                  whileTap={full ? undefined : { scale: 0.94 }}
+                  // A full tile has nothing left to add, so tapping it shows
+                  // the card instead of doing nothing. Holding any tile does
+                  // the same, full or not.
+                  onClick={() => (full ? peek(card) : add(card.id))}
+                  className="relative"
+                  aria-label={`${card.name}, ${used} of ${max} in deck`}
                 >
-                  {used}/{max}
-                </span>
+                  <div style={{ opacity: used >= max ? 0.4 : 1 }}>
+                    <PressableCard card={card} compact noHolo />
+                  </div>
 
-                {!full && (
                   <span
-                    className="absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded-pill w-5 h-5 grid place-items-center"
-                    style={{ background: 'rgba(10,7,3,.85)', color: 'var(--gold-bright)' }}
+                    className="absolute -top-1 -right-1 rounded-pill px-1.5 h-5 grid place-items-center text-[10px] font-bold tabular-nums"
+                    style={{
+                      background: used > 0 ? 'var(--gold)' : 'rgba(10,7,3,.8)',
+                      color: used > 0 ? '#241a0e' : 'var(--gold-bright)',
+                    }}
                   >
-                    <PlusIcon size={12} />
+                    {used}/{max}
                   </span>
-                )}
-              </motion.button>
-            )
-          })}
-        </div>
+
+                  {!full && (
+                    <span
+                      className="absolute bottom-0.5 left-1/2 -translate-x-1/2 rounded-pill w-5 h-5 grid place-items-center"
+                      style={{ background: 'rgba(10,7,3,.85)', color: 'var(--gold-bright)' }}
+                    >
+                      <PlusIcon size={12} />
+                    </span>
+                  )}
+                </motion.button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 pb-4">
+            {collection.map((card) => {
+              const held = owned[card.id] ?? 0
+              const used = inDeck.get(card.id) ?? 0
+              const max = Math.min(RULES.MAX_COPIES, held)
+              const full = used >= max || cards.length >= RULES.DECK_SIZE
+
+              return (
+                <DeckCollectionRow
+                  key={card.id}
+                  card={card}
+                  used={used}
+                  max={max}
+                  full={full}
+                  onOpen={() => (full ? peek(card) : add(card.id))}
+                />
+              )
+            })}
+          </div>
+        )}
 
         {collection.length === 0 && (
           <p className="text-sm text-ink-muted text-center py-8 px-6">
@@ -449,5 +512,69 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
         </Button>
       </div>
     </div>
+  )
+}
+
+/**
+ * One ownable card per row — the list counterpart to the grid tile above,
+ * for scanning names rather than recognising pictures. Same tap, same
+ * add/peek rule as the grid: a row with room left adds a copy, a full one
+ * opens the card instead of doing nothing.
+ */
+function DeckCollectionRow({
+  card,
+  used,
+  max,
+  full,
+  onOpen,
+}: {
+  card: CardData
+  used: number
+  max: number
+  full: boolean
+  onOpen: () => void
+}) {
+  const figure = isFigure(card) ? card : null
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.98 }}
+      onClick={onOpen}
+      className="relative flex items-center gap-3 w-full text-left rounded-lg p-1.5"
+      style={{ background: 'var(--surface)', opacity: used >= max ? 0.6 : 1 }}
+      aria-label={`${card.name}, ${used} of ${max} in deck`}
+    >
+      <div className="w-12 shrink-0">
+        <PressableCard card={card} compact noHolo />
+      </div>
+
+      <span className="flex-1 min-w-0">
+        <span className="font-display text-sm text-ink-strong truncate block">{card.name}</span>
+        <span className="flex items-center gap-1 mt-0.5 text-xs text-ink-muted">
+          {figure && <EnergyOrb type={figure.type} size={13} />}
+          {figure ? `${figure.hp} HP · ` : ''}
+          {RARITY_LABEL[card.rarity]}
+        </span>
+      </span>
+
+      <span
+        className="shrink-0 rounded-pill px-1.5 h-5 grid place-items-center text-[10px] font-bold tabular-nums"
+        style={{
+          background: used > 0 ? 'var(--gold)' : 'rgba(10,7,3,.8)',
+          color: used > 0 ? '#241a0e' : 'var(--gold-bright)',
+        }}
+      >
+        {used}/{max}
+      </span>
+
+      {!full && (
+        <span
+          className="shrink-0 rounded-pill w-5 h-5 grid place-items-center"
+          style={{ background: 'rgba(10,7,3,.85)', color: 'var(--gold-bright)' }}
+        >
+          <PlusIcon size={12} />
+        </span>
+      )}
+    </motion.button>
   )
 }

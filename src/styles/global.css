@@ -248,6 +248,34 @@
       var(--tabbar-h) + max(var(--s-3), env(safe-area-inset-bottom)) + var(--s-5)
     );
   }
+
+  /* A toggle in its "on" state gets a bright ring rather than just the sunk
+   * shadow the rest of its chrome already carries. In `@layer utilities`
+   * rather than `@layer components` on purpose: this is meant to sit beside
+   * Tailwind's own `shadow-pressed` on the same element, and a same-property
+   * rule in `components` was losing to `shadow-pressed` outright regardless
+   * of which came later in the file — box-shadow doesn't merge across rules,
+   * the winning one replaces the whole property, so landing in the same
+   * layer as `shadow-pressed` isn't enough either unless this rule also
+   * carries the sunk shadow itself. Splicing `var(--shadow-pressed)` in as
+   * the tail of this list is what keeps the pressed look once this rule
+   * wins the collision, rather than trading one effect for the other.
+   *
+   * `--gold-bright` alone is the pale tan `.cov-figure-card.cov-slot-drag-
+   * target` above uses for the same ring-plus-glow idea, which reads fine
+   * over a dark battle mat but nearly vanishes over this kit's light
+   * theme's near-white `--surface` — a glow has to out-contrast what it
+   * sits on, and a toggle lives on both themes. `--gold` is the kit's more
+   * saturated mid-tone (further from white, closer to black, so it holds
+   * against either), carrying the solid ring; `--gold-bright` stays for the
+   * soft blur outside it, since a blur fading to transparent doesn't need
+   * the same contrast its own hard edge does. */
+  .cov-toggle-glow {
+    box-shadow:
+      0 0 0 2px var(--gold),
+      0 0 12px 1px var(--gold-bright),
+      var(--shadow-pressed);
+  }
 }
 
 @layer components {
