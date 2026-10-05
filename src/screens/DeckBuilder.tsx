@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { BackIcon, CheckIcon, CloseIcon, GridIcon, ListIcon, MinusIcon, PlusIcon, SearchIcon } from '@/art/icons'
@@ -48,6 +48,32 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   const [query, setQuery] = useState('')
   const [autoMode, setAutoMode] = useState<'single' | 'multiple'>('single')
   const [view, setView] = useState<ViewMode>(loadCardsView)
+
+  // Tapping a card already in the deck doesn't open its full view any more —
+  // it jumps to that same card's own tile further down, in the list it can
+  // actually be added from or removed. `highlightId` is what tile briefly
+  // glows once the jump lands, so the deck strip's tap has somewhere visible
+  // to send you rather than just scrolling and leaving you to find it.
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const collectionRefs = useRef(new Map<string, HTMLElement>())
+
+  const jumpToCard = (cardId: string) => {
+    // A search in progress could be hiding the very card being jumped to —
+    // clearing it is what guarantees the tile actually exists to scroll to,
+    // since the collection list filters on nothing else.
+    setQuery('')
+    setHighlightId(cardId)
+  }
+
+  useEffect(() => {
+    if (!highlightId) return
+    // Clearing the query above lands in the same render as setting this, so
+    // by the time this effect runs the DOM already reflects the unfiltered
+    // list — the ref map is already current.
+    collectionRefs.current.get(highlightId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setHighlightId(null), 1400)
+    return () => clearTimeout(timer)
+  }, [highlightId])
 
   const hasCollection = useMemo(() => Object.values(owned).some((n) => n > 0), [owned])
 
@@ -341,13 +367,13 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
               const card = requireCard(cardId)
               return (
                 <div key={cardId} className="relative shrink-0 w-[52px]">
-                  {/* The card itself opens it — previously this whole tile was
-                      one button that removed a copy, so there was no way to
-                      just look at a card already in the deck without taking
-                      it out first. The minus below is now its own separate
-                      target for that. */}
+                  {/* The card itself jumps to its own tile in the list below
+                      — previously this whole tile was one button that
+                      removed a copy, so there was no way to find a card
+                      already in the deck without taking it out first. The
+                      minus below is now its own separate target for that. */}
                   <button
-                    onClick={() => peek(card)}
+                    onClick={() => jumpToCard(cardId)}
                     className="block w-full"
                     aria-label={`${card.name}, ${count} in deck`}
                   >
@@ -432,12 +458,19 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
               return (
                 <motion.button
                   key={card.id}
+                  ref={(el) => {
+                    if (el) collectionRefs.current.set(card.id, el)
+                    else collectionRefs.current.delete(card.id)
+                  }}
                   whileTap={full ? undefined : { scale: 0.94 }}
                   // A full tile has nothing left to add, so tapping it shows
                   // the card instead of doing nothing. Holding any tile does
                   // the same, full or not.
                   onClick={() => (full ? peek(card) : add(card.id))}
-                  className="relative"
+                  className={cx(
+                    'relative rounded-lg transition-shadow duration-300',
+                    highlightId === card.id && 'cov-toggle-glow',
+                  )}
                   aria-label={`${card.name}, ${used} of ${max} in deck`}
                 >
                   <div style={{ opacity: used >= max ? 0.4 : 1 }}>
@@ -481,6 +514,11 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
                   used={used}
                   max={max}
                   full={full}
+                  highlighted={highlightId === card.id}
+                  registerRef={(el) => {
+                    if (el) collectionRefs.current.set(card.id, el)
+                    else collectionRefs.current.delete(card.id)
+                  }}
                   onOpen={() => (full ? peek(card) : add(card.id))}
                 />
               )
@@ -526,21 +564,29 @@ function DeckCollectionRow({
   used,
   max,
   full,
+  highlighted,
+  registerRef,
   onOpen,
 }: {
   card: CardData
   used: number
   max: number
   full: boolean
+  highlighted: boolean
+  registerRef: (el: HTMLButtonElement | null) => void
   onOpen: () => void
 }) {
   const figure = isFigure(card) ? card : null
 
   return (
     <motion.button
+      ref={registerRef}
       whileTap={{ scale: 0.98 }}
       onClick={onOpen}
-      className="relative flex items-center gap-3 w-full text-left rounded-lg p-1.5"
+      className={cx(
+        'relative flex items-center gap-3 w-full text-left rounded-lg p-1.5 transition-shadow duration-300',
+        highlighted && 'cov-toggle-glow',
+      )}
       style={{ background: 'var(--surface)', opacity: used >= max ? 0.6 : 1 }}
       aria-label={`${card.name}, ${used} of ${max} in deck`}
     >
