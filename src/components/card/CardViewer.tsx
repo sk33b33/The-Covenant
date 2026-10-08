@@ -55,7 +55,7 @@ const MAX_TILT = 25
  *  `useAnimationFrame` below. A plain exponential lerp rather than a
  *  physically-modelled spring: no overshoot, no bounce, just a fixed
  *  fraction of catch-up per frame. */
-const TILT_SMOOTHING = 0.12
+const TILT_SMOOTHING = 0.18
 
 /** How far sideways a release has to land from where the finger went down
  *  before it reads as a swipe to the next or previous card rather than a
