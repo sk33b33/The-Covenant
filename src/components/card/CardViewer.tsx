@@ -168,17 +168,25 @@ function Viewer({
   })
 
   /*
-   * The card lifts toward the finger: touch the right edge and that edge
-   * rises toward you, as though the card were tilting up to meet the touch
-   * rather than pressing flat away from it.
+   * The two axes lift opposite edges, on purpose — matched directly against
+   * a Pokémon TCG Pocket reference recording rather than derived from any
+   * single "physical" model, since the reference itself isn't symmetric
+   * between them:
    *
-   * A positive rotateY sends the right edge away from the viewer and a
-   * positive rotateX sends the top edge away, so lifting the touched edge
-   * toward the viewer instead means negating both from what a plain
-   * `(px, py)` reading would otherwise give.
+   * Sideways, the touched edge rises: drag toward the right and the right
+   * corners grow, the left recede — as though the card were tilting up to
+   * meet the touch. A positive rotateY sends the right edge away from the
+   * viewer, so this is the negated reading.
+   *
+   * Vertically, the *opposite* edge rises: drag toward the bottom and the
+   * top corners grow, the bottom recede — a seesaw around the centre rather
+   * than a lift. A positive rotateX sends the *bottom* edge toward the
+   * viewer, which would grow the touched edge same as rotateY does — the
+   * wrong one here — so this axis is negated too, just toward a different
+   * visible result than the sideways case.
    */
   const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
 
   /*
    * The light is derived from the rotation, not from the pointer.
