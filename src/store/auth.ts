@@ -92,3 +92,16 @@ export const useAuth = create<AuthState>((set) => ({
 // session, not just at launch) bounces back to the sign-in gate the same
 // way an explicit sign-out does.
 portalApi.setOnUnauthorized(() => useAuth.setState({ signedIn: false, email: null }))
+
+// A device that stayed signed in across launches never went through
+// `signInWithPassword` again, so `hydrateFromPortal` — the only place that
+// ever pulled — never ran for it either. It kept showing whatever was on
+// disk from its *own* last session, which drifted further behind every time
+// progress was made on another device: open the game on your phone, it
+// never catches up. `hasValidToken` is a synchronous local expiry check, so
+// this costs nothing when signed out, and the pull that follows a `true`
+// here is fire-and-forget — the app renders immediately from whatever is
+// already on disk and silently refreshes under it once the pull lands,
+// the same trade the launch-time token check itself already makes rather
+// than block the first paint on a network round trip.
+if (portalApi.hasValidToken()) void hydrateFromPortal()
