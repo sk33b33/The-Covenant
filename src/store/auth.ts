@@ -55,6 +55,16 @@ interface AuthState {
   email: string | null
   error: string | null
   busy: boolean
+  /**
+   * False only during the fire-and-forget launch pull below, for a device
+   * that was already signed in. Everything that decides something from
+   * *absence* of local data — most sharply, `Enter.tsx` handing out the
+   * starter deck to an `isNew` profile — has to wait on this first, or a
+   * browser signing in for the first time with an already-progressed
+   * account can grant (and push-clobber the server with) a starter deck
+   * before the real pull has even landed. See `waitForHydration` below.
+   */
+  hydrated: boolean
 
   signInWithPassword: (email: string, password: string) => Promise<boolean>
   signOut: () => Promise<void>
@@ -66,6 +76,9 @@ export const useAuth = create<AuthState>((set) => ({
   email: portalApi.currentEmail(),
   error: null,
   busy: false,
+  // Nothing to pull if there's no token yet — that's not a pending
+  // hydration, it's just signed out, so it starts `true`.
+  hydrated: !portalApi.hasValidToken(),
 
   signInWithPassword: async (email, password) => {
     set({ busy: true, error: null })
@@ -76,7 +89,7 @@ export const useAuth = create<AuthState>((set) => ({
     }
 
     await hydrateFromPortal()
-    set({ busy: false, signedIn: true, email: portalApi.currentEmail() })
+    set({ busy: false, signedIn: true, email: portalApi.currentEmail(), hydrated: true })
     return true
   },
 
@@ -103,5 +116,32 @@ portalApi.setOnUnauthorized(() => useAuth.setState({ signedIn: false, email: nul
 // here is fire-and-forget — the app renders immediately from whatever is
 // already on disk and silently refreshes under it once the pull lands,
 // the same trade the launch-time token check itself already makes rather
-// than block the first paint on a network round trip.
-if (portalApi.hasValidToken()) void hydrateFromPortal()
+// than block the first paint on a network round trip. `hydrated` flips
+// true when it settles either way (including a failed fetch — offline is
+// not a reason to wedge `waitForHydration` forever).
+if (portalApi.hasValidToken()) {
+  void hydrateFromPortal().finally(() => useAuth.setState({ hydrated: true }))
+}
+
+/**
+ * Resolves once the launch-time pull above has settled (immediately, if
+ * there was never one to wait for — signed out, or already resolved).
+ * Capped at `timeoutMs` so a dead network can't wedge a caller forever;
+ * past the cap the data just wasn't there in time and the caller proceeds
+ * on local state the same way it always used to, before this existed.
+ */
+export function waitForHydration(timeoutMs = 2500): Promise<void> {
+  if (useAuth.getState().hydrated) return Promise.resolve()
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      unsubscribe()
+      resolve()
+    }, timeoutMs)
+    const unsubscribe = useAuth.subscribe((s) => {
+      if (!s.hydrated) return
+      window.clearTimeout(timer)
+      unsubscribe()
+      resolve()
+    })
+  })
+}

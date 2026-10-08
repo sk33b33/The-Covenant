@@ -8,6 +8,7 @@ import { useCollection } from '@/store/collection'
 import { useDecks } from '@/store/decks'
 import { useProfile } from '@/store/profile'
 import { useNav } from '@/store/nav'
+import { waitForHydration } from '@/store/auth'
 
 /**
  * Tap to enter.
@@ -55,7 +56,6 @@ const LIFT_S = VISUAL_S * 0.25
 const PROMPT_OUT_S = 0.45
 
 export function Enter() {
-  const isNew = useProfile((s) => s.isNew)
   const markSeen = useProfile((s) => s.markSeen)
   const setTab = useNav((s) => s.setTab)
   const addCards = useCollection((s) => s.add)
@@ -93,14 +93,23 @@ export function Enter() {
     // empty deck list and an unusable Battle tab is three dead ends before the
     // game has said anything.
     //
-    // Done on the tap rather than with the route change below: deferring it
-    // would mean closing the app mid-fade leaves `isNew` true, and the starter
-    // deck gets handed out a second time.
-    if (isNew) {
-      addCards(STARTER_CARD_IDS)
-      ensureStarter()
-    }
-    markSeen()
+    // `isNew` is read fresh after `waitForHydration`, not the render-time
+    // closure above: a browser signing in for the first time with an
+    // already-progressed account still has `isNew: true` locally (nothing
+    // was ever saved on this device) until the launch pull's own
+    // `profile.hydrate()` corrects it. Handing out the starter deck on the
+    // stale value would race that pull — and since `add`/`ensureStarter`
+    // push whatever they just set, a loss of that race doesn't just show
+    // the wrong thing locally, it overwrites the real collection on the
+    // server with a starter-only one.
+    void (async () => {
+      await waitForHydration()
+      if (useProfile.getState().isNew) {
+        addCards(STARTER_CARD_IDS)
+        ensureStarter()
+      }
+      markSeen()
+    })()
 
     // Changing the route is what removes this overlay, so it waits until the
     // screen has gone black and held there. Staging the exit itself — one
