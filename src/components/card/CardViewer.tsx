@@ -28,12 +28,24 @@ import { useSettings } from '@/store/settings'
  * your Active Figure mid-match, which also carries its attacks underneath, so
  * one tap still both inspects and acts.
  *
- * The card lifts toward your thumb, as though it were being tilted up to
- * meet it, and both the holo sheen and the metal rim track that lean: the
- * pairing is what makes a rare card feel like a physical foil rather than a
- * picture of one. Release and it springs back level. Motion is dropped
- * entirely under `prefers-reduced-motion` — or its in-app equivalent, the
- * "Simplify effects" switch in Menu → Graphics.
+ * The card leans toward your thumb, and both the holo sheen and the metal
+ * rim track that lean: the pairing is what makes a rare card feel like a
+ * physical foil rather than a picture of one. Release and it springs back
+ * level. Motion is dropped entirely under `prefers-reduced-motion` — or its
+ * in-app equivalent, the "Simplify effects" switch in Menu → Graphics.
+ *
+ * The lean is a 2D skew, not a 3D rotation — no `perspective`, no
+ * `rotateX`/`rotateY`. An earlier version used real CSS 3D, and every
+ * configuration of it (rigid, perspective near, perspective far, combined
+ * or independent axis caps) kept reporting as either flat or warped —
+ * `rotateX`/`rotateY` through a `perspective` is a true projection, so a
+ * corner dragged toward its own cap genuinely does foreshorten more than
+ * the opposite one, which is what "warped" was. `skewX`/`skewY` is a plain
+ * shear: it has no vanishing point, so opposite edges always stay parallel
+ * and equal length regardless of angle — there is no corner for it *to*
+ * stretch relative to another, by construction rather than by tuning. A
+ * small uniform `scale` on top sells "lifted toward you" without the shear
+ * having to carry that alone.
  *
  * A held touch or mouse press is the only input — a mouse merely hovering
  * does nothing, the same as a finger that isn't down does nothing. The
@@ -47,8 +59,16 @@ import { useSettings } from '@/store/settings'
  * Mounted once, in App. Everything else opens it through the peek store.
  */
 
-/** Degrees at the card's edge, same cap on both axes. */
-const MAX_TILT = 25
+/** Degrees of shear at the card's edge, same cap on both axes. Shear reads
+ *  stronger per degree than the old perspective rotation did — the same
+ *  25° that looked like a believable lean as a `rotateY` looks like warm
+ *  taffy as a `skewY` — so this is much smaller than that cap was. */
+const MAX_SKEW = 4
+
+/** How much the card grows while held, as a fraction — a uniform `scale`,
+ *  so it can never distort the shape the way the shear's own degree cap is
+ *  kept small specifically to avoid. Just enough to read as "picked up". */
+const MAX_LIFT = 0.035
 
 /** Fraction of the remaining distance to the target closed each frame —
  *  `cur += (target - cur) * TILT_SMOOTHING`, run every animation frame in
@@ -168,49 +188,58 @@ function Viewer({
   })
 
   /*
-   * The card lifts toward the finger: touch the right edge and that edge
-   * rises toward you, as though the card were tilting up to meet the touch
+   * The card leans toward the finger: touch the right edge and that edge
+   * shears toward you, as though the card were tilting up to meet the touch
    * rather than pressing flat away from it.
    *
-   * A positive rotateY sends the right edge away from the viewer and a
-   * positive rotateX sends the top edge away, so lifting the touched edge
-   * toward the viewer instead means negating both from what a plain
-   * `(px, py)` reading would otherwise give.
+   * `skewX` shears vertical edges based on vertical position (touch the top
+   * or bottom and the card leans that way) and `skewY` shears horizontal
+   * edges based on horizontal position — the same (px, py)→(axis) pairing
+   * the old `rotateX`/`rotateY` used, just a shear instead of a rotation, so
+   * the gesture still reads the same even though what it draws is different.
    */
-  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
-  const rotateX = useTransform(sy, (v) => v * MAX_TILT)
+  const skewX = useTransform(sy, (v) => v * MAX_SKEW)
+  const skewY = useTransform(sx, (v) => -v * MAX_SKEW)
+  const scale = useTransform(
+    [sx, sy] as const,
+    ([x = 0, y = 0]: number[]) => 1 + Math.min(1, Math.hypot(x, y)) * MAX_LIFT,
+  )
 
   /*
-   * The light is derived from the rotation, not from the pointer.
-   *
-   * Both were driven off the pointer before, which meant flipping the tilt
-   * silently sent the highlight sweeping against the surface instead of across
-   * it — the sort of mismatch that reads as "wrong" without being nameable.
-   * Taking the rotation as the input makes the two impossible to desynchronise:
-   * whichever way the card faces, the sheen and the rim's specular follow it.
+   * The light is derived from the pointer directly now, not from the
+   * geometric lean — there is no rotation left to derive it from, and the
+   * shear's own cap (8°) is kept deliberately small for safety, which would
+   * have throttled the sheen's sweep along with it if this still rode the
+   * shear the way it used to ride `rotateY`/`rotateX`. The coefficients
+   * below are the old ones carried through algebraically — `rotateY` was
+   * `-sx * 25`, and `holoAngle` read `rotateY * 2.6`, so `sx * -65` lands on
+   * the exact same sweep the card already had, just sourced one step
+   * earlier in the chain. The light sweeping a full, dramatic arc while the
+   * card itself only leans a few degrees is the point: a trading card's
+   * foil doesn't need the whole card to tip over for the rainbow to move
+   * across it.
    */
-  // Both axes feed the angle, not just rotateY — a pure up/down drag used to
-  // leave this untouched, so tilting the card toward or away from you swept
-  // no sheen at all and read as no different from the resting card. The
-  // rim's own highlight (below) already took both axes; the sheen just
-  // hadn't caught up.
+  // Both axes feed the angle, not just the horizontal one — a pure up/down
+  // drag used to leave this untouched, so tilting the card toward or away
+  // from you swept no sheen at all and read as no different from the
+  // resting card. The rim's own highlight (below) already took both axes;
+  // the sheen just hadn't caught up.
   //
-  // Equal weight on both axes (2.6 and 2.6) was the wrong way to fix that:
-  // rotateY and rotateX can carry opposite signs — a bottom-right or
-  // top-left corner drag is exactly that — and with matching coefficients
-  // the two terms partially cancel instead of adding, so the corners along
-  // that diagonal barely moved the sheen at all while the other diagonal
-  // (top-right, bottom-left) swept twice as far as intended. Uneven
-  // coefficients, the same idea rimBase already uses below, mean no
-  // direction cancels: every corner still gets a real, visible sweep, just
-  // not identical in size to its neighbor.
+  // Equal weight on both axes was the wrong way to fix that: the two terms
+  // can carry opposite signs — a bottom-right or top-left corner drag is
+  // exactly that — and with matching coefficients they partially cancel
+  // instead of adding, so the corners along that diagonal barely moved the
+  // sheen at all while the other diagonal (top-right, bottom-left) swept
+  // twice as far as intended. Uneven coefficients mean no direction
+  // cancels: every corner still gets a real, visible sweep, just not
+  // identical in size to its neighbor.
   const holoAngle = useMotionTemplate`${useTransform(
-    [rotateY, rotateX] as const,
-    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 1,
+    [sx, sy] as const,
+    ([x = 0, y = 0]: number[]) => 115 + x * -65 + y * 25,
   )}deg`
   const rimBase = useMotionTemplate`${useTransform(
-    [rotateY, rotateX] as const,
-    ([y = 0, x = 0]: number[]) => 218 + y * 1.9 + x,
+    [sx, sy] as const,
+    ([x = 0, y = 0]: number[]) => 218 + x * -47.5 + y * 25,
   )}deg`
   const lit = useTransform([sx, sy] as const, ([x = 0, y = 0]: number[]) =>
     Math.min(1, Math.hypot(x, y)),
@@ -300,11 +329,14 @@ function Viewer({
     if (reduced.current || !dragging.current) return
     const r = rectRef.current
     if (!r) return
-    // -1 to 1 across the card, so MAX_TILT reads as degrees at the edge —
+    // -1 to 1 across the card, so MAX_SKEW reads as degrees at the edge —
     // each axis clamped independently, so a corner drag (both near their
-    // own ±1 at once) reaches close to MAX_TILT on rotateX *and* rotateY
-    // together rather than sharing one combined budget. Pointer capture is
-    // what lets the finger carry on past the card's own edge and simply
+    // own ±1 at once) reaches close to MAX_SKEW on skewX *and* skewY
+    // together rather than sharing one combined budget. A shear has no
+    // vanishing point to push two full-budget axes through, unlike the old
+    // rotation, so there's no "opposite corners stretch" failure mode left
+    // for a combined corner budget to be guarding against. Pointer capture
+    // is what lets the finger carry on past the card's own edge and simply
     // hold each axis at its own ±1 instead of reading some undefined,
     // ever-growing value out past the card.
     px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
@@ -380,8 +412,8 @@ function Viewer({
         No `stopPropagation` here on purpose — closing on a tap anywhere,
         card included, is the whole point now that there's no close button.
         It's still safe for the tilt gesture: `closeIfTap` on the scrim only
-        fires when the pointer barely moved, so a real drag that turns the
-        card in 3D never closes it, only a plain tap does.
+        fires when the pointer barely moved, so a real drag that leans the
+        card never closes it, only a plain tap does.
       */}
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center px-4 pt-safe pb-6 gap-1 overflow-hidden">
         {/*
@@ -400,18 +432,8 @@ function Viewer({
           className="shrink-0 px-2 py-4"
           style={{
             width: `min(300px, 78vw, calc((100dvh - ${chrome}) * 63 / 88))`,
-            // Perspective is back, on request, matching a reference
-            // implementation's settings: MAX_TILT 25° on both axes with no
-            // shared corner budget, real keystone included. This reopens
-            // exactly the "opposite corners stretch" failure mode the last
-            // several fixes existed to close — a corner drag can now reach
-            // close to 25° on rotateX *and* rotateY at once, pushed through
-            // a real vanishing point, which is a materially stronger
-            // distortion than anything that drew that complaint before. The
-            // reference didn't specify a distance (its own perspective lives
-            // on a CSS rule this session never saw); 650px is a middle
-            // value, not a verified-safe one.
-            perspective: '650px',
+            // No `perspective` here — the lean below is a 2D skew, which
+            // has nothing for a perspective distance to project through.
             // Without this a vertical drag on the card would scroll an ancestor
             // instead of turning the card.
             touchAction: 'none',
@@ -495,9 +517,9 @@ function Viewer({
                   {
                     position: 'absolute',
                     inset: 0,
-                    rotateX,
-                    rotateY,
-                    transformStyle: 'preserve-3d',
+                    skewX,
+                    skewY,
+                    scale,
                     '--holo-angle': holoAngle,
                     '--holo-opacity': holoOpacity,
                     '--rim-base': rimBase,
