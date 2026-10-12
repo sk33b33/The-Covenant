@@ -28,6 +28,20 @@ export const MAT_TINT: Record<EnergyType, string> = {
   shadow: '#3a3242',
 }
 
+/** Linear interpolation between two `#rrggbb` hex colours, `t` in [0, 1]. */
+function mix(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16)
+  const pb = parseInt(b.slice(1), 16)
+  const chan = (shift: number) => {
+    const va = (pa >> shift) & 0xff
+    const vb = (pb >> shift) & 0xff
+    return Math.round(va + (vb - va) * t)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return `#${chan(16)}${chan(8)}${chan(0)}`
+}
+
 export function BattleMat({
   className,
   theme = 'earth',
@@ -40,6 +54,24 @@ export function BattleMat({
   const id = (n: string) => `${n}-${uid}`
   const tint = MAT_TINT[theme]
 
+  // The frame — corner filigree and the inner edge rule — stays pure gold
+  // regardless of theme, the same metal every other border in the game
+  // uses: it reads as the table's own edge, not part of the match. The
+  // *field* is what carries the theme, in two registers: a colour-graded
+  // wash across the ground itself (barely there near the centre, heaviest
+  // toward the corners, so it frames rather than competes with the clash
+  // glow) and an accent metal — gold folded toward the tint — for the
+  // elements that actually ring the clash: the two circles and the
+  // halfway line gating them. Below `clash`, which still carries the
+  // strongest, purest hit of the colour right where the action lands.
+  const groundNear = mix('#2b2317', tint, 0.08)
+  const groundMid = mix('#191308', tint, 0.16)
+  const groundFar = mix('#0d0a05', tint, 0.24)
+  const accentNear = mix('#e8cf9e', tint, 0.4)
+  const accentMid = mix('#b08751', tint, 0.4)
+  const accentDeep = mix('#7a5a2e', tint, 0.4)
+  const accentFar = mix('#d9b478', tint, 0.4)
+
   return (
     <svg
       viewBox="0 0 390 620"
@@ -49,9 +81,9 @@ export function BattleMat({
     >
       <defs>
         <radialGradient id={id('ground')} cx="50%" cy="50%" r="72%">
-          <stop offset="0%" stopColor="#2b2317" />
-          <stop offset="58%" stopColor="#191308" />
-          <stop offset="100%" stopColor="#0d0a05" />
+          <stop offset="0%" stopColor={groundNear} />
+          <stop offset="58%" stopColor={groundMid} />
+          <stop offset="100%" stopColor={groundFar} />
         </radialGradient>
 
         <radialGradient id={id('clash')} cx="50%" cy="50%" r="50%">
@@ -66,6 +98,13 @@ export function BattleMat({
           <stop offset="65%" stopColor="#7a5a2e" />
           <stop offset="100%" stopColor="#d9b478" />
         </linearGradient>
+
+        <linearGradient id={id('accent')} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="390" y2="620">
+          <stop offset="0%" stopColor={accentNear} />
+          <stop offset="35%" stopColor={accentMid} />
+          <stop offset="65%" stopColor={accentDeep} />
+          <stop offset="100%" stopColor={accentFar} />
+        </linearGradient>
       </defs>
 
       <rect width="390" height="620" fill={`url(#${id('ground')})`} />
@@ -77,7 +116,7 @@ export function BattleMat({
         cy="310"
         r="86"
         fill="none"
-        stroke={`url(#${id('gold')})`}
+        stroke={`url(#${id('accent')})`}
         strokeWidth="1.4"
         opacity="0.5"
       />
@@ -86,7 +125,7 @@ export function BattleMat({
         cy="310"
         r="72"
         fill="none"
-        stroke={`url(#${id('gold')})`}
+        stroke={`url(#${id('accent')})`}
         strokeWidth="0.7"
         opacity="0.3"
       />
@@ -94,7 +133,7 @@ export function BattleMat({
       {/* The halfway line, broken at the centre so the ring reads as a gate. */}
       <path
         d="M8 310 H109 M281 310 H382"
-        stroke={`url(#${id('gold')})`}
+        stroke={`url(#${id('accent')})`}
         strokeWidth="1.2"
         opacity="0.5"
       />
