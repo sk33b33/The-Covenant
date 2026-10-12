@@ -41,6 +41,14 @@ interface Props {
   selected?: boolean
   /** Draws the pulsing target ring. */
   targetable?: boolean
+  /**
+   * The same pulsing gold glow the Altar shows once it holds energy —
+   * drawn behind this Figure's card instead, meaning "there's enough
+   * energy attached here to swing with right now." Set only for your own
+   * Active Figure, and only on your turn (see `canAttackNow` in
+   * Battle.tsx); never on the opponent's or a Bench Figure's.
+   */
+  attackReady?: boolean
   /** Hides HP and energy for the opponent's face-down or distant pieces. */
   compactStats?: boolean
   /**
@@ -92,6 +100,7 @@ export function BoardFigure({
   onClick,
   selected,
   targetable,
+  attackReady,
   compactStats,
   noPeek,
   className,
@@ -202,6 +211,27 @@ export function BoardFigure({
       }
       aria-label={faceDown ? 'Face-down card' : `${card.name}, ${remaining} of ${hp} HP`}
     >
+      {/* Drawn first so the (opaque) card paints over the top of it, same
+          stacking as the Altar's identical glow sitting behind its orb.
+          Sized a fifth larger than the card on every side, unlike the
+          Altar's own version (which sits flush at `inset: 0`): there, the
+          glow shares its box with a small round orb, so the same box
+          scaling past it reads fine either way. Flush against a full card
+          it would spend half of every cycle scaled *below* 100% — fully
+          eclipsed behind the opaque card it sits under — and never read as
+          pulsing at all. Oversizing it first means even the dim end of the
+          breathing scale below still clears the card's own edge. */}
+      {attackReady && (
+        <span
+          className="cov-figure-ready-glow absolute pointer-events-none"
+          style={{
+            inset: '-20%',
+            borderRadius: '4.5% / 3.22%',
+            background: 'radial-gradient(ellipse, rgba(229,192,140,.65), transparent 70%)',
+          }}
+        />
+      )}
+
       <div
         style={{
           boxShadow: selected

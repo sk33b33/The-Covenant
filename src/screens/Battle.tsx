@@ -1154,6 +1154,15 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
     return { byHand, byUid, attacks, retreats, miracles }
   }, [legal])
 
+  /** Whether your Active Figure has at least one attack it can actually pay
+   *  for and use right now — the same list the attack sheet itself is built
+   *  from (see `openSheet` below), so the Active card's glow never lights up
+   *  offering something the sheet wouldn't also have on offer. Gated on
+   *  `myTurn` rather than `actionsFor.attacks` alone: `legal` (and so
+   *  `actionsFor`) reflects whoever is actually to move, and on the
+   *  opponent's turn that's their attacks, not yours. */
+  const canAttackNow = myTurn && actionsFor.attacks.length > 0
+
   /* --------------------------------------------------------------- setup */
 
   const basicsInHand = you.hand
@@ -2011,6 +2020,7 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
               emptyLabel="Active"
               onClick={you.active && myTurn ? openActive : undefined}
               selected={Boolean(you.active && myTurn)}
+              attackReady={canAttackNow}
               noPeek={Boolean(you.active && myTurn)}
               previewCardId={activePreview?.cardId}
               previewTentative={activePreview?.tentative}

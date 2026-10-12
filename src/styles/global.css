@@ -469,6 +469,14 @@
     animation: cov-pulse-glow 2.4s ease-in-out infinite;
   }
 
+  /* The same pulse, same colour, same rhythm, sized to a Figure's card
+   * instead of the Altar's own orb — "enough energy is attached here to
+   * attack right now" read with the exact cue the Altar already uses for
+   * "there's energy to spend." See BoardFigure.tsx's `attackReady`. */
+  .cov-figure-ready-glow {
+    animation: cov-pulse-glow 2.4s ease-in-out infinite;
+  }
+
   /* Marks a hand card as viable the moment it can be acted on — a pulsing
    * ring rather than the pile's radial pulse, since it has to trace a
    * card's rounded-rectangle edge instead of sitting inside a circle. The
