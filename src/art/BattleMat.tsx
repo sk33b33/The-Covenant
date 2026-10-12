@@ -15,7 +15,11 @@ import { cx } from '@/lib/cx'
  * slot is a real button positioned over it.
  */
 
-const TINT: Record<EnergyType, string> = {
+/** The clash ring's own tint per type — exported so a small swatch picker
+ *  (DeckBuilder's playmat row) can key a quick-glance colour dot off the
+ *  exact same value, since the full mat's own glow is too small a fraction
+ *  of a thumbnail-sized render to read as a colour at a glance on its own. */
+export const MAT_TINT: Record<EnergyType, string> = {
   light: '#f2d675',
   fire: '#d2543a',
   water: '#3d7fa6',
@@ -34,7 +38,7 @@ export function BattleMat({
 }) {
   const uid = useId().replace(/:/g, '')
   const id = (n: string) => `${n}-${uid}`
-  const tint = TINT[theme]
+  const tint = MAT_TINT[theme]
 
   return (
     <svg

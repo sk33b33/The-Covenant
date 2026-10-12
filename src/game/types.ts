@@ -216,5 +216,14 @@ export interface Deck {
   energy: EnergyType[]
   /** Card id whose art represents the deck in lists. */
   coverCardId?: string
+  /**
+   * An explicit playmat choice for matches played with this deck, overriding
+   * the default per-match tint (today: the opponent's own energy in a Quick
+   * Battle or Training match). `undefined` keeps that default — a deck is
+   * never *without* a mat, just without an opinion of its own about which
+   * one. Story encounters are never overridden: that mat is the scene's own,
+   * not the deck's.
+   */
+  matTheme?: EnergyType
   updatedAt: number
 }

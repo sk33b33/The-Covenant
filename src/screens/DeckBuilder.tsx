@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { BattleMat, MAT_TINT } from '@/art/BattleMat'
 import { EnergyOrb } from '@/art/EnergyOrb'
 import { BackIcon, CheckIcon, CloseIcon, GridIcon, ListIcon, MinusIcon, PlusIcon, SearchIcon } from '@/art/icons'
 import { PressableCard } from '@/components/card/PressableCard'
@@ -8,6 +9,7 @@ import { Button, Panel, Progress } from '@/components/ui'
 import { CARDS, getCard, requireCard } from '@/data/cards'
 import { RULES } from '@/game/config'
 import {
+  ENERGY_LABEL,
   ENERGY_TYPES,
   RARITY_LABEL,
   RARITY_ORDER,
@@ -45,6 +47,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
   const [name, setName] = useState(existing?.name ?? 'New Deck')
   const [cards, setCards] = useState<string[]>(existing?.cards ?? [])
   const [energy, setEnergy] = useState<EnergyType[]>(existing?.energy ?? [])
+  const [matTheme, setMatTheme] = useState<EnergyType | undefined>(existing?.matTheme)
   const [query, setQuery] = useState('')
   const [autoMode, setAutoMode] = useState<'single' | 'multiple'>('single')
   const [view, setView] = useState<ViewMode>(loadCardsView)
@@ -233,6 +236,7 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
       cards,
       energy,
       ...(cover ? { coverCardId: cover.id } : {}),
+      ...(matTheme ? { matTheme } : {}),
     })
     setActive(id)
     back()
@@ -325,6 +329,59 @@ export function DeckBuilder({ deckId }: { deckId?: string }) {
                   }}
                 >
                   <EnergyOrb type={type} size={20} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Playmat. "Auto" keeps today's default — the opponent's own
+              energy in a Quick Battle or Training match — rather than
+              forcing every deck to carry an explicit opinion; Story's own
+              encounter mat is never affected either way (that one is the
+              scene's, not the deck's). Each swatch is the real mat, not a
+              colour stand-in, so the choice is made from what will actually
+              show up at the table. */}
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-xs text-ink-muted shrink-0">Playmat</span>
+            <div className="flex gap-1.5 flex-wrap">
+              <button
+                onClick={() => setMatTheme(undefined)}
+                aria-pressed={matTheme === undefined}
+                aria-label="Auto playmat — match your opponent"
+                className={cx(
+                  'relative w-7 h-10 rounded-[18%] overflow-hidden grid place-items-center transition-all duration-200',
+                  matTheme === undefined ? 'shadow-pressed scale-95 cov-toggle-glow' : 'shadow-raised-sm',
+                )}
+                style={{ background: 'var(--bg-sunk)' }}
+              >
+                <span
+                  className="text-[7px] font-bold tracking-wide"
+                  style={{ color: 'var(--ink-faint)' }}
+                >
+                  AUTO
+                </span>
+              </button>
+              {ENERGY_TYPES.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setMatTheme(type)}
+                  aria-pressed={matTheme === type}
+                  aria-label={`${ENERGY_LABEL[type]} playmat`}
+                  className={cx(
+                    'relative w-7 h-10 rounded-[18%] overflow-hidden transition-all duration-200',
+                    matTheme === type ? 'shadow-pressed scale-95 cov-toggle-glow' : 'shadow-raised-sm',
+                  )}
+                >
+                  <BattleMat theme={type} />
+                  {/* The mat's own clash-ring glow is too small a fraction
+                      of a thumbnail this size to read as a colour at a
+                      glance — this dot, in the same tint, is the quick cue;
+                      the mat above it is still what's actually being
+                      chosen. */}
+                  <span
+                    className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full"
+                    style={{ background: MAT_TINT[type], boxShadow: '0 0 0 1px rgba(0,0,0,.4)' }}
+                  />
                 </button>
               ))}
             </div>

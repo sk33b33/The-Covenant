@@ -64,7 +64,7 @@ export function BattleRoute({ deckId, training }: { deckId?: string; training?: 
       difficulty={tier?.config ?? DIFFICULTY.steady}
       seed={seed}
       opponentName={tier?.label ?? 'Wanderer'}
-      themeType={opponent.energy[0] ?? 'earth'}
+      themeType={deck.matTheme ?? opponent.energy[0] ?? 'earth'}
       onExit={back}
     />
   )
