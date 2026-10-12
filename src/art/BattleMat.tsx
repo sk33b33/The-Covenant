@@ -28,6 +28,55 @@ export const MAT_TINT: Record<EnergyType, string> = {
   shadow: '#3a3242',
 }
 
+/**
+ * A single sprig of the Covenant seal's own tree — the same silhouette the
+ * card back carries (trunk, two branch pairs, a top twig, root ticks at the
+ * base), simplified to a line-weight a scattered watermark can actually
+ * read at. Drawn once in `<defs>` and stamped out by `<use>` below rather
+ * than repeated inline, the same reuse the corner marks further down
+ * already get from being one `<path>` mirrored by transform instead of four.
+ * Centred on its own origin so each stamp's `rotate`/`scale` in the scatter
+ * below turns it in place rather than around a corner.
+ */
+const TREE_MARK =
+  'M0 14 V-10 M0 14 L-4 18 M0 14 L0 19 M0 14 L4 18 M0 6 L-7 -1 M0 6 L7 -1 M0 -2 L-6 -9 M0 -2 L6 -9 M0 -10 L0 -16'
+const TREE_LEAVES: [number, number][] = [
+  [-7, -1],
+  [7, -1],
+  [-6, -9],
+  [6, -9],
+  [0, -16],
+]
+
+/**
+ * Where each stamp lands — hand-placed rather than seeded at random, so the
+ * pattern is fixed art rather than something that reshuffles if this ever
+ * re-renders. Kept clear of the clash rings themselves (within ~110px of
+ * centre) and off the very edge (the filigree's own territory), scaled and
+ * rotated unevenly so the field reads as scattered rather than a stamped
+ * grid.
+ */
+const TREE_SCATTER: { x: number; y: number; r: number; s: number; o: number }[] = [
+  { x: 55, y: 70, r: -12, s: 0.9, o: 0.09 },
+  { x: 320, y: 55, r: 18, s: 1.1, o: 0.08 },
+  { x: 150, y: 108, r: 8, s: 0.7, o: 0.07 },
+  { x: 262, y: 132, r: -20, s: 1.0, o: 0.09 },
+  { x: 40, y: 200, r: 15, s: 1.2, o: 0.08 },
+  { x: 352, y: 222, r: -8, s: 0.8, o: 0.07 },
+  { x: 96, y: 252, r: -22, s: 0.65, o: 0.06 },
+  { x: 110, y: 30, r: 5, s: 0.6, o: 0.06 },
+  { x: 300, y: 382, r: 10, s: 0.9, o: 0.08 },
+  { x: 60, y: 422, r: -15, s: 1.0, o: 0.09 },
+  { x: 332, y: 440, r: 20, s: 0.75, o: 0.07 },
+  { x: 140, y: 482, r: -6, s: 1.15, o: 0.08 },
+  { x: 252, y: 500, r: 14, s: 0.85, o: 0.07 },
+  { x: 190, y: 540, r: -18, s: 0.7, o: 0.06 },
+  { x: 45, y: 562, r: 22, s: 0.95, o: 0.09 },
+  { x: 340, y: 572, r: -10, s: 1.05, o: 0.08 },
+  { x: 280, y: 592, r: -14, s: 0.8, o: 0.07 },
+  { x: 200, y: 172, r: 25, s: 0.55, o: 0.05 },
+]
+
 /** Linear interpolation between two `#rrggbb` hex colours, `t` in [0, 1]. */
 function mix(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16)
@@ -105,9 +154,29 @@ export function BattleMat({
           <stop offset="65%" stopColor={accentDeep} />
           <stop offset="100%" stopColor={accentFar} />
         </linearGradient>
+
+        <g id={id('tree')}>
+          <path d={TREE_MARK} stroke={`url(#${id('accent')})`} strokeWidth="1" strokeLinecap="round" fill="none" />
+          {TREE_LEAVES.map(([lx, ly], i) => (
+            <circle key={i} cx={lx} cy={ly} r="1.5" fill={`url(#${id('accent')})`} />
+          ))}
+        </g>
       </defs>
 
       <rect width="390" height="620" fill={`url(#${id('ground')})`} />
+
+      {/* The seal's own tree, scattered across the field — part of the
+          ground texture rather than the structural frame, so it's drawn in
+          `accent` (gold folded toward the theme) alongside the clash rings
+          and halfway line, not the frame's plain `gold`. */}
+      {TREE_SCATTER.map((t, i) => (
+        <use
+          key={i}
+          href={`#${id('tree')}`}
+          transform={`translate(${t.x} ${t.y}) rotate(${t.r}) scale(${t.s})`}
+          opacity={t.o}
+        />
+      ))}
 
       {/* The clash, dead centre. */}
       <circle cx="195" cy="310" r="150" fill={`url(#${id('clash')})`} />
