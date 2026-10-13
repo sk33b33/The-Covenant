@@ -3285,7 +3285,13 @@ function PileCount({ count }: { count: number }) {
     <button
       onClick={tap}
       disabled={count === 0}
-      className="relative rounded-sm overflow-hidden"
+      // No `overflow-hidden` here — see the "No `overflow: hidden` here,
+      // deliberately" comment at the top of card.css. `CardBack` clips its
+      // own content at its own border-radius already; a second, mismatched
+      // clip from a Tailwind `rounded-sm` (a fixed 2px, not the ~2.3px this
+      // curve actually resolves to at this size) is exactly the kind of
+      // slightly-off outer mask that comment describes shaving the corners.
+      className="relative"
       style={{ width: size, aspectRatio: '63/88' }}
       aria-label={`Deck: ${count} card${count === 1 ? '' : 's'} left`}
     >
@@ -3334,7 +3340,18 @@ function DiscardPile({ cardIds, onOpen }: { cardIds: string[]; onOpen: () => voi
     <button
       onClick={() => count > 0 && onOpen()}
       disabled={count === 0}
-      className="relative shrink-0 rounded-sm overflow-hidden"
+      // No `overflow-hidden` here — see the "No `overflow: hidden` here,
+      // deliberately" comment at the top of card.css. `Card` is a stack of
+      // independently-radiused layers with no outer clip of its own on
+      // purpose, precisely so nothing outside it ever has to guess that
+      // radius; wrapping it in a second, mismatched clip (a Tailwind
+      // `rounded-sm`, not the card's own `4.5cqw`) is exactly the setup
+      // that comment describes shaving the corners — here visibly, since
+      // the nameplate reaches close enough to the card's own top edge to
+      // cross right through where that wrong clip line fell. It was also
+      // cropping the count badge below, which deliberately overhangs the
+      // card's own corner.
+      className="relative shrink-0"
       style={{ width: size, aspectRatio: '63/88' }}
       aria-label={`Discard: ${count} card${count === 1 ? '' : 's'}`}
     >
