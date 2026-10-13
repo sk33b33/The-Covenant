@@ -282,6 +282,17 @@ function Viewer({
   // a card this size does often enough to notice.
   const dragging = useRef(false)
 
+  // True from the moment a finger goes down until it first actually moves.
+  // A touch that never moves should never tilt anything — the card used to
+  // start leaning toward wherever the finger first landed the instant it
+  // landed, even dead still, which read as the card reacting to a touch
+  // rather than to a drag. Once real movement does happen, this also tells
+  // `track` to snap `sx`/`sy` straight to the target instead of letting the
+  // per-frame lerp (below) visibly catch up to it from level — the engage
+  // itself should be instant, even though the lerp still smooths everything
+  // that follows it.
+  const engaging = useRef(false)
+
   // The frame's own box, read once per drag rather than on every single
   // pointermove. A rect this size only ever changes from a resize/rotate or
   // the one-time enter animation settling, never from the drag itself — the
@@ -315,8 +326,15 @@ function Viewer({
     // what lets the finger carry on past the card's own edge and simply
     // hold each axis at its own ±1 instead of reading some undefined,
     // ever-growing value out past the card.
-    px.set(clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1))
-    py.set(clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1))
+    const nx = clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1)
+    const ny = clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1)
+    px.set(nx)
+    py.set(ny)
+    if (engaging.current) {
+      engaging.current = false
+      sx.set(nx)
+      sy.set(ny)
+    }
   }
 
   const level = () => {
@@ -433,12 +451,16 @@ function Viewer({
           // card's own bounds instead of stopping dead at the edge.
           onPointerDown={(e) => {
             dragging.current = true
+            engaging.current = true
             refreshRect()
             e.currentTarget.setPointerCapture(e.pointerId)
-            track(e)
+            // No `track(e)` here any more — see `engaging` above. A tap or a
+            // motionless hold now leaves the card flat; only an actual move
+            // (the pointer's own `onPointerMove` below) engages the tilt.
           }}
           onPointerUp={(e) => {
             dragging.current = false
+            engaging.current = false
             e.currentTarget.releasePointerCapture(e.pointerId)
             level()
             // A swipe is read from where the finger ended up relative to
@@ -466,6 +488,7 @@ function Viewer({
           // purposes mid-drag), and that still snaps back to level.
           onPointerCancel={() => {
             dragging.current = false
+            engaging.current = false
             level()
           }}
         >
