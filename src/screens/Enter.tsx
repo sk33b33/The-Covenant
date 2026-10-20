@@ -135,61 +135,75 @@ export function Enter() {
       exit={{ opacity: 0 }}
       transition={{ duration: lift, ease: [0.4, 0, 0.2, 1] }}
     >
-      {/* A very slow push-in so the screen breathes without drawing attention. */}
-      <motion.img
-        src={asset('art/key/cover.webp')}
-        alt="The Covenant"
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{ objectPosition: '50% 38%' }}
-        initial={{ scale: 1.02, opacity: 0 }}
-        animate={{ scale: 1.09, opacity: 1 }}
-        transition={{
-          opacity: { duration: 1.2, ease: 'easeOut' },
-          scale: { duration: 26, ease: 'linear', repeat: Infinity, repeatType: 'reverse' },
-        }}
-      />
+      {/*
+        Everything that is the key art — the image itself, its scrim and the
+        prompt sitting on it — stays inside the same `max-w-app` column every
+        other screen's content is capped at, centred by the `mx-auto` here.
+        The painting was composed for a phone's own aspect; without this, a
+        wide browser window handed `object-cover` a box far wider than the
+        art was ever meant to fill, and the crop it reached for to cover that
+        extra width read as the whole image being zoomed in. The outer
+        button's own `bg-[#0d0a06]` — already close to the art's darkest
+        tone — is what the letterboxing either side of a wide window shows
+        instead, rather than stretched or over-cropped art.
+      */}
+      <div className="relative mx-auto h-full max-w-app">
+        {/* A very slow push-in so the screen breathes without drawing attention. */}
+        <motion.img
+          src={asset('art/key/cover.webp')}
+          alt="The Covenant"
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ objectPosition: '50% 38%' }}
+          initial={{ scale: 1.02, opacity: 0 }}
+          animate={{ scale: 1.09, opacity: 1 }}
+          transition={{
+            opacity: { duration: 1.2, ease: 'easeOut' },
+            scale: { duration: 26, ease: 'linear', repeat: Infinity, repeatType: 'reverse' },
+          }}
+        />
 
-      {/* Only enough scrim at the foot to hold the prompt legible. */}
-      <div
-        className="absolute inset-x-0 bottom-0 h-[34%] pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(8,6,3,.94) 0%, rgba(8,6,3,.6) 45%, transparent 100%)',
-        }}
-      />
+        {/* Only enough scrim at the foot to hold the prompt legible. */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-[34%] pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(to top, rgba(8,6,3,.94) 0%, rgba(8,6,3,.6) 45%, transparent 100%)',
+          }}
+        />
 
-      <div className="relative h-full flex flex-col items-center justify-end pb-16 px-8">
-        <motion.div
-          className="flex flex-col items-center gap-4"
-          initial={{ opacity: 0, y: 14 }}
-          animate={leaving ? { opacity: 0, y: 0 } : { opacity: 1, y: 0 }}
-          transition={
-            leaving
-              ? { duration: PROMPT_OUT_S, ease: 'easeOut' }
-              : { delay: 0.9, duration: 0.9, ease: [0.22, 1, 0.36, 1] }
-          }
-        >
-          <span
-            className="h-px w-24"
-            style={{
-              background: 'linear-gradient(to right, transparent, #d9b478, transparent)',
-            }}
-          />
-
-          {/* Breathing, not blinking — a blink reads as a warning. */}
-          <motion.span
-            className="font-display text-sm tracking-[0.34em] pl-[0.34em]"
-            style={{ color: '#f0dcbc', textShadow: '0 2px 12px rgba(0,0,0,.8)' }}
-            animate={leaving ? { opacity: 0 } : { opacity: [0.42, 1, 0.42] }}
+        <div className="relative h-full flex flex-col items-center justify-end pb-16 px-8">
+          <motion.div
+            className="flex flex-col items-center gap-4"
+            initial={{ opacity: 0, y: 14 }}
+            animate={leaving ? { opacity: 0, y: 0 } : { opacity: 1, y: 0 }}
             transition={
               leaving
-                ? { duration: PROMPT_OUT_S }
-                : { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }
+                ? { duration: PROMPT_OUT_S, ease: 'easeOut' }
+                : { delay: 0.9, duration: 0.9, ease: [0.22, 1, 0.36, 1] }
             }
           >
-            TAP TO ENTER
-          </motion.span>
-        </motion.div>
+            <span
+              className="h-px w-24"
+              style={{
+                background: 'linear-gradient(to right, transparent, #d9b478, transparent)',
+              }}
+            />
+
+            {/* Breathing, not blinking — a blink reads as a warning. */}
+            <motion.span
+              className="font-display text-sm tracking-[0.34em] pl-[0.34em]"
+              style={{ color: '#f0dcbc', textShadow: '0 2px 12px rgba(0,0,0,.8)' }}
+              animate={leaving ? { opacity: 0 } : { opacity: [0.42, 1, 0.42] }}
+              transition={
+                leaving
+                  ? { duration: PROMPT_OUT_S }
+                  : { duration: 2.8, repeat: Infinity, ease: 'easeInOut' }
+              }
+            >
+              TAP TO ENTER
+            </motion.span>
+          </motion.div>
+        </div>
       </div>
 
       {/*
