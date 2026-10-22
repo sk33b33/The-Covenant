@@ -1,17 +1,13 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { BattleIcon, GiftIcon, MailIcon } from '@/art/icons'
+import { BattleIcon, GiftIcon, MailIcon, TreeMark } from '@/art/icons'
 import { CardViewer } from '@/components/card/CardViewer'
 import { TabBar } from '@/components/TabBar'
 import { BattleHub } from '@/screens/BattleHub'
-import { BattleRoute } from '@/screens/BattleRoute'
 import { Bible } from '@/screens/Bible'
 import { Collection } from '@/screens/Collection'
-import { DeckBuilder } from '@/screens/DeckBuilder'
 import { Enter } from '@/screens/Enter'
-import { PackOpen } from '@/screens/PackOpen'
 import { Shop } from '@/screens/Shop'
-import { StoryEncounter } from '@/screens/StoryEncounter'
 import { StoryMap } from '@/screens/StoryMap'
 import { Training } from '@/screens/Training'
 import { Home } from '@/screens/Home'
@@ -26,6 +22,42 @@ import { pauseMusic, playMusic } from '@/lib/music'
 import { pauseBattleMusic } from '@/lib/battleMusic'
 import { useAuth } from '@/store/auth'
 import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
+
+/*
+ * These four pull in the single biggest piece of the app by a wide margin —
+ * `Battle.tsx` alone is the largest file in the codebase, and its own
+ * `battle/` subcomponents (attack effects, the match result screen, the
+ * board) roughly double that again. `BattleRoute` and `StoryEncounter` both
+ * import `Battle` directly rather than through each other, so both have to
+ * be lazy for that weight to actually leave the main bundle — splitting
+ * just one still leaves the other pulling the whole battle engine in
+ * eagerly. `DeckBuilder` and `PackOpen` are smaller but still substantial
+ * and, like the other two, not needed on first paint: a fresh load reaches
+ * `Home` long before it reaches a match, a deck edit, or a pack reveal.
+ */
+const BattleRoute = lazy(() => import('@/screens/BattleRoute').then((m) => ({ default: m.BattleRoute })))
+const StoryEncounter = lazy(() =>
+  import('@/screens/StoryEncounter').then((m) => ({ default: m.StoryEncounter })),
+)
+const DeckBuilder = lazy(() => import('@/screens/DeckBuilder').then((m) => ({ default: m.DeckBuilder })))
+const PackOpen = lazy(() => import('@/screens/PackOpen').then((m) => ({ default: m.PackOpen })))
+
+/** What a lazy screen's own chunk shows while it's still being fetched — a
+ *  faint pulse on the game's own mark rather than a blank cut, for the rare
+ *  case a chunk doesn't already win the race against the route's own fade
+ *  (`motion.main`'s 0.16s opacity-in, below) on a fast connection. */
+function RouteLoading() {
+  return (
+    <div className="h-full grid place-items-center">
+      <motion.span
+        animate={{ opacity: [0.25, 0.6, 0.25] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <TreeMark size={32} className="text-ink-faint" />
+      </motion.span>
+    </div>
+  )
+}
 
 /** What `{ name: 'coming-soon' }` picks from — a fixed set, not a React node,
  *  so the route itself stays a plain value (see the type in store/nav.ts). */
@@ -172,7 +204,9 @@ export default function App() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.16 }}
         >
-          <Screen route={route} />
+          <Suspense fallback={<RouteLoading />}>
+            <Screen route={route} />
+          </Suspense>
         </motion.main>
       </AnimatePresence>
 
