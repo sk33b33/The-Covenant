@@ -8,6 +8,7 @@ import { useAuth } from '@/store/auth'
 import { useNav } from '@/store/nav'
 import { useProfile } from '@/store/profile'
 import { useSettings } from '@/store/settings'
+import { useSyncStatus } from '@/store/syncStatus'
 import { applyTheme, resolveTheme, type Theme } from '@/lib/theme'
 import { cx } from '@/lib/cx'
 
@@ -24,6 +25,9 @@ export function Menu() {
   const profile = useProfile()
   const email = useAuth((s) => s.email)
   const signOut = useAuth((s) => s.signOut)
+  const syncPending = useSyncStatus((s) => s.pending)
+  const syncError = useSyncStatus((s) => s.lastError)
+  const lastSyncedAt = useSyncStatus((s) => s.lastSyncedAt)
 
   const [theme, setTheme] = useState<Theme>(resolveTheme)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -97,12 +101,44 @@ export function Menu() {
         {/* Menu only ever renders while signed in — there's no "Sign In"
             branch here any more, since reaching this screen at all requires
             it (see App.tsx's gate) and there's no account to create in-app. */}
-        <Panel className="p-4 mt-3 flex items-center justify-between gap-3">
-          <span className="text-sm truncate">{email}</span>
-          <Button variant="sunk" className="!px-4 !py-2 text-sm shrink-0" onClick={signOut}>
-            Sign Out
-          </Button>
+        <Panel className="p-4 mt-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm truncate">{email}</span>
+            <Button variant="sunk" className="!px-4 !py-2 text-sm shrink-0" onClick={signOut}>
+              Sign Out
+            </Button>
+          </div>
+
+          {/* The one place a push that silently failed — and has now
+              exhausted its own retries (see `portalApi.ts`'s `pushState`)
+              — actually says so, rather than the save just quietly not
+              being there next time. Says nothing at all for the ordinary
+              case (synced, nothing pending, no error) rather than a
+              permanent "All good" line competing for attention with
+              everything else on this screen. */}
+          {(syncPending > 0 || syncError) && (
+            <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: '1px solid rgba(229,192,140,.2)' }}>
+              <span
+                className="w-1.5 h-1.5 rounded-pill shrink-0"
+                style={{
+                  background: syncError ? 'var(--negative)' : 'var(--warning)',
+                }}
+                aria-hidden="true"
+              />
+              <span className="text-xs text-ink-muted">
+                {syncError
+                  ? `Not synced — will retry on your next change (${syncError})`
+                  : 'Syncing…'}
+              </span>
+            </div>
+          )}
         </Panel>
+
+        {lastSyncedAt !== null && syncPending === 0 && !syncError && (
+          <p className="text-[11px] text-ink-faint text-center mt-1.5">
+            Synced {formatSyncedAgo(lastSyncedAt)}
+          </p>
+        )}
 
         {/* ----------------------------------------------------------- theme */}
         <h2 className="font-display text-md mt-6 mb-2 px-1">Appearance</h2>
@@ -341,6 +377,20 @@ function AudioChannel({
       </div>
     </div>
   )
+}
+
+/** A coarse "how long ago", matching the rough-grain `20:00`/`19:59`-style
+ *  countdowns already used in battle rather than a precise timestamp —
+ *  nobody reading "synced 3 minutes ago" needs it to the second. */
+function formatSyncedAgo(at: number): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000))
+  if (seconds < 10) return 'just now'
+  if (seconds < 60) return `${seconds}s ago`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
 }
 
 function Rule({ title, body }: { title: string; body: string }) {

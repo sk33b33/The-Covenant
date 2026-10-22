@@ -10,6 +10,8 @@
  * never mistaken for syncable game state.
  */
 
+import { syncFailed, syncStarted, syncSucceeded } from '@/store/syncStatus'
+
 export const PORTAL_URL = (import.meta.env.VITE_PORTAL_API_URL as string | undefined)?.replace(
   /\/$/,
   '',
@@ -128,6 +130,32 @@ export async function logout(): Promise<void> {
   }).catch(() => {})
 }
 
+/** Delay before each retry, in order — three tries past the first, capped
+ *  at 8s rather than climbing further: a push that's still failing after
+ *  ~12s total has already pushed into "the next save will carry this
+ *  change anyway" territory, and the one thing worse than giving up is
+ *  holding a stale bearer token hostage to a long backoff on a tab the
+ *  player has already moved on from. */
+const RETRY_DELAYS_MS = [1000, 3000, 8000]
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+type AttemptResult = 'ok' | 'unauthorized' | 'failed'
+
+async function attemptPush(key: string, data: unknown, token: string): Promise<AttemptResult> {
+  try {
+    const response = await fetch(`${PORTAL_URL}/api/game/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ patch: { [key]: data } }),
+    })
+    if (response.status === 401) return 'unauthorized'
+    return response.ok ? 'ok' : 'failed'
+  } catch {
+    return 'failed'
+  }
+}
+
 /**
  * Merges one store's data into the signed-in player's save row — never a
  * full overwrite, so pushing `economy` right after a pack opens can't
@@ -140,6 +168,13 @@ export async function logout(): Promise<void> {
  * silently" case any more — sign-in is mandatory to ever reach gameplay,
  * so a missing or rejected token here means the session genuinely needs
  * re-authenticating, not that guest play is in progress.
+ *
+ * A dropped connection or a server hiccup retries a few times on its own
+ * (see `RETRY_DELAYS_MS`) before giving up — the original version failed
+ * silently on the first attempt, which on a flaky connection meant losing
+ * writes for no better reason than bad timing. `syncStatus.ts` tracks the
+ * outcome so Menu's account row can actually say so when it finally does
+ * give up, rather than the save just quietly not being there next time.
  */
 export function pushState(key: string, data: unknown): void {
   const stored = readToken()
@@ -148,22 +183,30 @@ export function pushState(key: string, data: unknown): void {
     forceSignOut()
     return
   }
+  const token = stored.token
 
-  fetch(`${PORTAL_URL}/api/game/save`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${stored.token}` },
-    body: JSON.stringify({ patch: { [key]: data } }),
-  })
-    .then((response) => {
-      if (response.status === 401) {
+  syncStarted()
+  void (async () => {
+    for (let attempt = 0; ; attempt++) {
+      const result = await attemptPush(key, data, token)
+
+      if (result === 'ok') {
+        syncSucceeded()
+        return
+      }
+      if (result === 'unauthorized') {
+        syncFailed('Signed out')
         forceSignOut()
         return
       }
-      if (!response.ok) console.error(`[portalApi] push of "${key}" failed:`, response.status)
-    })
-    .catch((error) => {
-      console.error(`[portalApi] push of "${key}" failed:`, error)
-    })
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        console.error(`[portalApi] push of "${key}" failed after ${attempt + 1} attempts`)
+        syncFailed(`Couldn't save "${key}"`)
+        return
+      }
+      await wait(RETRY_DELAYS_MS[attempt]!)
+    }
+  })()
 }
 
 /**
