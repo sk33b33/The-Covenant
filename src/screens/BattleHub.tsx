@@ -1,4 +1,4 @@
-import { BattleIcon, ChevronRight, ClockIcon, DuplicateIcon, ScrollIcon } from '@/art/icons'
+import { BattleIcon, ChevronRight, ClockIcon, DuplicateIcon, ListIcon, ScrollIcon } from '@/art/icons'
 import { PressableCard } from '@/components/card/PressableCard'
 import { Button, EmptyState, Panel } from '@/components/ui'
 import { getCard } from '@/data/cards'
@@ -145,6 +145,25 @@ export function BattleHub() {
             <span className="block font-display text-md">Training</span>
             <span className="block text-xs text-ink-muted mt-0.5">
               Practice against a preset, single-element opponent — Standard, Advanced or Master
+            </span>
+          </span>
+        </button>
+
+        {/* ------------------------------------------------- match history */}
+        <button
+          onClick={() => go({ name: 'match-history' })}
+          className="neu rounded-lg w-full p-4 mt-3 flex items-center gap-4 text-left"
+        >
+          <span
+            className="grid place-items-center w-12 h-12 rounded-pill shrink-0"
+            style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}
+          >
+            <ListIcon size={24} />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-display text-md">Match History</span>
+            <span className="block text-xs text-ink-muted mt-0.5">
+              Every match you've finished — Quick Battle, Training and Story alike
             </span>
           </span>
         </button>

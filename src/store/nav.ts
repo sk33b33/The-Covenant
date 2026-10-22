@@ -29,6 +29,7 @@ export type Route =
   | { name: 'profile' }
   | { name: 'bible' }
   | { name: 'deck-builder'; deckId?: string }
+  | { name: 'match-history' }
   | { name: 'story-map' }
   | { name: 'story-encounter'; encounterId: string }
   | { name: 'training'; deckId?: string }

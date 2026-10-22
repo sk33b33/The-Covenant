@@ -4,6 +4,7 @@ import { useProfile } from './profile'
 import { useCollection } from './collection'
 import { useDecks } from './decks'
 import { useEconomy } from './economy'
+import { useMatchHistory } from './matchHistory'
 import { useMissions } from './missions'
 import { useStory } from './story'
 
@@ -15,7 +16,7 @@ import { useStory } from './story'
  * nothing but `Auth` until `signedIn` is true.
  */
 
-/** One key, one store's `hydrate` — the same six keys `persist.ts` already
+/** One key, one store's `hydrate` — the same keys `persist.ts` already
  *  saves under, so a pulled save's `state` object slots straight in without
  *  either side needing to know the other's exact field shapes. */
 const HYDRATE: Record<string, (data: never) => void> = {
@@ -25,6 +26,7 @@ const HYDRATE: Record<string, (data: never) => void> = {
   economy: (data) => useEconomy.getState().hydrate(data),
   missions: (data) => useMissions.getState().hydrate(data),
   story: (data) => useStory.getState().hydrate(data),
+  matchHistory: (data) => useMatchHistory.getState().hydrate(data),
 }
 
 /**

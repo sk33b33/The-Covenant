@@ -20,6 +20,7 @@ import { RULES } from '@/game/config'
 import { miracleFor } from '@/game/miracles'
 import { canPayCost, figureCard, figuresInPlay } from '@/engine/state'
 import { ENERGY_LABEL, isFigure, type EnergyType } from '@/game/types'
+import { useMatchHistory } from '@/store/matchHistory'
 import { usePeek } from '@/store/peek'
 import { useProfile } from '@/store/profile'
 import { asset } from '@/lib/asset'
@@ -1074,14 +1075,22 @@ export function Battle({ opponentName = 'Opponent', themeType = 'earth', onFinis
   // below: the win is banked even if the player backgrounds the app while
   // the finishing blow is still playing out.
   const recordBattle = useProfile((s) => s.recordBattle)
+  const recordMatch = useMatchHistory((s) => s.record)
   const [recorded, setRecorded] = useState(false)
   useEffect(() => {
     if (state.phase !== 'ended' || recorded) return
     setRecorded(true)
     const won = state.winner === 'you'
     recordBattle(won)
+    recordMatch({
+      won,
+      opponentName,
+      yourPoints: state.players.you.points,
+      opponentPoints: state.players.foe.points,
+      endReason: state.endReason ?? 'points',
+    })
     onFinish?.(won)
-  }, [state.phase, state.winner, recorded, recordBattle, onFinish])
+  }, [state.phase, state.winner, recorded, recordBattle, recordMatch, opponentName, onFinish, state.players, state.endReason])
 
   /**
    * When the result screen is allowed up.

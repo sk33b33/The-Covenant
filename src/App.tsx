@@ -34,6 +34,9 @@ import { useNav, type ComingSoonIcon, type Route } from '@/store/nav'
  * eagerly. `DeckBuilder` and `PackOpen` are smaller but still substantial
  * and, like the other two, not needed on first paint: a fresh load reaches
  * `Home` long before it reaches a match, a deck edit, or a pack reveal.
+ * `MatchHistory` is small enough that splitting it barely moves the bundle
+ * — it's lazy mainly for consistency with everything else reached the same
+ * way, a plain list screen off the Battle tab.
  */
 const BattleRoute = lazy(() => import('@/screens/BattleRoute').then((m) => ({ default: m.BattleRoute })))
 const StoryEncounter = lazy(() =>
@@ -41,6 +44,9 @@ const StoryEncounter = lazy(() =>
 )
 const DeckBuilder = lazy(() => import('@/screens/DeckBuilder').then((m) => ({ default: m.DeckBuilder })))
 const PackOpen = lazy(() => import('@/screens/PackOpen').then((m) => ({ default: m.PackOpen })))
+const MatchHistory = lazy(() =>
+  import('@/screens/MatchHistory').then((m) => ({ default: m.MatchHistory })),
+)
 
 /** What a lazy screen's own chunk shows while it's still being fetched — a
  *  faint pulse on the game's own mark rather than a blank cut, for the rare
@@ -297,6 +303,9 @@ function Screen({ route }: { route: Route }) {
 
     case 'bible':
       return <Bible />
+
+    case 'match-history':
+      return <MatchHistory />
 
     case 'story-map':
       return <StoryMap />

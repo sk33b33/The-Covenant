@@ -10,6 +10,7 @@ import { useProfile } from '@/store/profile'
 import { useSettings } from '@/store/settings'
 import { useSyncStatus } from '@/store/syncStatus'
 import { applyTheme, resolveTheme, type Theme } from '@/lib/theme'
+import { formatRelativeTime } from '@/lib/relativeTime'
 import { cx } from '@/lib/cx'
 
 /**
@@ -136,7 +137,7 @@ export function Menu() {
 
         {lastSyncedAt !== null && syncPending === 0 && !syncError && (
           <p className="text-[11px] text-ink-faint text-center mt-1.5">
-            Synced {formatSyncedAgo(lastSyncedAt)}
+            Synced {formatRelativeTime(lastSyncedAt)}
           </p>
         )}
 
@@ -377,20 +378,6 @@ function AudioChannel({
       </div>
     </div>
   )
-}
-
-/** A coarse "how long ago", matching the rough-grain `20:00`/`19:59`-style
- *  countdowns already used in battle rather than a precise timestamp —
- *  nobody reading "synced 3 minutes ago" needs it to the second. */
-function formatSyncedAgo(at: number): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - at) / 1000))
-  if (seconds < 10) return 'just now'
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
 }
 
 function Rule({ title, body }: { title: string; body: string }) {
