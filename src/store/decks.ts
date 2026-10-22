@@ -95,6 +95,16 @@ interface DeckStore {
   upsert: (deck: Omit<Deck, 'updatedAt'>) => void
   remove: (id: string) => void
   setActive: (id: string) => void
+  /** A full copy of the named deck, inserted directly after it — same
+   *  cards, energy and playmat, a new id and "<name> Copy" so the two are
+   *  never confused in the list. The copy is never made active on its
+   *  own; duplicating a deck is for keeping a variant beside the original,
+   *  not switching to it. */
+  duplicate: (id: string) => void
+  /** Moves a deck one slot earlier (-1) or later (+1) in the saved list.
+   *  A no-op past either end rather than wrapping — a list that cycles
+   *  when you push past the top reads as a bug the first time it happens. */
+  moveDeck: (id: string, direction: -1 | 1) => void
   /** Installs the starter deck if the player has none. */
   ensureStarter: () => void
   /** Replaces state wholesale from a cloud pull on sign-in — see `store/auth.ts`. */
@@ -141,6 +151,37 @@ export const useDecks = create<DeckStore>((set, get) => {
 
     setActive: (id) => {
       set({ activeDeckId: id })
+      persist()
+    },
+
+    duplicate: (id) => {
+      const decks = get().decks
+      const index = decks.findIndex((d) => d.id === id)
+      const original = decks[index]
+      if (!original) return
+
+      const copy: Deck = {
+        ...original,
+        id: `deck-${Date.now().toString(36)}`,
+        name: `${original.name} Copy`,
+        updatedAt: Date.now(),
+      }
+      const next = [...decks]
+      next.splice(index + 1, 0, copy)
+      set({ decks: next })
+      persist()
+    },
+
+    moveDeck: (id, direction) => {
+      const decks = get().decks
+      const index = decks.findIndex((d) => d.id === id)
+      const target = index + direction
+      if (index === -1 || target < 0 || target >= decks.length) return
+
+      const next = [...decks]
+      const [moved] = next.splice(index, 1)
+      next.splice(target, 0, moved!)
+      set({ decks: next })
       persist()
     },
 

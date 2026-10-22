@@ -213,6 +213,15 @@ export const ResetIcon = (p: IconProps) => (
   </Icon>
 )
 
+/** Duplicate: two overlapping squares, the back one only showing where the
+ *  front doesn't cover it. */
+export const DuplicateIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="8.2" y="8.2" width="11.2" height="11.2" rx="2" />
+    <path d="M15.4 8.2V6.4a2.2 2.2 0 0 0-2.2-2.2H6.4a2.2 2.2 0 0 0-2.2 2.2v6.8a2.2 2.2 0 0 0 2.2 2.2h1.8" />
+  </Icon>
+)
+
 /** Grid view: four equal tiles. */
 export const GridIcon = (p: IconProps) => (
   <Icon {...p}>

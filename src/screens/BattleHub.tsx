@@ -1,4 +1,4 @@
-import { BattleIcon, ClockIcon, ScrollIcon } from '@/art/icons'
+import { BattleIcon, ChevronRight, ClockIcon, DuplicateIcon, ScrollIcon } from '@/art/icons'
 import { PressableCard } from '@/components/card/PressableCard'
 import { Button, EmptyState, Panel } from '@/components/ui'
 import { getCard } from '@/data/cards'
@@ -19,6 +19,8 @@ export function BattleHub() {
   const decks = useDecks((s) => s.decks)
   const activeDeckId = useDecks((s) => s.activeDeckId)
   const setActive = useDecks((s) => s.setActive)
+  const duplicate = useDecks((s) => s.duplicate)
+  const moveDeck = useDecks((s) => s.moveDeck)
 
   const deck = decks.find((d) => d.id === activeDeckId) ?? decks[0]
   const validation = deck ? validateDeck(deck) : null
@@ -148,43 +150,83 @@ export function BattleHub() {
         </button>
 
         {/* ---------------------------------------------------- other decks */}
-        {decks.length > 1 && (
-          <>
+        {/* Shown even with a single deck now, not just once there's more than
+            one to switch between — duplicate and reorder are both useful
+            with exactly one deck (duplicating it is usually how a second
+            one starts existing at all), and gating the whole list on
+            `length > 1` hid both behind "build a second deck first." */}
+        <>
             <h2 className="font-display text-md mt-6 mb-2 px-1">Your decks</h2>
             <div className="space-y-2">
-              {decks.map((entry) => {
+              {decks.map((entry, index) => {
                 const check = validateDeck(entry)
                 return (
-                  <button
+                  <div
                     key={entry.id}
-                    onClick={() => setActive(entry.id)}
-                    className="neu rounded-lg w-full px-4 py-3 flex items-center gap-3 text-left"
+                    className="neu rounded-lg flex items-center gap-1 pr-1.5"
                     style={{
                       outline: entry.id === deck.id ? '1.5px solid var(--gold)' : undefined,
                     }}
                   >
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium truncate">{entry.name}</span>
-                      <span className="block text-xs text-ink-muted tabular-nums">
-                        {entry.cards.length}/{RULES.DECK_SIZE}
-                        {!check.legal && ' · not legal'}
+                    <button
+                      onClick={() => setActive(entry.id)}
+                      className="flex-1 min-w-0 px-4 py-3 flex items-center gap-3 text-left"
+                    >
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium truncate">{entry.name}</span>
+                        <span className="block text-xs text-ink-muted tabular-nums">
+                          {entry.cards.length}/{RULES.DECK_SIZE}
+                          {!check.legal && ' · not legal'}
+                        </span>
                       </span>
+                      <span className="flex gap-1 shrink-0">
+                        {entry.energy.map((type) => (
+                          <span
+                            key={type}
+                            className="w-3 h-3 rounded-pill"
+                            style={{ background: `var(--energy-${type})` }}
+                          />
+                        ))}
+                      </span>
+                    </button>
+
+                    {/* Duplicate and reorder live outside the tap-to-activate
+                        button rather than as a second thing that button does
+                        on long-press or similar — a deck list is tapped far
+                        more than it's rearranged, and overloading the same
+                        control for both would make the common case (switch
+                        decks) the one that risks a mistap into the rare one
+                        (duplicate a deck you only meant to select). */}
+                    <span className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        onClick={() => duplicate(entry.id)}
+                        className="w-8 h-8 rounded-pill grid place-items-center text-ink-faint"
+                        aria-label={`Duplicate ${entry.name}`}
+                      >
+                        <DuplicateIcon size={15} />
+                      </button>
+                      <button
+                        onClick={() => moveDeck(entry.id, -1)}
+                        disabled={index === 0}
+                        className="w-8 h-8 rounded-pill grid place-items-center text-ink-faint disabled:opacity-25"
+                        aria-label={`Move ${entry.name} up`}
+                      >
+                        <ChevronRight size={15} style={{ transform: 'rotate(-90deg)' }} />
+                      </button>
+                      <button
+                        onClick={() => moveDeck(entry.id, 1)}
+                        disabled={index === decks.length - 1}
+                        className="w-8 h-8 rounded-pill grid place-items-center text-ink-faint disabled:opacity-25"
+                        aria-label={`Move ${entry.name} down`}
+                      >
+                        <ChevronRight size={15} style={{ transform: 'rotate(90deg)' }} />
+                      </button>
                     </span>
-                    <span className="flex gap-1 shrink-0">
-                      {entry.energy.map((type) => (
-                        <span
-                          key={type}
-                          className="w-3 h-3 rounded-pill"
-                          style={{ background: `var(--energy-${type})` }}
-                        />
-                      ))}
-                    </span>
-                  </button>
+                  </div>
                 )
               })}
             </div>
-          </>
-        )}
+        </>
 
         <div className="mt-4">
           <Button block onClick={() => go({ name: 'deck-builder' })}>
