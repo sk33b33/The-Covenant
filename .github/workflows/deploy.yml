@@ -8,6 +8,12 @@ name: Deploy
 # DEPLOY_BASE is the sub-path a project site is served from. Every asset path
 # in the app is resolved against it at runtime (see src/lib/asset.ts), so the
 # build works from a sub-path and from a domain root without changes.
+#
+# VITE_PORTAL_API_URL is the live Covenant TCG Portal the game signs players
+# in against — not a secret (Vite inlines it straight into the public
+# client bundle, same as it would for anyone reading the portal's own
+# published API routes), so it's a plain env value here rather than a
+# repo secret.
 
 on:
   push:
@@ -45,6 +51,7 @@ jobs:
       - run: npm run build
         env:
           DEPLOY_BASE: /${{ github.event.repository.name }}/
+          VITE_PORTAL_API_URL: https://covenant-tcg-portal-xi.vercel.app
 
       - uses: actions/upload-pages-artifact@v3
         with:
