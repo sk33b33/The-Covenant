@@ -1,5 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useRef, useState } from 'react'
+import {
+  AnimatePresence,
+  motion,
+  useAnimationFrame,
+  useMotionTemplate,
+  useMotionValue,
+  useTransform,
+} from 'framer-motion'
 import { RarityMark } from '@/art/RarityMark'
 import { cx } from '@/lib/cx'
 import { ActionList, type SheetOption } from '@/screens/battle/ActionSheet'
@@ -43,24 +50,12 @@ import { useSettings } from '@/store/settings'
 /** Degrees at the card's edge, same cap on both axes. */
 const MAX_TILT = 25
 
-/** Fraction of the remaining distance to the target closed each frame, *at
- *  a nominal 60Hz* — `cur += (target - cur) * t` every animation frame
- *  below, where `t` is this value re-derived per frame from the actual
- *  elapsed time (see `tick`), not used directly. A plain exponential lerp
- *  rather than a physically-modelled spring: no overshoot, no bounce, just
- *  a fixed fraction of catch-up per frame — the same shape as before, just
- *  driven by a manual `requestAnimationFrame` loop instead of framer's
- *  motion values, and corrected for frame rate so a 120Hz display doesn't
- *  catch up twice as fast as a 60Hz one. */
-const TILT_SMOOTHING = 0.12
-
-/** The frame budget `TILT_SMOOTHING` is tuned against. */
-const REFERENCE_FRAME_MS = 1000 / 60
-
-/** How close `current` has to be to `target`, on both axes, before the rAF
- *  loop stops scheduling itself rather than running forever at a
- *  no-longer-visible fraction of a degree per frame. */
-const TILT_EPSILON = 0.0005
+/** Fraction of the remaining distance to the target closed each frame —
+ *  `cur += (target - cur) * TILT_SMOOTHING`, run every animation frame in
+ *  `useAnimationFrame` below. A plain exponential lerp rather than a
+ *  physically-modelled spring: no overshoot, no bounce, just a fixed
+ *  fraction of catch-up per frame. */
+const TILT_SMOOTHING = 0.18
 
 /** How far sideways a release has to land from where the finger went down
  *  before it reads as a swipe to the next or previous card rather than a
@@ -150,32 +145,29 @@ function Viewer({
   }
 
   /*
-   * The tilt runs entirely on plain refs and a manual rAF loop, never on
-   * React state and never through framer's motion values either.
+   * The tilt runs entirely on motion values, never on React state.
    *
    * It used to setState on every pointermove, which re-rendered this component
    * and the whole Card tree beneath it — nameplate, artwork, orb, every attack
-   * row, the footer's SVGs — sixty times a second. That was the jank. Framer's
-   * motion values fixed that once already (see git history); this keeps that
-   * same shape — the pointer writes a raw target, a per-frame lerp closes a
-   * fixed fraction of the gap every frame — but writes the result straight to
-   * the DOM via `tiltRef` instead of through a motion value, so there is no
-   * framer subscription in the hot path at all, only a ref write. React does
-   * not re-render, and nothing here asks framer to schedule anything, while
-   * the card is turning.
+   * row, the footer's SVGs — sixty times a second. That was the jank. And the
+   * rotation was a spring `animate` target, so each move re-aimed a spring that
+   * was already in flight: it chased the thumb and never arrived.
+   *
+   * Now the pointer writes a raw target value and a per-frame lerp (below)
+   * closes a fixed fraction of the gap to it every frame, writing straight to
+   * `sx`/`sy`. React does not re-render at all while the card is turning.
    */
-  const target = useRef({ x: 0, y: 0 })
-  const current = useRef({ x: 0, y: 0 })
-  const tiltRef = useRef<HTMLDivElement>(null)
-  const rafId = useRef<number | null>(null)
-  const lastTick = useRef<number | null>(null)
+  const px = useMotionValue(0)
+  const py = useMotionValue(0)
+  const sx = useMotionValue(0)
+  const sy = useMotionValue(0)
+
+  useAnimationFrame(() => {
+    sx.set(sx.get() + (px.get() - sx.get()) * TILT_SMOOTHING)
+    sy.set(sy.get() + (py.get() - sy.get()) * TILT_SMOOTHING)
+  })
 
   /*
-   * One frame of the lerp, plus every value that rides on top of the
-   * rotation it produces — written straight to the DOM on `tiltRef`, the
-   * same node `rotateX`/`rotateY` and the four custom properties used to
-   * ride as framer-managed style props.
-   *
    * The two axes lift opposite edges, on purpose — matched directly against
    * a Pokémon TCG Pocket reference recording rather than derived from any
    * single "physical" model, since the reference itself isn't symmetric
@@ -193,118 +185,49 @@ function Viewer({
    * wrong one here — so this axis is negated too, just toward a different
    * visible result than the sideways case.
    */
-  const applyTilt = (x: number, y: number) => {
-    const el = tiltRef.current
-    if (!el) return
+  const rotateY = useTransform(sx, (v) => -v * MAX_TILT)
+  const rotateX = useTransform(sy, (v) => -v * MAX_TILT)
 
-    const rotateY = -x * MAX_TILT
-    const rotateX = -y * MAX_TILT
-    // Framer's own canonical transform order places rotateX before
-    // rotateY; written out by hand here, that order has to be kept
-    // explicit, since the two don't commute in 3D.
-    el.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`
-
-    /*
-     * The light is derived from the rotation, not from the pointer.
-     *
-     * Both were driven off the pointer before, which meant flipping the tilt
-     * silently sent the highlight sweeping against the surface instead of
-     * across it — the sort of mismatch that reads as "wrong" without being
-     * nameable. Taking the rotation as the input makes the two impossible
-     * to desynchronise: whichever way the card faces, the sheen and the
-     * rim's specular follow it.
-     */
-    // Both axes feed the angle, not just rotateY — a pure up/down drag used
-    // to leave this untouched, so tilting the card toward or away from you
-    // swept no sheen at all and read as no different from the resting
-    // card. The rim's own highlight already takes both axes; the sheen
-    // just hadn't caught up.
-    //
-    // Equal weight on both axes (2.6 and 2.6) was the wrong way to fix
-    // that: rotateY and rotateX can carry opposite signs — a bottom-right
-    // or top-left corner drag is exactly that — and with matching
-    // coefficients the two terms partially cancel instead of adding, so
-    // the corners along that diagonal barely moved the sheen at all while
-    // the other diagonal (top-right, bottom-left) swept twice as far as
-    // intended. Uneven coefficients, the same idea rimBase uses below,
-    // mean no direction cancels: every corner still gets a real, visible
-    // sweep, just not identical in size to its neighbor.
-    const holoAngle = 115 + rotateY * 2.6 + rotateX * 1
-    const rimBase = 218 + rotateY * 1.9 + rotateX
-    const lit = Math.min(1, Math.hypot(x, y))
-    // A high resting floor on purpose. At 0.15 a card sitting still carried
-    // almost no highlight and read closer to matte than to metal — polished
-    // metal is bright before you move it, and only *changes* when you do.
-    const holoOpacity = 0.5 + lit * 0.45
-    const glint = 0.38 + lit * 0.62
-
-    el.style.setProperty('--holo-angle', `${holoAngle}deg`)
-    el.style.setProperty('--holo-opacity', `${holoOpacity}`)
-    el.style.setProperty('--rim-base', `${rimBase}deg`)
-    el.style.setProperty('--rim-glint', `${glint}`)
-  }
-
-  // One rAF step: advance the lerp by a fraction of the gap scaled to the
-  // actual elapsed time (so 120Hz closes the same ground per *second* as
-  // 60Hz, just in twice as many smaller steps), then either schedule the
-  // next frame or, once both axes are within `TILT_EPSILON` of the target,
-  // snap exactly onto it and stop — a loop that runs forever at a
-  // no-longer-visible fraction of a degree per frame is pure waste.
-  const tick = (now: number) => {
-    const last = lastTick.current ?? now
-    const dt = now - last
-    lastTick.current = now
-
-    const t = 1 - Math.pow(1 - TILT_SMOOTHING, dt / REFERENCE_FRAME_MS)
-    const cur = current.current
-    const tgt = target.current
-    cur.x += (tgt.x - cur.x) * t
-    cur.y += (tgt.y - cur.y) * t
-
-    const settled = Math.abs(tgt.x - cur.x) < TILT_EPSILON && Math.abs(tgt.y - cur.y) < TILT_EPSILON
-    if (settled) {
-      cur.x = tgt.x
-      cur.y = tgt.y
-    }
-    applyTilt(cur.x, cur.y)
-
-    if (settled) {
-      rafId.current = null
-      lastTick.current = null
-    } else {
-      rafId.current = requestAnimationFrame(tick)
-    }
-  }
-
-  // Kicks the loop if it isn't already running — called after every change
-  // to `target` (and the one place that also snaps `current` directly, the
-  // engage below), so the loop only ever exists while there is somewhere
-  // left to go.
-  const startTiltLoop = () => {
-    if (rafId.current !== null) return
-    lastTick.current = null
-    rafId.current = requestAnimationFrame(tick)
-  }
-
-  // Paints the resting state once before the browser's first paint, the
-  // same thing framer's motion values used to do by resolving eagerly on
-  // mount. `--holo-opacity` and `--rim-glint` carry different fallbacks in
-  // card.css (0.75 and 0.15) for a card with no tilt system riding it at
-  // all — a plain binder thumbnail, say — so skipping this would flash
-  // that duller default before the first real frame ever ran.
-  useLayoutEffect(() => {
-    applyTilt(0, 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // The loop is only ever started from `track`/`level` below, never left
-  // running past the point it converges — but if the card closes mid-drag,
-  // nothing else would ever cancel an in-flight frame.
-  useEffect(() => {
-    return () => {
-      if (rafId.current !== null) cancelAnimationFrame(rafId.current)
-    }
-  }, [])
+  /*
+   * The light is derived from the rotation, not from the pointer.
+   *
+   * Both were driven off the pointer before, which meant flipping the tilt
+   * silently sent the highlight sweeping against the surface instead of across
+   * it — the sort of mismatch that reads as "wrong" without being nameable.
+   * Taking the rotation as the input makes the two impossible to desynchronise:
+   * whichever way the card faces, the sheen and the rim's specular follow it.
+   */
+  // Both axes feed the angle, not just rotateY — a pure up/down drag used to
+  // leave this untouched, so tilting the card toward or away from you swept
+  // no sheen at all and read as no different from the resting card. The
+  // rim's own highlight (below) already took both axes; the sheen just
+  // hadn't caught up.
+  //
+  // Equal weight on both axes (2.6 and 2.6) was the wrong way to fix that:
+  // rotateY and rotateX can carry opposite signs — a bottom-right or
+  // top-left corner drag is exactly that — and with matching coefficients
+  // the two terms partially cancel instead of adding, so the corners along
+  // that diagonal barely moved the sheen at all while the other diagonal
+  // (top-right, bottom-left) swept twice as far as intended. Uneven
+  // coefficients, the same idea rimBase already uses below, mean no
+  // direction cancels: every corner still gets a real, visible sweep, just
+  // not identical in size to its neighbor.
+  const holoAngle = useMotionTemplate`${useTransform(
+    [rotateY, rotateX] as const,
+    ([y = 0, x = 0]: number[]) => 115 + y * 2.6 + x * 1,
+  )}deg`
+  const rimBase = useMotionTemplate`${useTransform(
+    [rotateY, rotateX] as const,
+    ([y = 0, x = 0]: number[]) => 218 + y * 1.9 + x,
+  )}deg`
+  const lit = useTransform([sx, sy] as const, ([x = 0, y = 0]: number[]) =>
+    Math.min(1, Math.hypot(x, y)),
+  )
+  const holoOpacity = useTransform(lit, (v) => 0.5 + v * 0.45)
+  // A high resting floor on purpose. At 0.15 a card sitting still carried
+  // almost no highlight and read closer to matte than to metal — polished metal
+  // is bright before you move it, and only *changes* when you do.
+  const glint = useTransform(lit, (v) => 0.38 + v * 0.62)
 
   // Two sources feed the same flag: the OS's own prefers-reduced-motion, and
   // the player's "Simplify effects" switch in Menu → Graphics. Read directly
@@ -405,18 +328,18 @@ function Viewer({
     // ever-growing value out past the card.
     const nx = clamp(((e.clientX - r.left) / r.width - 0.5) * 2, -1, 1)
     const ny = clamp(((e.clientY - r.top) / r.height - 0.5) * 2, -1, 1)
-    target.current = { x: nx, y: ny }
+    px.set(nx)
+    py.set(ny)
     if (engaging.current) {
       engaging.current = false
-      current.current = { x: nx, y: ny }
-      applyTilt(nx, ny)
+      sx.set(nx)
+      sy.set(ny)
     }
-    startTiltLoop()
   }
 
   const level = () => {
-    target.current = { x: 0, y: 0 }
-    startTiltLoop()
+    px.set(0)
+    py.set(0)
   }
 
   /*
@@ -579,6 +502,14 @@ function Viewer({
           */}
           <div style={{ position: 'relative', width: '100%', aspectRatio: '63 / 88' }}>
             {/*
+              The custom properties ride the motion element, not the Card.
+              framer-motion only subscribes a motion value on a component it
+              owns, and Card is a plain function that spreads `style` onto an
+              article — handed motion values there, React stringified them and
+              the rim sat frozen at its rest angle. Set here they inherit down
+              to the rim and the sheen, which is what `inherits: true` on each
+              @property is for.
+
               Keyed on the card's own id: framer only plays enter/exit for an
               element it sees replaced, not one that merely got new props, so
               swapping the id is what turns "the card changed" into an actual
@@ -586,46 +517,31 @@ function Viewer({
               the presence group is what keeps the *first* card from playing
               this same enter every time the viewer itself opens — that
               entrance already belongs to the outer frame's own scale-in.
-
-              This element carries the swipe (`variants`/`x`) and nothing
-              else now — the tilt used to ride the same `style` as
-              `rotateX`/`rotateY` motion values, which framer composed
-              together with the swipe's own `x` into one `transform`. Now
-              that the tilt writes to `style.transform` directly on a plain
-              ref every frame (see `tiltRef` above), it can't share this
-              element with framer any more — two different things writing
-              the same CSS property every frame would just stomp each
-              other — so the tilt gets its own plain child below instead,
-              and this one goes back to being framer's alone.
             */}
             <AnimatePresence initial={false} custom={swipeDir}>
               <motion.div
                 key={card.id}
                 custom={swipeDir}
-                style={{ position: 'absolute', inset: 0 }}
+                style={
+                  {
+                    position: 'absolute',
+                    inset: 0,
+                    rotateX,
+                    rotateY,
+                    transformStyle: 'preserve-3d',
+                    '--holo-angle': holoAngle,
+                    '--holo-opacity': holoOpacity,
+                    '--rim-base': rimBase,
+                    '--rim-glint': glint,
+                  } as React.ComponentProps<typeof motion.div>['style']
+                }
                 variants={SWIPE_VARIANTS}
                 initial="enter"
                 animate="center"
                 exit="exit"
                 transition={{ type: 'spring', stiffness: 380, damping: 34 }}
               >
-                {/*
-                  The custom properties ride this element, not the Card.
-                  Framer used to need them on a component it owns to
-                  subscribe its motion values; now they're plain inline
-                  styles written by `applyTilt`, but they still have to sit
-                  somewhere between the swipe wrapper above and `Card`
-                  below for the same reason as before — Card is a plain
-                  function that spreads `style` onto an article, and the
-                  rim/sheen read these via CSS inheritance (`inherits: true`
-                  on each @property), which only reaches down, never across.
-                */}
-                <div
-                  ref={tiltRef}
-                  style={{ width: '100%', height: '100%', transformStyle: 'preserve-3d' }}
-                >
-                  <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
-                </div>
+                <Card card={card} style={{ boxShadow: 'var(--shadow-card-lifted)' }} />
               </motion.div>
             </AnimatePresence>
           </div>
